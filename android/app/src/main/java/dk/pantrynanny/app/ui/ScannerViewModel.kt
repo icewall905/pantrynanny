@@ -105,6 +105,8 @@ class ScannerViewModel(private val c: AppContainer) : ViewModel() {
 
     /** Called on the camera analysis thread for every decoded frame. */
     fun onDecoded(raw: String, format: Int) {
+        // Blank after the backend strip rule: the server would reject the op (422), so never enqueue it.
+        if (BarcodeNormalizer.isBlank(raw)) return
         val symbology = symbologyFor(format)
         val checksumValid = BarcodeNormalizer.normalize(raw, symbology).valid
         if (!dedup.onDecoded(raw, checksumValid)) return

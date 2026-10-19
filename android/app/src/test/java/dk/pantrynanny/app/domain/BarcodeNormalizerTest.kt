@@ -3,6 +3,7 @@ package dk.pantrynanny.app.domain
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -122,7 +123,78 @@ class BarcodeNormalizerTest {
     @Test
     fun oddLengthsAreLocal() {
         assertEquals("local:12345", BarcodeNormalizer.normalize("12345").code)
-        assertEquals("local:", BarcodeNormalizer.normalize("").code)
+    }
+
+    // Parity vectors mirrored from backend/tests/test_barcodes.py (keep the two lists in sync).
+    @Test
+    fun stripParityVectors() {
+        val raws = listOf(
+            "5701234567899",
+            "\t5701234567899\r\n",
+            "\u001D5701234567899\u001D", // GS1 group separator
+            "\u001C\u001E\u001F5701234567899",
+            "\u00855701234567899\u00A0", // NEL, NBSP
+            "\uFEFF5701234567899", // BOM
+            "\u000B\u000C 5701234567899 ",
+            "5 701234 567899", // inner ASCII whitespace ignored
+        )
+        for (raw in raws) {
+            val r = BarcodeNormalizer.normalize(raw)
+            assertEquals(raw, "05701234567899", r.code)
+            assertTrue(raw, r.valid)
+        }
+    }
+
+    @Test
+    fun nonAsciiDigitsAndInnerSeparatorsAreLocal() {
+        val raws = listOf(
+            "570123456789\u00B2", // superscript two
+            "\u0665\u0667\u0660\u0661234567899", // Arabic-Indic digits
+            "5701234567899\u200B", // zero-width space is NOT stripped
+            "57\u00A001234567899", // inner NBSP is not ignorable
+            "57\u001D01234567899", // inner separators are not ignorable
+            "\uFF15701234567899", // full-width digit
+        )
+        for (raw in raws) {
+            val r = BarcodeNormalizer.normalize(raw)
+            assertFalse(raw, r.valid)
+            assertEquals("local:" + BarcodeNormalizer.strip(raw), r.code)
+        }
+    }
+
+    @Test
+    fun crossImplementationVectors() {
+        val vectors = listOf(
+            "5701234567899\u001D" to "05701234567899",
+            "\u001D5701234567899" to "05701234567899",
+            "\uFEFF5701234567899" to "05701234567899",
+            " 5701234567899\u0085" to "05701234567899",
+            "570 1234 567899" to "05701234567899",
+            "\u200B5701234567899" to "local:\u200B5701234567899",
+            "570123456789\u00B2" to "local:570123456789\u00B2",
+            "5701234567892\u001D" to "local:5701234567892",
+            "\uFF15\uFF17\uFF10\uFF11\uFF12\uFF13\uFF14\uFF15\uFF16\uFF17\uFF18\uFF19\uFF19" to
+                "local:\uFF15\uFF17\uFF10\uFF11\uFF12\uFF13\uFF14\uFF15\uFF16\uFF17\uFF18\uFF19\uFF19",
+            "\u0665\u0667\u0660\u0661\u0662\u0663\u0664\u0665\u0666\u0667\u0668\u0669\u0669" to
+                "local:\u0665\u0667\u0660\u0661\u0662\u0663\u0664\u0665\u0666\u0667\u0668\u0669\u0669",
+        )
+        for ((raw, code) in vectors) assertEquals(raw, code, BarcodeNormalizer.normalize(raw).code)
+    }
+
+    @Test
+    fun unicodeSpacesOutsideTheRuleAreKept() {
+        // Kotlin trim() would strip these; the backend does not.
+        assertEquals("local:\u20035701234567899", BarcodeNormalizer.normalize("\u20035701234567899").code)
+        assertEquals("local:57\u200301234567899", BarcodeNormalizer.normalize("57\u200301234567899").code)
+    }
+
+    @Test
+    fun blankAfterStripIsRejected() {
+        for (raw in listOf("", "  ", "\t\n", "\u001D\u001C", "\u00A0\uFEFF\u0085")) {
+            assertTrue(raw, BarcodeNormalizer.isBlank(raw))
+            assertThrows(IllegalArgumentException::class.java) { BarcodeNormalizer.normalize(raw) }
+        }
+        assertFalse(BarcodeNormalizer.isBlank(" 1 "))
     }
 
     @Test

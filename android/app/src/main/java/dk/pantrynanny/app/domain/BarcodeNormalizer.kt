@@ -2,7 +2,10 @@ package dk.pantrynanny.app.domain
 
 data class NormalizedBarcode(val code: String, val symbology: String?, val valid: Boolean)
 
-/** Kotlin port of the barcode normalisation in docs/api-contract.md section 6. */
+/**
+ * Kotlin port of backend/pantrynanny/services/barcodes.py `normalize` (docs/api-contract.md section 6).
+ * Keep in parity: BarcodeNormalizerTest mirrors the backend parity vectors.
+ */
 object BarcodeNormalizer {
 
     private val NON_GTIN = setOf("qr", "data_matrix", "code_128", "code_39")
@@ -10,13 +13,32 @@ object BarcodeNormalizer {
         "ean_13", "ean_8", "upc_a", "upc_e", "code_128", "code_39", "itf", "qr", "data_matrix", "other",
     )
 
+    /**
+     * Characters stripped from BOTH ENDS of a scanned value (must equal the backend rule exactly):
+     * ASCII whitespace (U+0009-000D, U+0020), U+001C-001F (incl. the GS1 group separator U+001D),
+     * U+0085, U+00A0 and U+FEFF. Deliberately not Kotlin trim()/isWhitespace(), which differ.
+     */
+    fun isStripChar(c: Char): Boolean =
+        c in '\u0009'..'\u000D' || c == ' ' || c in '\u001C'..'\u001F' ||
+            c == '\u0085' || c == '\u00A0' || c == '\uFEFF'
+
+    fun strip(raw: String): String = raw.trim(::isStripChar)
+
+    /** True when nothing is left after stripping: such a value is invalid and must not be enqueued. */
+    fun isBlank(raw: String): Boolean = strip(raw).isEmpty()
+
+    private fun isAsciiWhitespace(c: Char): Boolean = c in '\u0009'..'\u000D' || c == ' '
+
+    /** @throws IllegalArgumentException when [raw] is blank after stripping (check [isBlank] first). */
     fun normalize(raw: String, symbologyHint: String? = null): NormalizedBarcode {
-        val stripped = raw.trim()
+        val stripped = strip(raw)
+        require(stripped.isNotEmpty()) { "empty barcode" }
         val hint = symbologyHint?.takeIf { it in KNOWN }
         // Non-GTIN symbologies never take the GTIN path (same as the backend).
         if (hint in NON_GTIN) return local(stripped, hint)
 
-        val digits = stripped.filter { !it.isWhitespace() }
+        // Inner ASCII whitespace is ignored; digits means ASCII 0-9 only.
+        val digits = stripped.filterNot(::isAsciiWhitespace)
         if (digits.isEmpty() || !digits.all { it in '0'..'9' }) return local(stripped, hint)
 
         val n = digits.length
@@ -40,8 +62,8 @@ object BarcodeNormalizer {
         return NormalizedBarcode(digits.padStart(14, '0'), kind, true)
     }
 
-    private fun local(trimmedRaw: String, symbology: String?) =
-        NormalizedBarcode("local:$trimmedRaw", symbology ?: "other", false)
+    private fun local(strippedRaw: String, symbology: String?) =
+        NormalizedBarcode("local:$strippedRaw", symbology ?: "other", false)
 
     /** Mod-10 (GS1) check over the whole string, the last digit being the check digit. */
     fun hasValidCheckDigit(digits: String): Boolean {
