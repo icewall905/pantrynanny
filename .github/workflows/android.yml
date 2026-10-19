@@ -63,6 +63,16 @@ jobs:
       # Signed release for Obtainium: every push to main that touches android/ publishes
       # android-v0.1.<commit count> with pantrynanny-0.1.<n>.apk. Needs the four ANDROID_* secrets
       # (see android/README.md); without them this step is skipped and CI stays green.
+      - name: Report signing secrets (presence only)
+        env:
+          A: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+          B: ${{ secrets.ANDROID_KEYSTORE_PASSWORD != '' }}
+          C: ${{ secrets.ANDROID_KEY_ALIAS != '' }}
+          D: ${{ secrets.ANDROID_KEY_PASSWORD != '' }}
+        run: |
+          echo "ANDROID_KEYSTORE_BASE64=$A ANDROID_KEYSTORE_PASSWORD=$B ANDROID_KEY_ALIAS=$C ANDROID_KEY_PASSWORD=$D"
+          echo "::notice::signing secrets present: keystore=$A storePw=$B alias=$C keyPw=$D"
+
       - name: Publish signed release APK
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && env.HAS_KEYSTORE == 'true'
         env:
