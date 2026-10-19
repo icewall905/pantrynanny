@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Check, ClipboardCopy, Download, Lightbulb, Minus, PackageCheck, Plus, ShoppingBasket, Store, Trash2 } from 'lucide-react'
@@ -140,7 +140,7 @@ export default function ShoppingPage() {
   }
   const [editing, setEditing] = useState<ShoppingItem | null>(null)
   const [putAway, setPutAway] = useState(false)
-  const stores = useMemo(() => [...new Set(items.map((i) => i.store).filter((s): s is string => !!s))].sort(), [items])
+  const stores = [...new Set(items.map((i) => i.store).filter((s): s is string => !!s))].sort()
   const groups =
     groupBy === 'store'
       ? [...stores, null].map((st) => ({

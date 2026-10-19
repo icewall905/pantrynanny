@@ -84,7 +84,7 @@
     "you": "You",
     "assistantName": "Assistant",
     "thinking": "Thinking it over… the local AI can take up to a minute.",
-    "readOnly": "The assistant can only read your inventory; it never changes anything.",
+    "readOnly": "The assistant reads your stock, recipes and meal plan. It never changes anything itself – suggested actions appear as buttons you confirm.",
     "usedTools": "Looked up: {{tools}}",
     "retry": "Try again",
     "errorUnavailable": "The assistant cannot be reached right now. The rest of the app works as usual.",
@@ -108,7 +108,14 @@
     "nothingMissing": "You have everything you need.",
     "noRecipes": "No suggestions yet",
     "noRecipesHint": "Press the button to get suggestions based on what you have in stock.",
-    "aiNote": "AI suggestions can be wrong. Always check expiry dates and ingredients yourself."
+    "aiNote": "AI suggestions can be wrong. Always check expiry dates and ingredients yourself.",
+    "proposals": "Suggested actions",
+    "prop_shopping_add": "Add to shopping list",
+    "prop_meal_plan": "Plan",
+    "prop_consume": "Take out of stock",
+    "propConfirm": "tap to confirm",
+    "propDone": "done",
+    "propFailed": "failed – try again"
   },
   "dashboard": {
     "title": "Overview",

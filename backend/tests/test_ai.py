@@ -201,9 +201,9 @@ async def test_tool_loop_runs_tools_on_real_inventory(env, app):
     assert tool_msg["content"].startswith("<<<PANTRY_DATA") and "untrusted" in tool_msg["content"]
     third = fake.requests[2]["messages"]
     assert "Mælk" in [m for m in third if m["role"] == "tool"][1]["content"]
-    assert fake.requests[0]["tools"] and len(fake.requests[0]["tools"]) == 6
+    assert fake.requests[0]["tools"] and len(fake.requests[0]["tools"]) == 12
     system = fake.requests[0]["messages"][0]["content"]
-    assert "skrivebeskyttet" in system and "DATA" in system
+    assert "IKKE selv ændre" in system and "FORESLÅ" in system and "DATA" in system
 
 
 async def test_tool_loop_max_rounds(env, app):
@@ -260,7 +260,8 @@ async def test_tools_household_isolated_and_read_only(env, other_env, app):
     assert "Hemmelig ost" not in blob
     assert "product not found" in blob
     assert (await env.client.get("/api/inventory", headers=env.member)).json() == before
-    # No write tool is advertised and unknown tools are refused.
+    # No write tool is advertised (propose_* only record a suggestion for the user to confirm,
+    # see test_ai_actions.py) and unknown tools are refused.
     names = {t["function"]["name"] for t in fake.requests[0]["tools"]}
     assert names == {
         "search_inventory",
@@ -269,6 +270,12 @@ async def test_tools_household_isolated_and_read_only(env, other_env, app):
         "get_product_details",
         "get_low_stock_items",
         "get_shopping_list",
+        "what_can_we_cook",
+        "get_meal_plan",
+        "get_running_out",
+        "propose_add_to_shopping",
+        "propose_plan_meal",
+        "propose_use_up",
     }
 
 

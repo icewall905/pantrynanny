@@ -9,9 +9,9 @@ import json
 import re
 import unicodedata
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, timedelta
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 from sqlalchemy import select
@@ -51,6 +51,9 @@ class ToolContext:
     session: AsyncSession
     household_id: uuid.UUID
     today: date
+    # Actions the model suggested. They are only shown to the user as confirm buttons; nothing
+    # here is ever executed by the server on the model's behalf.
+    proposals: list[dict[str, Any]] = field(default_factory=list)
 
 
 # --------------------------------------------------------------------------- argument schemas
@@ -85,6 +88,37 @@ class ProductDetailsArgs(_Args):
 
 class NoArgs(_Args):
     pass
+
+
+class CookArgs(_Args):
+    max_minutes: int | None = Field(default=None, ge=1, le=1000, description="Max total time")
+
+
+class MealPlanArgs(_Args):
+    days: int = Field(default=7, ge=1, le=14, description="Days ahead from today (1-14)")
+
+
+class RunningOutArgs(_Args):
+    days: int = Field(default=7, ge=1, le=60, description="Look-ahead window in days")
+
+
+class ProposeShoppingArgs(_Args):
+    name: str = Field(min_length=1, max_length=100, description="What to buy")
+    quantity: float = Field(default=1, gt=0, le=100)
+
+
+class ProposeMealArgs(_Args):
+    recipe: str = Field(min_length=1, max_length=200, description="Title of a saved recipe")
+    day: date = Field(description="YYYY-MM-DD")
+    slot: Literal["breakfast", "lunch", "dinner", "snack"] = "dinner"
+
+
+class ProposeUseArgs(_Args):
+    product: str = Field(min_length=1, max_length=100, description="Product name or id in stock")
+    quantity: float = Field(default=1, gt=0, le=1000)
+
+
+MAX_PROPOSALS = 5
 
 
 # --------------------------------------------------------------------------- data helpers
@@ -276,6 +310,135 @@ async def get_shopping_list(ctx: ToolContext, a: NoArgs) -> dict:
     return _items_result(items)
 
 
+async def what_can_we_cook(ctx: ToolContext, a: CookArgs) -> dict:
+    from ..services import recipes as rsvc  # local import: recipes depend on inventory
+
+    recipes = await rsvc.list_recipes(ctx.session, ctx.household_id)
+    products = await rsvc.pantry(ctx.session, ctx.household_id)
+    pairs = [(r, rsvc.availability(r, products, today=ctx.today)) for r in recipes]
+    items = []
+    for r, av in rsvc.rank(pairs, max_minutes=a.max_minutes)[:15]:
+        items.append(
+            {
+                "recipe": clean(r.title),
+                "minutes": (r.prep_min or 0) + (r.cook_min or 0) or None,
+                "servings": r.servings,
+                "missing": [
+                    clean(i.ingredient.name, 60) for i in av.items if i.status == "missing"
+                ],
+                "not_enough": [clean(i.ingredient.name, 60) for i in av.items if i.status == "low"],
+                "uses_expiring": [clean(x, 60) for x in av.uses_expiring],
+            }
+        )
+    return _items_result(items, {"saved_recipes": len(recipes)})
+
+
+async def get_meal_plan(ctx: ToolContext, a: MealPlanArgs) -> dict:
+    from ..models import MealPlanEntry, Recipe
+
+    rows = (
+        await ctx.session.execute(
+            select(MealPlanEntry, Recipe.title)
+            .outerjoin(Recipe, Recipe.id == MealPlanEntry.recipe_id)
+            .where(
+                MealPlanEntry.household_id == ctx.household_id,
+                MealPlanEntry.day >= ctx.today,
+                MealPlanEntry.day < ctx.today + timedelta(days=a.days),
+            )
+            .order_by(MealPlanEntry.day)
+        )
+    ).all()
+    items = [
+        {
+            "day": e.day.isoformat(),
+            "slot": e.slot,
+            "meal": clean(title or e.title or ""),
+            **({"cooked": True} if e.cooked_at else {}),
+        }
+        for e, title in rows
+    ]
+    return _items_result(items, {"from": ctx.today.isoformat()})
+
+
+async def get_running_out(ctx: ToolContext, a: RunningOutArgs) -> dict:
+    from ..services.forecast import forecasts
+
+    rows = await forecasts(ctx.session, ctx.household_id, horizon_days=a.days)
+    items = [
+        {
+            "name": clean(f.product.name),
+            "quantity": _qty(f.total),
+            "unit": clean(f.product.stock_unit, 8),
+            "days_left": round(f.days_left, 1),
+            "confidence": f.confidence,
+        }
+        for f in rows
+    ]
+    return _items_result(items, {"window_days": a.days})
+
+
+def _propose(ctx: ToolContext, kind: str, label: str, payload: dict) -> dict:
+    if len(ctx.proposals) >= MAX_PROPOSALS:
+        return {"error": "too many proposals in one answer"}
+    pid = f"p{len(ctx.proposals) + 1}"
+    ctx.proposals.append({"id": pid, "kind": kind, "label": label[:200], "payload": payload})
+    return {
+        "status": "proposed",
+        "id": pid,
+        "note": "Nothing has changed. The user sees a button and decides; tell them to confirm.",
+    }
+
+
+async def _find_product(ctx: ToolContext, text: str, in_stock: bool) -> StockView | None:
+    views = await list_inventory(ctx.session, ctx.household_id, include_empty=not in_stock)
+    try:
+        pid = uuid.UUID(text)
+        return next((v for v in views if v.product.id == pid), None)
+    except ValueError:
+        pass
+    want = norm(text)
+    return next((v for v in views if norm(v.product.name) == want), None) or next(
+        (v for v in views if want in norm(v.product.name)), None
+    )
+
+
+async def propose_add_to_shopping(ctx: ToolContext, a: ProposeShoppingArgs) -> dict:
+    v = await _find_product(ctx, a.name, in_stock=False)
+    name = clean(v.product.name if v else a.name)
+    qty = round(a.quantity, 3)
+    payload = {"name": name, "quantity": qty, "product_id": str(v.product.id) if v else None}
+    return _propose(ctx, "shopping_add", f"{name} × {qty:g}", payload)
+
+
+async def propose_plan_meal(ctx: ToolContext, a: ProposeMealArgs) -> dict:
+    from ..services import recipes as rsvc
+
+    if a.day < ctx.today or a.day > ctx.today + timedelta(days=60):
+        return {"error": "day must be between today and 60 days ahead"}
+    recipes = await rsvc.list_recipes(ctx.session, ctx.household_id)
+    want = norm(a.recipe)
+    r = next((x for x in recipes if norm(x.title) == want), None) or next(
+        (x for x in recipes if want in norm(x.title)), None
+    )
+    if r is None:
+        return {
+            "error": "no saved recipe with that title",
+            "saved": [clean(x.title) for x in recipes[:20]],
+        }
+    payload = {"recipe_id": str(r.id), "day": a.day.isoformat(), "slot": a.slot}
+    return _propose(ctx, "meal_plan", f"{clean(r.title)} · {a.day.isoformat()} · {a.slot}", payload)
+
+
+async def propose_use_up(ctx: ToolContext, a: ProposeUseArgs) -> dict:
+    v = await _find_product(ctx, a.product, in_stock=True)
+    if v is None or v.total <= 0:
+        return {"error": "that product is not in stock"}
+    qty = round(min(a.quantity, float(v.total)), 3)
+    name = clean(v.product.name)
+    payload = {"product_id": str(v.product.id), "quantity": qty, "name": name}
+    return _propose(ctx, "consume", f"{name} − {qty:g}", payload)
+
+
 @dataclass(frozen=True, slots=True)
 class Tool:
     name: str
@@ -322,6 +485,45 @@ TOOLS: dict[str, Tool] = {
             "Show the open (unchecked) items on the shopping list.",
             NoArgs,
             get_shopping_list,
+        ),
+        Tool(
+            "what_can_we_cook",
+            "Rank the household's SAVED recipes by what is in stock now (missing items, "
+            "expiring food they use up). Use this for 'what can we make' questions.",
+            CookArgs,
+            what_can_we_cook,
+        ),
+        Tool(
+            "get_meal_plan",
+            "Show the planned meals from today for N days.",
+            MealPlanArgs,
+            get_meal_plan,
+        ),
+        Tool(
+            "get_running_out",
+            "Products expected to run out within N days at the household's usual pace.",
+            RunningOutArgs,
+            get_running_out,
+        ),
+        Tool(
+            "propose_add_to_shopping",
+            "PROPOSE adding an item to the shopping list. Does not change anything: the user "
+            "gets a confirm button.",
+            ProposeShoppingArgs,
+            propose_add_to_shopping,
+        ),
+        Tool(
+            "propose_plan_meal",
+            "PROPOSE putting a saved recipe on the meal plan for a day. The user confirms.",
+            ProposeMealArgs,
+            propose_plan_meal,
+        ),
+        Tool(
+            "propose_use_up",
+            "PROPOSE taking a quantity of a product out of stock (it was eaten/used). The user "
+            "confirms; never assume it happened.",
+            ProposeUseArgs,
+            propose_use_up,
         ),
     )
 }

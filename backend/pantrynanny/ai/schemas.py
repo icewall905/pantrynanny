@@ -39,10 +39,21 @@ class ToolCallOut(BaseModel):
     arguments: dict
 
 
+class Proposal(BaseModel):
+    """An action the assistant suggests. Shown as a button; only the user can carry it out
+    (through the normal, validated endpoints)."""
+
+    id: str
+    kind: Literal["shopping_add", "meal_plan", "consume"]
+    label: str
+    payload: dict
+
+
 class ChatOut(BaseModel):
     reply: str
     tool_calls: list[ToolCallOut]
     model: str | None
+    proposals: list[Proposal] = Field(default_factory=list)
 
 
 class RecipesIn(BaseModel):

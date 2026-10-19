@@ -298,4 +298,11 @@ export interface ChatReply {
   reply: string
   tool_calls: { name: string; arguments: Record<string, unknown> }[]
   model: string | null
+  /** suggested actions: shown as buttons, executed only when the user taps confirm */
+  proposals?: Proposal[]
 }
+
+export type Proposal =
+  | { id: string; kind: 'shopping_add'; label: string; payload: { name: string; quantity: number; product_id: string | null } }
+  | { id: string; kind: 'meal_plan'; label: string; payload: { recipe_id: string; day: string; slot: string } }
+  | { id: string; kind: 'consume'; label: string; payload: { product_id: string; quantity: number; name: string } }

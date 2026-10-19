@@ -84,7 +84,7 @@
     "you": "Dig",
     "assistantName": "Assistent",
     "thinking": "Tænker lige over det… den lokale AI kan bruge op til et minut.",
-    "readOnly": "Assistenten kan kun læse dit lager – den ændrer aldrig noget.",
+    "readOnly": "Assistenten læser jeres lager, opskrifter og madplan. Den ændrer aldrig noget selv – foreslåede handlinger vises som knapper, I bekræfter.",
     "usedTools": "Slog op: {{tools}}",
     "retry": "Prøv igen",
     "errorUnavailable": "Assistenten kan ikke nås lige nu. Resten af appen virker som normalt.",
@@ -108,7 +108,14 @@
     "nothingMissing": "Du har alt hvad du skal bruge.",
     "noRecipes": "Ingen forslag endnu",
     "noRecipesHint": "Tryk på knappen for at få forslag ud fra det du har på lager.",
-    "aiNote": "AI-forslag kan tage fejl. Tjek altid holdbarhed og ingredienser selv."
+    "aiNote": "AI-forslag kan tage fejl. Tjek altid holdbarhed og ingredienser selv.",
+    "proposals": "Foreslåede handlinger",
+    "prop_shopping_add": "Sæt på indkøbslisten",
+    "prop_meal_plan": "Planlæg",
+    "prop_consume": "Træk fra lageret",
+    "propConfirm": "tryk for at bekræfte",
+    "propDone": "udført",
+    "propFailed": "fejlede – prøv igen"
   },
   "dashboard": {
     "title": "Overblik",

@@ -1,9 +1,11 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useMutation } from '@tanstack/react-query'
-import { Bot, Loader2, RotateCcw, Send, User } from 'lucide-react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Bot, CalendarPlus, Check, Loader2, MinusCircle, RotateCcw, Send, ShoppingBasket, User } from 'lucide-react'
 import { ApiError, post } from '../../api/client'
-import type { ChatMessage, ChatReply } from '../../api/types'
+import type { ChatMessage, ChatReply, Proposal } from '../../api/types'
+import { useInvalidateStock } from '../../api/queries'
+import { enqueueOp } from '../../offline'
 import { Button, Card, Chip } from '../ui'
 import { cn } from '../../lib/format'
 
@@ -39,6 +41,49 @@ export function historyPayload(entries: ChatMessage[]): ChatMessage[] {
 
 interface Entry extends ChatMessage {
   tools?: string[]
+  proposals?: Proposal[]
+}
+
+const ICONS = { shopping_add: ShoppingBasket, meal_plan: CalendarPlus, consume: MinusCircle } as const
+
+/** One suggested action. Nothing happens until the user taps it; it then goes through the same
+ * validated endpoints/stock ops as a manual change. */
+function ProposalButton({ p }: { p: Proposal }) {
+  const { t } = useTranslation()
+  const qc = useQueryClient()
+  const invalidate = useInvalidateStock()
+  const run = useMutation({
+    mutationFn: async () => {
+      if (p.kind === 'shopping_add')
+        await post('/shopping', p.payload.product_id ? { product_id: p.payload.product_id, quantity: p.payload.quantity } : { name: p.payload.name, quantity: p.payload.quantity })
+      else if (p.kind === 'meal_plan') await post('/meal-plan', p.payload)
+      else await enqueueOp({ type: 'remove', product_id: p.payload.product_id, quantity: p.payload.quantity, reason: 'assistant' })
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['shopping'] })
+      void qc.invalidateQueries({ queryKey: ['meal-plan'] })
+      void invalidate()
+    },
+  })
+  const Icon = run.isSuccess ? Check : ICONS[p.kind]
+  return (
+    <button
+      type="button"
+      disabled={run.isPending || run.isSuccess}
+      onClick={() => run.mutate()}
+      data-testid="proposal"
+      className={cn(
+        'flex min-h-11 items-center gap-2 rounded-xl px-3 text-left text-sm font-semibold ring-1 transition',
+        run.isSuccess ? 'bg-leaf-100 text-leaf-700 ring-leaf-500/30' : run.isError ? 'bg-tomato-50 text-tomato-600 ring-tomato-500/30' : 'bg-surface ring-cream-200 hover:bg-cream-200/70',
+      )}
+    >
+      {run.isPending ? <Loader2 className="size-4 animate-spin" /> : <Icon className="size-4 shrink-0" />}
+      <span className="min-w-0 flex-1">
+        {t(`assistant.prop_${p.kind}`)}: {p.label}
+      </span>
+      <span className="text-xs font-normal text-ink-500">{run.isSuccess ? t('assistant.propDone') : run.isError ? t('assistant.propFailed') : t('assistant.propConfirm')}</span>
+    </button>
+  )
 }
 
 export default function ChatPanel({ locale }: { locale: 'da' | 'en' }) {
@@ -51,7 +96,10 @@ export default function ChatPanel({ locale }: { locale: 'da' | 'en' }) {
     mutationFn: (messages: ChatMessage[]) =>
       post<ChatReply>('/ai/chat', { messages, locale }, { timeoutMs: 180_000 }),
     onSuccess: (r) =>
-      setEntries((l) => [...l, { role: 'assistant', content: r.reply, tools: [...new Set(r.tool_calls.map((c) => c.name))] }]),
+      setEntries((l) => [
+        ...l,
+        { role: 'assistant', content: r.reply, tools: [...new Set(r.tool_calls.map((c) => c.name))], proposals: r.proposals ?? [] },
+      ]),
   })
 
   useEffect(() => {
@@ -97,6 +145,13 @@ export default function ChatPanel({ locale }: { locale: 'da' | 'en' }) {
                 {m.role === 'user' ? t('assistant.you') : t('assistant.assistantName')}
               </div>
               <div className="space-y-1 break-words text-sm">{m.role === 'user' ? <p>{m.content}</p> : renderReply(m.content)}</div>
+              {m.proposals && m.proposals.length > 0 && (
+                <div className="mt-3 flex flex-col gap-2" aria-label={t('assistant.proposals')}>
+                  {m.proposals.map((p) => (
+                    <ProposalButton key={p.id} p={p} />
+                  ))}
+                </div>
+              )}
               {m.tools && m.tools.length > 0 && (
                 <div className="mt-2 text-xs text-ink-300">{t('assistant.usedTools', { tools: m.tools.join(', ') })}</div>
               )}

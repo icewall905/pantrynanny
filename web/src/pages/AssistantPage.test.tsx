@@ -40,6 +40,29 @@ describe('AssistantPage', () => {
     expect((chat.body as { messages: unknown[] }).messages).toEqual([{ role: 'user', content: 'Hvad har vi i køleskabet?' }])
   })
 
+  it('shows proposed actions as buttons and runs one only when tapped', async () => {
+    const user = userEvent.setup()
+    const calls = mockFetch({
+      'GET /ai/status': status,
+      'POST /ai/chat': {
+        reply: 'Skal jeg sætte mælk på listen?',
+        tool_calls: [{ name: 'propose_add_to_shopping', arguments: {} }],
+        model: 'm',
+        proposals: [{ id: 'p1', kind: 'shopping_add', label: 'Mælk × 2', payload: { name: 'Mælk', quantity: 2, product_id: 'pm' } }],
+      },
+      'POST /shopping': { id: 's1' },
+    })
+    renderApp(<AssistantPage />)
+    await user.click(await screen.findByRole('button', { name: 'Hvad har vi i køleskabet?' }))
+    const btn = await screen.findByTestId('proposal')
+    expect(btn).toHaveTextContent('Sæt på indkøbslisten: Mælk × 2')
+    expect(calls.filter((c) => c.path === '/shopping')).toHaveLength(0)
+    await user.click(btn)
+    await waitFor(() => expect(calls.filter((c) => c.method === 'POST' && c.path === '/shopping')).toHaveLength(1))
+    expect(calls.find((c) => c.path === '/shopping')!.body).toEqual({ product_id: 'pm', quantity: 2 })
+    await waitFor(() => expect(btn).toBeDisabled())
+  })
+
   it('shows recipes and adds missing items only after an explicit click', async () => {
     const user = userEvent.setup()
     const calls = mockFetch({
