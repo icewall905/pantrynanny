@@ -13,7 +13,7 @@ import type {
   SyncSnapshot,
   UUID,
 } from '../api/types'
-import { normalizeBarcode, type NormalizedBarcode } from './normalize'
+import { normalizeBarcode, stripBarcode, type NormalizedBarcode } from './normalize'
 import { uuid } from './uuid'
 import type { FailedRecord, HistoryRecord, InventoryRecord, PendingRecord, SyncStatus } from './types'
 
@@ -104,11 +104,12 @@ export class OfflineStore {
 
   /** Dead IndexedDB connection (iOS kills them) → reopen and retry the whole operation once. */
   private async retryOnce<T>(fn: () => Promise<T>): Promise<T> {
+    const used = this.dbp
     try {
       return await fn()
     } catch (e) {
       if (!isDeadConnection(e)) throw e
-      await this.reopen()
+      await this.reopen(used)
       return fn()
     }
   }
@@ -145,9 +146,13 @@ export class OfflineStore {
     return p
   }
 
-  /** Forget the cached connection (after InvalidStateError / UnknownError). */
-  private async reopen() {
+  /**
+   * Forget the cached connection (after InvalidStateError / UnknownError). `failed` is the handle
+   * the failing call used: if a concurrent call already replaced it, keep the fresh connection.
+   */
+  private async reopen(failed?: Promise<DB> | null) {
     const old = this.dbp
+    if (failed !== undefined && failed !== null && old !== failed) return
     this.dbp = null
     try {
       ;(await old)?.close()
@@ -261,7 +266,7 @@ export class OfflineStore {
     const db = await this.db()
     const norm = normalizeBarcode(raw, symbology)
     let id = (await db.get('barcodeIndex', norm.code)) as UUID | undefined
-    id ??= (await db.get('barcodeIndex', `local:${raw.replace(/\s+/g, '')}`)) as UUID | undefined
+    id ??= (await db.get('barcodeIndex', `local:${stripBarcode(raw)}`)) as UUID | undefined
     const product = id ? ((await db.get('products', id)) as Product | undefined) ?? null : null
     return { norm, product }
   }
@@ -295,11 +300,12 @@ export class OfflineStore {
       client_op_id: op.client_op_id ?? uuid(),
       occurred_at: op.occurred_at ?? new Date().toISOString(),
     } as ClientOp
+    const used = this.dbp
     try {
       await this.writeOp(full)
     } catch (e) {
       if (!isDeadConnection(e)) throw e
-      await this.reopen()
+      await this.reopen(used)
       await this.writeOp(full) // same client_op_id: the put is idempotent
     }
     this.announce()
