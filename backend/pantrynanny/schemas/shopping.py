@@ -15,6 +15,7 @@ class ShoppingItemOut(ORM):
     unit: str | None
     category_id: UUID | None
     note: str | None
+    store: str | None = None
     checked: bool
     checked_at: datetime | None
     source: str
@@ -29,6 +30,7 @@ class ShoppingCreate(BaseModel):
     unit: Unit | None = None
     category_id: UUID | None = None
     note: str | None = Field(default=None, max_length=500)
+    store: str | None = Field(default=None, max_length=60)
 
 
 class ShoppingPatch(BaseModel):
@@ -37,4 +39,5 @@ class ShoppingPatch(BaseModel):
     unit: Unit | None = None
     category_id: UUID | None = None
     note: str | None = Field(default=None, max_length=500)
+    store: str | None = Field(default=None, max_length=60)
     checked: bool | None = None

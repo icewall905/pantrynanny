@@ -10,6 +10,8 @@ import {
   TrendingDown,
   type LucideIcon,
 } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { get } from '../api/client'
 import { useDashboard } from '../api/queries'
 import type { Transaction } from '../api/types'
 import { useAuth } from '../auth/AuthProvider'
@@ -131,6 +133,8 @@ export default function DashboardPage() {
             </div>
           </section>
 
+          <RunOutCard />
+
           <div className="grid gap-4 md:grid-cols-2">
             <Card>
               <h2 className="mb-1 text-lg font-bold">{t('dashboard.recentAdded')}</h2>
@@ -144,5 +148,44 @@ export default function DashboardPage() {
         </div>
       )}
     </>
+  )
+}
+
+interface RunOut {
+  product_id: string
+  name: string
+  image_url: string | null
+  total_quantity: number
+  stock_unit: string
+  days_left: number
+  confidence: 'medium' | 'high'
+}
+
+/** "At your usual pace this runs out in ~N days": from the household's own history only. */
+function RunOutCard() {
+  const { t, i18n } = useTranslation()
+  const q = useQuery({ queryKey: ['stats', 'runout'], queryFn: () => get<RunOut[]>('/stats/runout?days=10'), staleTime: 300_000 })
+  if (!q.data?.length) return null
+  return (
+    <Card>
+      <h2 className="mb-1 text-lg font-bold">{t('dashboard.runOut')}</h2>
+      <p className="mb-1 text-xs text-ink-500">{t('dashboard.runOutHint')}</p>
+      <ul className="divide-y divide-cream-200" data-testid="runout">
+        {q.data.slice(0, 6).map((r) => (
+          <li key={r.product_id}>
+            <Link to={`/products/${r.product_id}`} className="flex min-h-14 items-center gap-3 py-2">
+              <ProductThumb name={r.name} src={r.image_url} className="size-10 text-base" />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-semibold">{r.name}</div>
+                <div className="text-xs text-ink-500">
+                  {t('dashboard.left', { qty: formatQty(r.total_quantity, i18n.language) })} · {t(`dashboard.conf_${r.confidence}`)}
+                </div>
+              </div>
+              <span className="text-sm font-bold tabular-nums text-honey-600">{t('dashboard.inAboutDays', { count: Math.max(1, Math.round(r.days_left)) })}</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </Card>
   )
 }

@@ -38,7 +38,8 @@
     "admin": "Admin",
     "kitchen": "Kitchen",
     "recipes": "Recipes",
-    "plan": "Meal plan"
+    "plan": "Meal plan",
+    "activity": "Activity"
   },
   "sync": {
     "synced": "Synced",
@@ -123,7 +124,14 @@
     "items": "{{count}} items",
     "recentAdded": "Recently added",
     "recentConsumed": "Recently used",
-    "nothingYet": "Nothing yet"
+    "nothingYet": "Nothing yet",
+    "runOut": "Runs out soon",
+    "runOutHint": "Based on how fast you usually use it.",
+    "left": "{{qty}} left",
+    "conf_medium": "rough estimate",
+    "conf_high": "good estimate",
+    "inAboutDays_one": "~{{count}} day",
+    "inAboutDays_other": "~{{count}} days"
   },
   "expiry": {
     "expired": "Expired",
@@ -174,7 +182,10 @@
     "emptyHint": "Scan some items to get started.",
     "noMatch": "No matches",
     "noMatchHint": "Try a different search.",
-    "changeFailed": "The change could not be applied"
+    "changeFailed": "The change could not be applied",
+    "inDays_one": "+{{count}} day",
+    "inDays_other": "+{{count}} days",
+    "noExpiry": "No date"
   },
   "product": {
     "new": "New product",
@@ -216,7 +227,9 @@
     "conflictHint": "The server version is “{{name}}” (v{{version}}). Reload and edit again.",
     "reload": "Reload",
     "notFound": "Product not found",
-    "deleteConfirm": "Delete “{{name}}”?"
+    "deleteConfirm": "Delete “{{name}}”?",
+    "runOut_one": "At your usual pace this lasts about {{count}} more day",
+    "runOut_other": "At your usual pace this lasts about {{count}} more days"
   },
   "status": {
     "known": "Known",
@@ -265,7 +278,25 @@
     "copied": "List copied",
     "copyFailed": "Could not copy",
     "empty": "The shopping list is empty",
-    "emptyHint": "Add items above or from your inventory."
+    "emptyHint": "Add items above or from your inventory.",
+    "editItem": "Edit {{name}}",
+    "editTitle": "Edit item",
+    "name": "Name",
+    "store": "Shop",
+    "storeHint": "Optional – group the list by shop.",
+    "note": "Note",
+    "groupBy": "Group:",
+    "byCategory": "Category",
+    "byStore": "Shop",
+    "anyStore": "Any shop",
+    "putAway_one": "Put {{count}} item in stock",
+    "putAway_other": "Put {{count}} items in stock",
+    "putAwayTitle": "Put the shopping away",
+    "putAwayHint": "Ticked items are added to stock and removed from the list. Check the amounts first.",
+    "putAwayConfirm": "Add to stock",
+    "putAwayDone_one": "{{count}} item added to stock",
+    "putAwayDone_other": "{{count}} items added to stock",
+    "notLinked": "not linked to a product – scan it in instead"
   },
   "stats": {
     "days": "{{count}} days",
@@ -566,5 +597,23 @@
     "shopped_one": "{{count}} item added: {{names}}",
     "shopped_other": "{{count}} items added: {{names}}",
     "nothingToBuy": "You have everything for this week."
+  },
+  "activity": {
+    "title": "Activity",
+    "subtitle": "Every change to your stock, newest first.",
+    "empty": "Nothing has happened yet.",
+    "someone": "someone",
+    "type_add": "added",
+    "type_remove": "taken out",
+    "type_adjust": "counted",
+    "type_move": "moved",
+    "type_undo": "undo",
+    "fromRecipe": "cooked",
+    "wasUndone": "undone",
+    "undo": "Undo {{name}}",
+    "confirmUndo": "Undo this change to {{name}}?",
+    "undone": "Undone",
+    "undoFailed": "Could not undo",
+    "more": "Show older"
   }
 }

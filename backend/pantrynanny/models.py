@@ -357,6 +357,7 @@ class ShoppingItem(Base):
     unit: Mapped[str | None] = mapped_column(String(8))
     category_id: Mapped[uuid.UUID | None] = _fk("categories.id", nullable=True, ondelete="SET NULL")
     note: Mapped[str | None] = mapped_column(Text)
+    store: Mapped[str | None] = mapped_column(String(60))
     checked: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
     checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     source: Mapped[str] = mapped_column(String(16), default="manual", server_default="manual")

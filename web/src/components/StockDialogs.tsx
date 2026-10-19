@@ -5,7 +5,8 @@ import { patch, post } from '../api/client'
 import { useInvalidateStock, useLocations } from '../api/queries'
 import type { InventoryItem, StockBatch } from '../api/types'
 import { useStockOps } from '../hooks/useStock'
-import { Button, Field, Input, Modal, Select } from './ui'
+import { Button, Chip, Field, Input, Modal, Select } from './ui'
+import { todayISO } from '../lib/format'
 import { useToast } from './Toast'
 
 export function MoveDialog({ items, onClose }: { items: InventoryItem[] | null; onClose: () => void }) {
@@ -89,6 +90,14 @@ export function ExpiryDialog({
       <Field label={t('inventory.expiryDate')}>
         {(id) => <Input id={id} type="date" value={current} onChange={(e) => setValue(e.target.value)} />}
       </Field>
+      <div className="mt-3 flex flex-wrap gap-2" data-testid="expiry-quick">
+        {[1, 3, 7, 14, 30].map((n) => (
+          <Chip key={n} onClick={() => setValue(todayISO(new Date(Date.now() + n * 86_400_000)))}>
+            {t('inventory.inDays', { count: n })}
+          </Chip>
+        ))}
+        {current && <Chip onClick={() => setValue('')}>{t('inventory.noExpiry')}</Chip>}
+      </div>
     </Modal>
   )
 }

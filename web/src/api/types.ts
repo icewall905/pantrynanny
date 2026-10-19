@@ -136,6 +136,8 @@ export interface ShoppingItem {
   unit: Unit | null
   category_id: UUID | null
   note: string | null
+  /** which shop to buy it in (free text, optional) */
+  store?: string | null
   checked: boolean
   checked_at: ISODateTime | null
   source: 'manual' | 'low_stock' | 'inventory'

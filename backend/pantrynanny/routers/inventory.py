@@ -3,11 +3,12 @@ from datetime import UTC, datetime
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Query, Response
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from ..db import get_session, get_sessionmaker
 from ..errors import AppError, not_found
-from ..models import StockTransaction
+from ..models import Product, StockTransaction, User
 from ..schemas.inventory import (
     BatchOut,
     BatchPatch,
@@ -16,6 +17,7 @@ from ..schemas.inventory import (
     OpResultOut,
     SyncOp,
     TransactionOut,
+    TxnWithProduct,
     UndoIn,
 )
 from ..security import Principal, get_principal
@@ -125,6 +127,51 @@ async def list_transactions(
         last = rows[-1]
         response.headers["X-Next-Before"] = f"{last.created_at.isoformat()}|{last.id}"
     return [txn_out(t) for t in rows]
+
+
+class ActivityOut(TxnWithProduct):
+    user_name: str | None
+
+
+@router.get("/activity", response_model=list[ActivityOut])
+async def activity(
+    response: Response,
+    limit: int = Query(default=50, ge=1, le=200),
+    before: str | None = Query(default=None, max_length=80),
+    principal: Principal = Depends(get_principal),
+    session: AsyncSession = Depends(get_session),
+):
+    """The household timeline: every stock change with product and who/which device did it."""
+    rows = await svc.recent_transactions(
+        session, principal.household_id, limit=limit, before=_parse_before(before)
+    )
+    if len(rows) == limit:
+        last = rows[-1]
+        response.headers["X-Next-Before"] = f"{last.created_at.isoformat()}|{last.id}"
+    pids = {t.product_id for t in rows}
+    uids = {t.user_id for t in rows if t.user_id}
+    products = {
+        p.id: p
+        for p in (await session.execute(select(Product).where(Product.id.in_(pids)))).scalars()
+    }
+    users = (
+        dict(
+            (
+                await session.execute(select(User.id, User.display_name).where(User.id.in_(uids)))
+            ).all()
+        )
+        if uids
+        else {}
+    )
+    return [
+        ActivityOut(
+            **txn_out(t).model_dump(),
+            product=product_out(products[t.product_id]),
+            user_name=users.get(t.user_id) if t.user_id else None,
+        )
+        for t in rows
+        if t.product_id in products
+    ]
 
 
 @router.post("/transactions/{txn_id}/undo", response_model=OpResultOut)

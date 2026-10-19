@@ -1,12 +1,14 @@
-import { useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { Check, ClipboardCopy, Download, Lightbulb, Minus, Plus, ShoppingBasket, Trash2 } from 'lucide-react'
+import { Check, ClipboardCopy, Download, Lightbulb, Minus, PackageCheck, Plus, ShoppingBasket, Store, Trash2 } from 'lucide-react'
 import { del, get, patch, post, qs } from '../api/client'
 import { keys, useCategories, useShopping } from '../api/queries'
 import type { InventoryItem, Product, ShoppingItem } from '../api/types'
 import { useToast } from '../components/Toast'
-import { Button, Card, EmptyState, ErrorState, Input, ListSkeleton, PageHeader } from '../components/ui'
+import { Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListSkeleton, Modal, PageHeader } from '../components/ui'
+import { enqueueOp } from '../offline'
+import { useInvalidateStock } from '../api/queries'
 import { useDebounced } from '../hooks/useDebounced'
 import { cn, formatQty, groupShopping, shoppingToText } from '../lib/format'
 
@@ -15,11 +17,13 @@ export function ShoppingRow({
   onToggle,
   onQty,
   onDelete,
+  onEdit,
 }: {
   item: ShoppingItem
   onToggle: (i: ShoppingItem) => void
   onQty: (i: ShoppingItem, q: number) => void
   onDelete: (i: ShoppingItem) => void
+  onEdit?: (i: ShoppingItem) => void
 }) {
   const { t, i18n } = useTranslation()
   return (
@@ -36,10 +40,18 @@ export function ShoppingRow({
       >
         {item.checked && <Check className="size-5" />}
       </button>
-      <div className={cn('min-w-0 flex-1', item.checked && 'text-ink-300 line-through')}>
+      <button
+        type="button"
+        disabled={!onEdit}
+        onClick={() => onEdit?.(item)}
+        aria-label={onEdit ? t('shopping.editItem', { name: item.name }) : undefined}
+        className={cn('min-w-0 flex-1 text-left', item.checked && 'text-ink-300 line-through')}
+      >
         <div className="truncate font-semibold">{item.name}</div>
-        {item.note && <div className="truncate text-xs text-ink-500">{item.note}</div>}
-      </div>
+        {(item.note || item.store) && (
+          <div className="truncate text-xs text-ink-500">{[item.store, item.note].filter(Boolean).join(' · ')}</div>
+        )}
+      </button>
       <div className="flex items-center gap-1">
         <button aria-label={t('shopping.less', { name: item.name })} disabled={item.quantity <= 1} onClick={() => onQty(item, item.quantity - 1)} className="grid size-10 place-items-center rounded-lg hover:bg-cream-200 disabled:opacity-30">
           <Minus className="size-4" />
@@ -111,7 +123,32 @@ export default function ShoppingPage() {
   const clear = useMutation({ mutationFn: () => post('/shopping/clear-checked'), onSuccess: refresh })
 
   const items = list.data ?? []
-  const groups = groupShopping(items, cats.data ?? [])
+  const [groupBy, setGroupByState] = useState<'category' | 'store'>(() => {
+    try {
+      return localStorage.getItem('pn.shopping.group') === 'store' ? 'store' : 'category'
+    } catch {
+      return 'category'
+    }
+  })
+  const setGroupBy = (g: 'category' | 'store') => {
+    setGroupByState(g)
+    try {
+      localStorage.setItem('pn.shopping.group', g)
+    } catch {
+      /* ignore */
+    }
+  }
+  const [editing, setEditing] = useState<ShoppingItem | null>(null)
+  const [putAway, setPutAway] = useState(false)
+  const stores = useMemo(() => [...new Set(items.map((i) => i.store).filter((s): s is string => !!s))].sort(), [items])
+  const groups =
+    groupBy === 'store'
+      ? [...stores, null].map((st) => ({
+          key: st ?? '',
+          title: st ?? t('shopping.anyStore'),
+          items: items.filter((i) => (i.store ?? null) === st).sort((a, b) => Number(a.checked) - Number(b.checked) || a.name.localeCompare(b.name)),
+        })).filter((g) => g.items.length)
+      : groupShopping(items, cats.data ?? []).map((g) => ({ key: g.key, title: g.category?.name ?? t('shopping.noCategory'), items: g.items }))
   const checkedCount = items.filter((i) => i.checked).length
   const productOf = (s: InventoryItem | Product): Product => ('product' in s ? s.product : s)
 
@@ -207,6 +244,30 @@ export default function ShoppingPage() {
         </Card>
       )}
 
+      {items.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <span className="text-sm text-ink-500">{t('shopping.groupBy')}</span>
+          <Chip active={groupBy === 'category'} onClick={() => setGroupBy('category')}>
+            {t('shopping.byCategory')}
+          </Chip>
+          <Chip active={groupBy === 'store'} onClick={() => setGroupBy('store')}>
+            <Store className="mr-1 inline size-4" />
+            {t('shopping.byStore')}
+          </Chip>
+        </div>
+      )}
+      {editing && (
+        <EditItem
+          item={editing}
+          stores={stores}
+          onClose={() => setEditing(null)}
+          onSave={(body) => {
+            update.mutate({ item: editing, body })
+            setEditing(null)
+          }}
+        />
+      )}
+      {putAway && <PutAway items={items.filter((i) => i.checked)} onClose={() => setPutAway(false)} onDone={() => clear.mutate()} />}
       {list.isError ? (
         <ErrorState error={list.error} onRetry={() => void list.refetch()} />
       ) : list.isLoading ? (
@@ -217,7 +278,7 @@ export default function ShoppingPage() {
         <div className="space-y-4">
           {groups.map((g) => (
             <Card key={g.key || 'none'} className="py-3">
-              <h2 className="text-xs font-bold uppercase tracking-wide text-ink-500">{g.category?.name ?? t('shopping.noCategory')}</h2>
+              <h2 className="text-xs font-bold uppercase tracking-wide text-ink-500">{g.title}</h2>
               <ul className="divide-y divide-cream-200">
                 {g.items.map((i) => (
                   <ShoppingRow
@@ -226,18 +287,135 @@ export default function ShoppingPage() {
                     onToggle={(it) => update.mutate({ item: it, body: { checked: !it.checked } })}
                     onQty={(it, q) => update.mutate({ item: it, body: { quantity: q } })}
                     onDelete={(it) => remove.mutate(it)}
+                    onEdit={setEditing}
                   />
                 ))}
               </ul>
             </Card>
           ))}
           {checkedCount > 0 && (
-            <Button className="w-full" loading={clear.isPending} onClick={() => clear.mutate()}>
-              <Trash2 className="size-4" /> {t('shopping.clearChecked', { count: checkedCount })}
-            </Button>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Button variant="primary" onClick={() => setPutAway(true)} data-testid="put-away">
+                <PackageCheck className="size-4" /> {t('shopping.putAway', { count: checkedCount })}
+              </Button>
+              <Button loading={clear.isPending} onClick={() => clear.mutate()}>
+                <Trash2 className="size-4" /> {t('shopping.clearChecked', { count: checkedCount })}
+              </Button>
+            </div>
           )}
         </div>
       )}
     </>
+  )
+}
+
+function EditItem({
+  item,
+  stores,
+  onClose,
+  onSave,
+}: {
+  item: ShoppingItem
+  stores: string[]
+  onClose: () => void
+  onSave: (body: Record<string, unknown>) => void
+}) {
+  const { t } = useTranslation()
+  const [name, setName] = useState(item.name)
+  const [note, setNote] = useState(item.note ?? '')
+  const [store, setStore] = useState(item.store ?? '')
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={t('shopping.editTitle')}
+      footer={
+        <>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button variant="primary" disabled={!name.trim()} onClick={() => onSave({ name: name.trim(), note: note.trim() || null, store: store.trim() || null })}>
+            {t('common.save')}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        <Field label={t('shopping.name')}>{(id) => <Input id={id} value={name} maxLength={200} onChange={(e) => setName(e.target.value)} />}</Field>
+        <Field label={t('shopping.store')} hint={t('shopping.storeHint')}>
+          {(id) => (
+            <>
+              <Input id={id} list="pn-stores" value={store} maxLength={60} onChange={(e) => setStore(e.target.value)} placeholder="Netto, Rema 1000…" />
+              <datalist id="pn-stores">
+                {stores.map((s) => (
+                  <option key={s} value={s} />
+                ))}
+              </datalist>
+            </>
+          )}
+        </Field>
+        <Field label={t('shopping.note')}>{(id) => <Input id={id} value={note} maxLength={500} onChange={(e) => setNote(e.target.value)} />}</Field>
+      </div>
+    </Modal>
+  )
+}
+
+/** After shopping: put the ticked items into stock in one go (each its own undoable stock op). */
+function PutAway({ items, onClose, onDone }: { items: ShoppingItem[]; onClose: () => void; onDone: () => void }) {
+  const { t, i18n } = useTranslation()
+  const toast = useToast()
+  const invalidate = useInvalidateStock()
+  const linked = items.filter((i) => i.product_id)
+  const [qty, setQty] = useState<Record<string, string>>(() => Object.fromEntries(linked.map((i) => [i.id, String(i.quantity)])))
+  const [busy, setBusy] = useState(false)
+  const go = async () => {
+    setBusy(true)
+    let n = 0
+    try {
+      for (const i of linked) {
+        const q = Number((qty[i.id] ?? '').replace(',', '.'))
+        if (!(q > 0)) continue
+        await enqueueOp({ type: 'add', product_id: i.product_id, quantity: q })
+        n++
+      }
+      void invalidate()
+      onDone()
+      onClose()
+      toast.push(t('shopping.putAwayDone', { count: n }), 'success')
+    } catch {
+      toast.push(t('inventory.changeFailed'), 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={t('shopping.putAwayTitle')}
+      footer={
+        <>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button variant="primary" loading={busy} onClick={() => void go()} data-testid="put-away-confirm">
+            {t('shopping.putAwayConfirm')}
+          </Button>
+        </>
+      }
+    >
+      <p className="mb-2 text-sm text-ink-500">{t('shopping.putAwayHint')}</p>
+      <ul className="divide-y divide-cream-200">
+        {items.map((i) => (
+          <li key={i.id} className="flex items-center gap-3 py-2">
+            <span className="min-w-0 flex-1 truncate">{i.name}</span>
+            {i.product_id ? (
+              <>
+                <Input className="w-20! text-right" inputMode="decimal" aria-label={t('recipes.amountFor', { name: i.name })} value={qty[i.id] ?? ''} onChange={(e) => setQty({ ...qty, [i.id]: e.target.value })} />
+                <span className="w-10 text-sm text-ink-500">{i.unit ? t(`units.${i.unit}`) : ''}</span>
+              </>
+            ) : (
+              <span className="text-xs text-ink-500">{t('shopping.notLinked', { lng: i18n.language })}</span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </Modal>
   )
 }

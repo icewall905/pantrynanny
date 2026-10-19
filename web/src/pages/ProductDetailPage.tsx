@@ -1,10 +1,10 @@
 import { uuid } from '../offline'
 import { useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Camera, CalendarPlus, ChevronLeft, Pencil, RefreshCw, ShoppingBasket, Trash2, Undo2 } from 'lucide-react'
-import { ApiError, del, patch, post } from '../api/client'
+import { ApiError, del, get, patch, post } from '../api/client'
 import { useCategories, useInvalidateStock, useInventoryDetail, useLocations } from '../api/queries'
 import type { InventoryItem, Product, StockBatch, Transaction } from '../api/types'
 import { ExpiryBadge } from '../components/ExpiryBadge'
@@ -186,6 +186,7 @@ export default function ProductDetailPage() {
               <ShoppingBasket className="size-4" /> {t('inventory.addToShopping')}
             </Button>
           </div>
+          <RunOutLine productId={p.id} />
           <div className="mt-4 flex flex-wrap gap-2">
             <Button size="sm" onClick={() => setEditing(true)}>
               <Pencil className="size-4" /> {t('common.edit')}
@@ -373,5 +374,22 @@ function Row({ label, value }: { label: string; value?: string }) {
       <dt className="text-ink-500">{label}</dt>
       <dd className="break-words">{value}</dd>
     </div>
+  )
+}
+
+/** "At your usual pace this lasts ~N more days" – only when there is enough history. */
+function RunOutLine({ productId }: { productId: string }) {
+  const { t } = useTranslation()
+  const q = useQuery({
+    queryKey: ['stats', 'runout', productId],
+    queryFn: () => get<{ days_left: number; per_day: number; confidence: 'medium' | 'high' }[]>(`/stats/runout?product_id=${productId}`),
+    staleTime: 300_000,
+  })
+  const f = q.data?.[0]
+  if (!f) return null
+  return (
+    <p className="mt-3 text-sm text-ink-500" data-testid="runout-line">
+      {t('product.runOut', { count: Math.max(1, Math.round(f.days_left)) })} · {t(`dashboard.conf_${f.confidence}`)}
+    </p>
   )
 }

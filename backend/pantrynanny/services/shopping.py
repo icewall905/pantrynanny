@@ -98,6 +98,7 @@ async def add_item(
         unit=body.unit or (product.stock_unit if product else None),
         category_id=body.category_id or (product.category_id if product else None),
         note=body.note,
+        store=(body.store or "").strip() or None,
         source="manual",
     )
     try:
@@ -141,9 +142,11 @@ async def patch_item(
         # Mutate inside the savepoint: begin_nested() flushes pending state first, so a
         # constraint violation caused by these changes must be raised within the block.
         async with session.begin_nested():
-            for field in ("name", "quantity", "unit", "category_id", "note"):
+            for field in ("name", "quantity", "unit", "category_id", "note", "store"):
                 if field in sent:
                     setattr(item, field, getattr(body, field))
+            if "store" in sent:
+                item.store = (body.store or "").strip() or None
             if "checked" in sent and body.checked is not None and body.checked != item.checked:
                 item.checked = body.checked
                 item.checked_at = datetime.now(UTC) if body.checked else None

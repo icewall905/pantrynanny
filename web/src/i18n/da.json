@@ -38,7 +38,8 @@
     "admin": "Administration",
     "kitchen": "Køkken",
     "recipes": "Opskrifter",
-    "plan": "Madplan"
+    "plan": "Madplan",
+    "activity": "Aktivitet"
   },
   "sync": {
     "synced": "Synkroniseret",
@@ -123,7 +124,14 @@
     "items": "{{count}} varer",
     "recentAdded": "Senest tilføjet",
     "recentConsumed": "Senest brugt",
-    "nothingYet": "Ingen endnu"
+    "nothingYet": "Ingen endnu",
+    "runOut": "Slipper snart op",
+    "runOutHint": "Ud fra hvor hurtigt I plejer at bruge det.",
+    "left": "{{qty}} tilbage",
+    "conf_medium": "groft skøn",
+    "conf_high": "godt skøn",
+    "inAboutDays_one": "~{{count}} dag",
+    "inAboutDays_other": "~{{count}} dage"
   },
   "expiry": {
     "expired": "Udløbet",
@@ -174,7 +182,10 @@
     "emptyHint": "Scan nogle varer for at komme i gang.",
     "noMatch": "Ingen match",
     "noMatchHint": "Prøv et andet søgeord.",
-    "changeFailed": "Ændringen kunne ikke gennemføres"
+    "changeFailed": "Ændringen kunne ikke gennemføres",
+    "inDays_one": "+{{count}} dag",
+    "inDays_other": "+{{count}} dage",
+    "noExpiry": "Ingen dato"
   },
   "product": {
     "new": "Ny vare",
@@ -216,7 +227,9 @@
     "conflictHint": "Serverens version er “{{name}}” (v{{version}}). Genindlæs og ret igen.",
     "reload": "Genindlæs",
     "notFound": "Varen findes ikke",
-    "deleteConfirm": "Slet “{{name}}”?"
+    "deleteConfirm": "Slet “{{name}}”?",
+    "runOut_one": "I jeres normale tempo holder det ca. {{count}} dag mere",
+    "runOut_other": "I jeres normale tempo holder det ca. {{count}} dage mere"
   },
   "status": {
     "known": "Kendt",
@@ -265,7 +278,25 @@
     "copied": "Listen er kopieret",
     "copyFailed": "Kunne ikke kopiere",
     "empty": "Indkøbslisten er tom",
-    "emptyHint": "Tilføj varer ovenfor eller fra dit lager."
+    "emptyHint": "Tilføj varer ovenfor eller fra dit lager.",
+    "editItem": "Ret {{name}}",
+    "editTitle": "Ret vare",
+    "name": "Navn",
+    "store": "Butik",
+    "storeHint": "Valgfrit – grupper listen efter butik.",
+    "note": "Note",
+    "groupBy": "Gruppér:",
+    "byCategory": "Kategori",
+    "byStore": "Butik",
+    "anyStore": "Alle butikker",
+    "putAway_one": "Sæt {{count}} vare på lager",
+    "putAway_other": "Sæt {{count}} varer på lager",
+    "putAwayTitle": "Pak indkøbene ud",
+    "putAwayHint": "De afkrydsede varer lægges på lager og fjernes fra listen. Tjek mængderne først.",
+    "putAwayConfirm": "Læg på lager",
+    "putAwayDone_one": "{{count}} vare lagt på lager",
+    "putAwayDone_other": "{{count}} varer lagt på lager",
+    "notLinked": "ikke koblet til en vare – scan den ind i stedet"
   },
   "stats": {
     "days": "{{count}} dage",
@@ -566,5 +597,23 @@
     "shopped_one": "{{count}} vare sat på: {{names}}",
     "shopped_other": "{{count}} varer sat på: {{names}}",
     "nothingToBuy": "I har alt til denne uge."
+  },
+  "activity": {
+    "title": "Aktivitet",
+    "subtitle": "Alle ændringer af lageret, nyeste først.",
+    "empty": "Der er ikke sket noget endnu.",
+    "someone": "nogen",
+    "type_add": "tilføjet",
+    "type_remove": "taget ud",
+    "type_adjust": "optalt",
+    "type_move": "flyttet",
+    "type_undo": "fortryd",
+    "fromRecipe": "madlavning",
+    "wasUndone": "fortrudt",
+    "undo": "Fortryd {{name}}",
+    "confirmUndo": "Fortryd denne ændring af {{name}}?",
+    "undone": "Fortrudt",
+    "undoFailed": "Kunne ikke fortryde",
+    "more": "Vis ældre"
   }
 }
