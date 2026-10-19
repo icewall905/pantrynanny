@@ -342,6 +342,29 @@
     "removeTimeout": "Fjern-tilstand timeout (min.)",
     "removeTimeoutHint": "Scanneren skifter tilbage til Tilføj efter denne tid",
     "rearm": "Scan genaktivering (ms)",
-    "rearmHint": "Hvor længe en stregkode skal være væk før den tælles igen"
+    "rearmHint": "Hvor længe en stregkode skal være væk før den tælles igen",
+    "passwordMin": "Mindst 8 tegn"
+  },
+  "opError": {
+    "invalid_quantity": "Ugyldigt antal",
+    "product_not_found": "Varen findes ikke længere",
+    "location_not_found": "Placeringen findes ikke længere",
+    "already_undone": "Allerede fortrudt",
+    "cannot_undo_undo": "En fortrydelse kan ikke fortrydes",
+    "clamped": "Fjernet så meget som muligt – beholdningen blev 0",
+    "server_error": "Serveren kunne ikke behandle ændringen",
+    "bad_request": "Serveren afviste ændringen",
+    "location_not_empty": "Flyt lageret ud af placeringen først",
+    "default_location": "Standardplaceringen kan ikke slettes",
+    "default_required": "Vælg en anden placering som standard i stedet",
+    "last_owner": "Husstanden skal have mindst én aktiv ejer",
+    "cannot_delete_self": "Du kan ikke slette din egen konto",
+    "owner_required": "Kun en ejer kan administrere ejere",
+    "username_taken": "Brugernavnet er allerede i brug",
+    "invalid_merge": "De to varer kan ikke slås sammen",
+    "category_not_found": "Kategorien findes ikke",
+    "invalid_image": "Billedet kunne ikke bruges",
+    "payload_too_large": "Filen er for stor",
+    "rate_limited": "For mange forsøg – vent lidt"
   }
 }

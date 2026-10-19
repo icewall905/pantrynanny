@@ -4,6 +4,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, select, text
+from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models import LookupAttempt, Product, ProviderSetting
@@ -71,7 +72,7 @@ async def failed_lookups(session: AsyncSession, household_id: uuid.UUID, limit: 
             LookupAttempt.household_id == household_id,
             LookupAttempt.status.in_(("not_found", "error")),
         )
-        .distinct(LookupAttempt.code)
+        .ext(distinct_on(LookupAttempt.code))
         .order_by(LookupAttempt.code, LookupAttempt.created_at.desc())
         .subquery()
     )

@@ -25,7 +25,7 @@ function fakeServer() {
   const seen = new Map<string, OpResult>()
   const requests: ClientOp[][] = []
   const totals = new Map<string, number>()
-  const state = { down: false, dropAfterApply: false, unauth: false, rejectIds: new Set<string>() }
+  const state = { fail500: new Set<string>(), down: false, dropAfterApply: false, unauth: false, rejectIds: new Set<string>() }
   const P = product('p1', '05701234567899')
   const handler = async (url: string, init?: RequestInit) => {
     if (state.down) throw new TypeError('Failed to fetch')
@@ -35,11 +35,12 @@ function fakeServer() {
     if (url.endsWith('/api/sync/ops')) {
       const body = JSON.parse(String(init!.body)) as { ops: ClientOp[] }
       requests.push(body.ops)
+      if (body.ops.some((o) => state.fail500.has(o.client_op_id))) return json({ detail: 'boom' }, 500)
       const results: OpResult[] = body.ops.map((op) => {
         const prev = seen.get(op.client_op_id)
         if (prev) return { ...prev, status: 'duplicate' }
         if (state.rejectIds.has(op.client_op_id))
-          return { client_op_id: op.client_op_id, status: 'rejected', error: 'nope', transaction_id: null, product: null, total_quantity: null }
+          return { client_op_id: op.client_op_id, status: 'rejected', error: 'nope', error_code: 'invalid_quantity', transaction_id: null, product: null, total_quantity: null }
         const d = op.type === 'remove' ? -op.quantity : op.type === 'undo' ? -1 : op.quantity
         totals.set('p1', (totals.get('p1') ?? 0) + d)
         const r: OpResult = { client_op_id: op.client_op_id, status: 'applied', error: null, transaction_id: 't', product: P, total_quantity: totals.get('p1')! }
@@ -306,5 +307,57 @@ describe('offline queue', () => {
     expect((await s.getPending()).map((x) => x.client_op_id)).toEqual([bad.client_op_id])
     await s.syncNow()
     expect(srv.totals.get('p1')).toBe(1)
+  })
+})
+
+describe('HTTP 500 handling', () => {
+  it('splits a repeatedly failing batch to single ops so good ops still sync', async () => {
+    const s = mk()
+    const a = await add(s)
+    const bad = await add(s)
+    const c = await add(s)
+    srv.state.fail500.add(bad.client_op_id)
+    await s.syncNow() // 1st 500 on the batch: retry later
+    expect(s.getStatus().error).not.toBeNull()
+    await s.syncNow() // 2nd 500: split; a goes through, bad fails once more
+    expect(srv.seen.has(a.client_op_id)).toBe(true)
+    expect(srv.seen.has(c.client_op_id)).toBe(false)
+    const pend = await s.getPending()
+    expect(pend.map((p) => p.client_op_id)).toEqual([bad.client_op_id, c.client_op_id])
+  })
+
+  it('parks a single op after 5 consecutive 500s in failedOps and unblocks the queue', async () => {
+    const s = mk()
+    const bad = await add(s)
+    const good = await add(s)
+    srv.state.fail500.add(bad.client_op_id)
+    for (let i = 0; i < 8; i++) await s.syncNow()
+    const failed = await s.getFailedOps()
+    expect(failed.map((f) => f.client_op_id)).toEqual([bad.client_op_id])
+    expect(failed[0].error_code).toBe('server_error')
+    expect((await s.getPending()).length).toBe(0)
+    expect(srv.seen.has(good.client_op_id)).toBe(true)
+    // retryable
+    srv.state.fail500.clear()
+    await s.retryFailedOp(bad.client_op_id)
+    await s.syncNow()
+    expect(srv.seen.has(bad.client_op_id)).toBe(true)
+  })
+
+  it('keeps retrying forever on 503 / network errors (never parks)', async () => {
+    const s = mk()
+    await add(s)
+    srv.state.down = true
+    for (let i = 0; i < 8; i++) await s.syncNow()
+    expect((await s.getFailedOps()).length).toBe(0)
+    expect((await s.getPending()).length).toBe(1)
+  })
+
+  it('stores the server error_code on rejected ops', async () => {
+    const s = mk()
+    const bad = await add(s)
+    srv.state.rejectIds.add(bad.client_op_id)
+    await s.syncNow()
+    expect((await s.getFailedOps())[0].error_code).toBe('invalid_quantity')
   })
 })

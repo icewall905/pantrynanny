@@ -89,7 +89,12 @@ export default function ShoppingPage() {
   })
   const update = useMutation({
     mutationFn: ({ item, body }: { item: ShoppingItem; body: Record<string, unknown> }) =>
-      patch<ShoppingItem>(`/shopping/${item.id}`, body, { headers: { 'If-Match': String(item.version) } }),
+      patch<ShoppingItem>(
+        `/shopping/${item.id}`,
+        body,
+        // check/uncheck is last-write-wins (contract §7.7): no If-Match; other edits keep optimistic concurrency.
+        Object.keys(body).every((k) => k === 'checked') ? undefined : { headers: { 'If-Match': String(item.version) } },
+      ),
     onMutate: async ({ item, body }) => {
       await qc.cancelQueries({ queryKey: keys.shopping })
       const prev = qc.getQueryData<ShoppingItem[]>(keys.shopping)
@@ -191,7 +196,7 @@ export default function ShoppingPage() {
               return (
                 <button
                   key={p.id}
-                  onClick={() => add.mutate({ product_id: p.id, name: p.name, quantity: 1, category_id: p.category_id, source: 'low_stock' })}
+                  onClick={() => add.mutate({ product_id: p.id, name: p.name, quantity: 1, category_id: p.category_id })}
                   className="inline-flex min-h-10 items-center gap-1.5 rounded-full bg-white px-4 text-sm font-medium shadow-sm hover:bg-leaf-50"
                 >
                   <Plus className="size-4 text-leaf-600" /> {p.name}

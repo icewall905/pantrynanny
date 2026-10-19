@@ -342,6 +342,29 @@
     "removeTimeout": "Remove mode timeout (min.)",
     "removeTimeoutHint": "The scanner switches back to Add after this time",
     "rearm": "Scan re-arm (ms)",
-    "rearmHint": "How long a barcode must be gone before it counts again"
+    "rearmHint": "How long a barcode must be gone before it counts again",
+    "passwordMin": "At least 8 characters"
+  },
+  "opError": {
+    "invalid_quantity": "Invalid quantity",
+    "product_not_found": "The product no longer exists",
+    "location_not_found": "The location no longer exists",
+    "already_undone": "Already undone",
+    "cannot_undo_undo": "An undo cannot be undone",
+    "clamped": "Removed as much as possible – stock is now 0",
+    "server_error": "The server could not process the change",
+    "bad_request": "The server rejected the change",
+    "location_not_empty": "Move the stock out of this location first",
+    "default_location": "The default location cannot be deleted",
+    "default_required": "Pick another location as default instead",
+    "last_owner": "The household needs at least one active owner",
+    "cannot_delete_self": "You cannot delete your own account",
+    "owner_required": "Only an owner can manage owners",
+    "username_taken": "That username is already taken",
+    "invalid_merge": "These products cannot be merged",
+    "category_not_found": "The category does not exist",
+    "invalid_image": "The image could not be used",
+    "payload_too_large": "The file is too large",
+    "rate_limited": "Too many attempts – wait a moment"
   }
 }

@@ -105,7 +105,6 @@ export function useAddToShopping() {
           name: it.product.name,
           quantity: 1,
           category_id: it.product.category_id,
-          source: 'inventory',
         })
     },
     onSuccess: () => {

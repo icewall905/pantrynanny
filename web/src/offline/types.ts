@@ -13,6 +13,8 @@ export interface PendingRecord {
   created: number
   /** Set (durably) right before the first upload attempt: the server may have applied it. */
   sent?: boolean
+  /** Consecutive HTTP 500 responses for this op when sent on its own. */
+  fails500?: number
 }
 
 export interface FailedRecord {
@@ -20,6 +22,8 @@ export interface FailedRecord {
   seq: number
   op: ClientOp
   error: string
+  /** Machine code from OpResult.error_code (or bad_request / server_error). */
+  error_code?: string | null
   at: string
 }
 

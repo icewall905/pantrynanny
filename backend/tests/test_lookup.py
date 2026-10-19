@@ -255,6 +255,9 @@ async def test_rate_limited_lookup_skips_http(env, lookup_on, off):
 
     lookup_on.off_rate_per_min = 1
     reset_buckets()
+    off.get("https://world.openfoodfacts.org/api/v2/product/5705830020017.json").mock(
+        return_value=httpx.Response(404, json={"status": 0})
+    )
     async with env.app.state.sessionmaker() as s:
         await lookup_external(s, env.household_id, "05705830020017")  # uses the only token
     async with env.app.state.sessionmaker() as s:
@@ -413,7 +416,7 @@ async def test_photo_upload_reencodes_and_strips_exif(env, lookup_on):
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["image_url"].startswith("/api/media/") and "image" in body["locked_fields"]
-    stored = Path(lookup_on.upload_dir) / body["image_url"].rsplit("/", 1)[1]
+    stored = Path(env.app.state.settings.upload_dir) / body["image_url"].rsplit("/", 1)[1]
     raw = stored.read_bytes()
     assert b"SecretCameraMaker" not in raw
     with Image.open(stored) as im:

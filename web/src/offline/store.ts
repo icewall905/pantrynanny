@@ -21,6 +21,10 @@ export type NewOp = Omit<ClientOp, 'client_op_id' | 'occurred_at'> &
   Partial<Pick<ClientOp, 'client_op_id' | 'occurred_at'>>
 
 const BATCH = 100
+/** Consecutive HTTP 500s for a multi-op batch before it is split into single ops. */
+const BATCH_500_SPLIT = 2
+/** Consecutive HTTP 500s for one single op before it is parked in failedOps. */
+const OP_500_LIMIT = 5
 const HISTORY_MAX = 50
 const BACKOFF_MIN = 1000
 const BACKOFF_MAX = 30_000
@@ -50,6 +54,7 @@ export class OfflineStore {
   /** Set after a 401: no polling/backoff until resume() (successful login or pairing). */
   private paused = false
   private retryDelay = BACKOFF_MIN
+  private batch500 = 0
   private retryTimer: ReturnType<typeof setTimeout> | null = null
   private started = false
   private cleanup: (() => void)[] = []
@@ -564,17 +569,37 @@ export class OfflineStore {
               size = 1
               continue
             }
-            await this.fail(batch[0], `${e.status}: ${e.message}`)
+            await this.fail(batch[0], `${e.status}: ${e.message}`, 'bad_request')
             continue
+          }
+          if (e instanceof ApiError && e.status === 500) {
+            // A poison op must never block the queue forever. 502/503/504/network stay retry-forever.
+            if (batch.length > 1) {
+              if (++this.batch500 >= BATCH_500_SPLIT) {
+                size = 1
+                continue
+              }
+              throw e
+            }
+            const rec = batch[0]
+            const n = (rec.fails500 ?? 0) + 1
+            if (n >= OP_500_LIMIT) {
+              await this.fail(rec, `${e.status}: ${e.message}`, 'server_error')
+              this.batch500 = 0
+              continue
+            }
+            await db.put('pendingOps', { ...rec, fails500: n })
+            throw e
           }
           throw e
         }
+        this.batch500 = 0
         const byId = new Map(res.results.map((r) => [r.client_op_id, r]))
         if (batch.some((b) => !byId.has(b.client_op_id))) throw new Error('incomplete sync response')
         for (const rec of batch) {
           const r = byId.get(rec.client_op_id)!
           if (r.status === 'rejected') {
-            await this.fail(rec, r.error ?? r.error_code ?? 'rejected')
+            await this.fail(rec, r.error ?? r.error_code ?? 'rejected', r.error_code ?? null)
             continue
           }
           const tx = db.transaction(['pendingOps', 'products', 'barcodeIndex', 'inventory'], 'readwrite')
@@ -599,7 +624,7 @@ export class OfflineStore {
     }
   }
 
-  private async fail(rec: PendingRecord, error: string) {
+  private async fail(rec: PendingRecord, error: string, error_code: string | null = null) {
     const db = await this.db()
     const tx = db.transaction(['pendingOps', 'failedOps'], 'readwrite')
     await tx.objectStore('failedOps').put({
@@ -607,6 +632,7 @@ export class OfflineStore {
       seq: rec.seq,
       op: rec.op,
       error,
+      error_code,
       at: new Date().toISOString(),
     } satisfies FailedRecord)
     await tx.objectStore('pendingOps').delete(rec.client_op_id)

@@ -17,6 +17,7 @@ import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Selec
 import { useAuth, useSettings } from '../auth/AuthProvider'
 import { useStockOps } from '../hooks/useStock'
 import { formatDateTime, formatQty } from '../lib/format'
+import { apiErrorText } from '../lib/opError'
 
 function attribution(p: Product, off: string): string | null {
   if (p.source_attribution) return p.source_attribution
@@ -90,7 +91,7 @@ export default function ProductDetailPage() {
       toast.push(t('product.undone'), 'success')
     },
     onError: (e) =>
-      toast.push(e instanceof ApiError && e.status === 409 ? t('product.alreadyUndone') : t('common.saveFailed'), 'error'),
+      toast.push(apiErrorText(t, e, t('common.saveFailed')), 'error'),
   })
 
   const refresh = useMutation({

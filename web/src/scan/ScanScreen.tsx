@@ -12,6 +12,7 @@ import { ScannerEngine, type EngineState, type ScanEvent } from './engine'
 import { beep, setSoundEnabled, vibrate } from './feedback'
 import { FRAME } from './geometry'
 import { NS } from './i18n'
+import { opErrorText } from '../lib/opError'
 import { loadMode, removeTimedOut, saveMode, type ScanMode } from './mode'
 import { perf } from './perf'
 import type { WakeState } from './wakelock'
@@ -72,7 +73,7 @@ export interface ScanScreenProps {
 }
 
 export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: ScanScreenProps) {
-  const { t } = useTranslation(NS)
+  const { t, i18n } = useTranslation(NS)
   const store = getStore()
   const sync = useSyncStatus()
 
@@ -600,7 +601,7 @@ export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: 
                   <div className="font-semibold">
                     {f.op.type} × {f.op.quantity} · {f.op.barcode ?? f.op.product_id}
                   </div>
-                  <div className="text-sm text-red-300">{f.error}</div>
+                  <div className="text-sm text-red-300">{opErrorText(i18n, f.error_code, f.error)}</div>
                   <div className="mt-2 flex gap-2">
                     <button type="button" className="rounded-lg bg-white/15 px-3 py-2" onClick={() => void store.retryFailedOp(f.client_op_id)}>
                       {t('failed.retry')}

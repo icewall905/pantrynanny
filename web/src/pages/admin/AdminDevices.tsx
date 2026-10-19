@@ -50,12 +50,12 @@ export default function AdminDevices() {
           <li key={d.id} className="flex items-center gap-3 py-3">
             <Smartphone className="size-5 text-ink-500" />
             <div className="min-w-0 flex-1">
-              <div className="truncate font-semibold">{d.name ?? d.platform ?? d.id.slice(0, 8)}</div>
+              <div className="truncate font-semibold">{d.device_name ?? d.platform ?? d.id.slice(0, 8)}</div>
               <div className="text-xs text-ink-500">
                 {[d.username, d.last_used_at ? formatDateTime(d.last_used_at, i18n.language) : null].filter(Boolean).join(' · ')}
               </div>
             </div>
-            {d.kiosk && <Badge tone="info">Kiosk</Badge>}
+            {d.kind === 'kiosk' && <Badge tone="info">Kiosk</Badge>}
             {d.current && <Badge tone="good">{t('admin.thisDevice')}</Badge>}
             <Button size="sm" variant="ghost" aria-label={t('admin.revoke')} onClick={() => revoke.mutate(d.id)}>
               <Trash2 className="size-4" /> {t('admin.revoke')}

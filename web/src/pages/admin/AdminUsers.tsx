@@ -5,6 +5,7 @@ import { Pencil, UserPlus } from 'lucide-react'
 import { get, patch, post } from '../../api/client'
 import type { AdminUser, Role } from '../../api/types'
 import { useToast } from '../../components/Toast'
+import { apiErrorText } from '../../lib/opError'
 import { Badge, Button, Card, ErrorState, Field, Input, ListSkeleton, Modal, Select, Toggle } from '../../components/ui'
 
 interface Draft extends Partial<AdminUser> {
@@ -28,7 +29,7 @@ export default function AdminUsers() {
       void qc.invalidateQueries({ queryKey: ['admin', 'users'] })
       toast.push(t('common.saved'), 'success')
     },
-    onError: () => toast.push(t('common.saveFailed'), 'error'),
+    onError: (e) => toast.push(apiErrorText(t, e, t('common.saveFailed')), 'error'),
   })
   if (q.isError) return <ErrorState error={q.error} onRetry={() => void q.refetch()} />
   if (!q.data) return <ListSkeleton rows={3} />
@@ -66,7 +67,7 @@ export default function AdminUsers() {
             <Button
               variant="primary"
               loading={save.isPending}
-              disabled={!edit?.display_name?.trim() || (!!creating && (!edit?.username?.trim() || !edit?.password))}
+              disabled={!edit?.display_name?.trim() || (!!creating && (!edit?.username?.trim() || (edit?.password?.length ?? 0) < 8)) || (!creating && !!edit?.password && edit.password.length < 8)}
               onClick={() => edit && save.mutate(edit)}
             >
               {t('common.save')}
@@ -78,7 +79,7 @@ export default function AdminUsers() {
           <div className="space-y-3">
             {creating && <Field label={t('login.username')}>{(id) => <Input id={id} autoCapitalize="none" value={edit.username ?? ''} onChange={(e) => setEdit({ ...edit, username: e.target.value })} />}</Field>}
             <Field label={t('admin.displayName')}>{(id) => <Input id={id} value={edit.display_name ?? ''} onChange={(e) => setEdit({ ...edit, display_name: e.target.value })} />}</Field>
-            <Field label={creating ? t('login.password') : t('admin.newPassword')} hint={creating ? undefined : t('admin.newPasswordHint')}>
+            <Field label={creating ? t('login.password') : t('admin.newPassword')} hint={creating ? t('admin.passwordMin') : `${t('admin.newPasswordHint')} · ${t('admin.passwordMin')}`}>
               {(id) => <Input id={id} type="password" autoComplete="new-password" value={edit.password ?? ''} onChange={(e) => setEdit({ ...edit, password: e.target.value })} />}
             </Field>
             <Field label={t('admin.role')}>

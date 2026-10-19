@@ -5,6 +5,7 @@ import { Pencil, Plus, Star, Trash2 } from 'lucide-react'
 import { del, get, patch, post } from '../../api/client'
 import type { Category, Location } from '../../api/types'
 import { useToast } from '../../components/Toast'
+import { apiErrorText } from '../../lib/opError'
 import { Badge, Button, Card, Field, Input, Modal, Toggle } from '../../components/ui'
 
 type Kind = 'locations' | 'categories'
@@ -33,7 +34,7 @@ function Section({ kind }: { kind: Kind }) {
       done()
       toast.push(t('common.saved'), 'success')
     },
-    onError: () => toast.push(t('common.saveFailed'), 'error'),
+    onError: (e) => toast.push(apiErrorText(t, e, t('common.saveFailed')), 'error'),
   })
   const remove = useMutation({
     mutationFn: (id: string) => del(`/${kind}/${id}`),
@@ -41,7 +42,7 @@ function Section({ kind }: { kind: Kind }) {
       setConfirm(null)
       done()
     },
-    onError: () => toast.push(t('common.saveFailed'), 'error'),
+    onError: (e) => toast.push(apiErrorText(t, e, t('common.saveFailed')), 'error'),
   })
   const rows = (list.data ?? []).filter((i) => !i.deleted_at)
   return (

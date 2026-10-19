@@ -247,14 +247,15 @@ export interface AdminUser {
 
 export interface DeviceInfo {
   id: UUID
-  name: string | null
-  platform?: string | null
-  kiosk?: boolean
-  user_id?: UUID | null
-  username?: string | null
-  created_at?: ISODateTime
-  last_used_at?: ISODateTime | null
-  current?: boolean
+  kind: 'browser' | 'device' | 'kiosk'
+  device_name: string | null
+  platform: string | null
+  user_id: UUID | null
+  username: string | null
+  created_at: ISODateTime
+  last_used_at: ISODateTime
+  expires_at: ISODateTime
+  current: boolean
 }
 
 export interface KioskCode {
@@ -276,7 +277,7 @@ export interface CatalogueStatus {
   by_status?: Record<string, number>
   by_source?: Record<string, number>
   failed_lookups?: { barcode?: string; raw?: string; status?: string; provider?: string; created_at?: string; error?: string | null }[]
-  duplicate_candidates?: { a?: Product; b?: Product; ids?: UUID[]; names?: string[]; reason?: string }[]
+  duplicate_candidates?: { a?: Product; b?: Product; ids?: UUID[]; names?: string[]; reason?: string; similarity?: number }[]
   lookup_stats?: Record<string, number | string | null>
 }
 

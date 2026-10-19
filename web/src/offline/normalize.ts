@@ -34,43 +34,47 @@ export function gs1CheckDigit(payload: string): number {
   return (10 - (sum % 10)) % 10
 }
 
-/** Expand a 6-digit zero-suppressed UPC-E body (number system 0) to an 11-digit UPC-A payload. */
-function expandUpcE(ns: string, d: string): string {
-  const [d1, d2, d3, d4, d5, d6] = d.split('')
+const SYMBOLOGIES = new Set<string>(['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'itf', 'qr', 'data_matrix', 'other'])
+const NON_GTIN = new Set<string>(['qr', 'data_matrix', 'code_128', 'code_39'])
+
+/** Expand a 6-digit UPC-E body to a 12-digit UPC-A (with check digit). Mirrors backend expand_upc_e. */
+function expandUpcE(six: string, ns: string): string {
+  const d = six
+  const last = d[5]
   let body: string
-  if ('012'.includes(d6)) body = `${d1}${d2}${d6}0000${d3}${d4}${d5}`
-  else if (d6 === '3') body = `${d1}${d2}${d3}00000${d4}${d5}`
-  else if (d6 === '4') body = `${d1}${d2}${d3}${d4}00000${d5}`
-  else body = `${d1}${d2}${d3}${d4}${d5}0000${d6}`
-  return ns + body
+  if ('012'.includes(last)) body = d.slice(0, 2) + last + '0000' + d.slice(2, 5)
+  else if (last === '3') body = d.slice(0, 3) + '00000' + d.slice(3, 5)
+  else if (last === '4') body = d.slice(0, 4) + '00000' + d[4]
+  else body = d.slice(0, 5) + '0000' + last
+  body = ns + body
+  return body + gs1CheckDigit(body)
 }
 
+/** Exact port of backend/pantrynanny/services/barcodes.py `normalize` (keep in parity). */
 export function normalizeBarcode(raw: string, symbologyHint?: string | null): NormalizedBarcode {
-  const s = raw.replace(/\s+/g, '')
-  const hint = symbologyHint ?? null
-  const local = (): NormalizedBarcode => ({ code: `local:${raw}`, symbology: hint ?? 'other', valid: false })
-  if (!/^\d+$/.test(s)) return local()
+  const stripped = raw.trim()
+  const hint = symbologyHint && SYMBOLOGIES.has(symbologyHint) ? symbologyHint : null
+  const local = (): NormalizedBarcode => ({ code: `local:${stripped}`, symbology: hint ?? 'other', valid: false })
+  if (hint && NON_GTIN.has(hint)) return local()
 
-  let digits = s
-  let sym = hint
-  if (s.length === 6 || (s.length === 8 && hint === 'upc_e')) {
-    const ns = s.length === 8 ? s[0] : '0'
-    const body = s.length === 8 ? s.slice(1, 7) : s
-    if (ns !== '0' && ns !== '1') return local()
-    const payload = expandUpcE(ns, body)
-    const full = payload + gs1CheckDigit(payload)
-    if (s.length === 8 && Number(s[7]) !== Number(full[11])) return local()
-    digits = full
-    sym = 'upc_e'
-  } else if (![8, 12, 13, 14].includes(s.length)) {
-    return local()
-  } else if (!sym || sym === 'other') {
-    sym = s.length === 8 ? 'ean_8' : s.length === 12 ? 'upc_a' : s.length === 13 ? 'ean_13' : 'other'
+  const digits = stripped.replace(/\s+/g, '')
+  if (!/^\d+$/.test(digits)) return local()
+
+  const n = digits.length
+  if (n === 6 || (n === 8 && hint === 'upc_e')) {
+    let upcA: string
+    if (n === 6) upcA = expandUpcE(digits, '0')
+    else {
+      if (digits[0] !== '0' && digits[0] !== '1') return local()
+      upcA = expandUpcE(digits.slice(1, 7), digits[0])
+      if (upcA[11] !== digits[7]) return local()
+    }
+    return { code: upcA.padStart(14, '0'), symbology: 'upc_e', valid: true }
   }
 
-  if (digits.length === 13 && /^2\d/.test(digits)) {
-    return { code: `instore:${digits.slice(0, 7)}`, symbology: sym ?? 'ean_13', valid: true }
-  }
-  if (!gtinChecksumValid(digits)) return local()
-  return { code: digits.padStart(14, '0'), symbology: sym ?? 'other', valid: true }
+  const kinds: Record<number, string> = { 8: 'ean_8', 12: 'upc_a', 13: 'ean_13', 14: 'itf' }
+  if (!(n in kinds) || !gtinChecksumValid(digits)) return local()
+
+  if (n === 13 && /^2\d/.test(digits)) return { code: `instore:${digits.slice(0, 7)}`, symbology: 'ean_13', valid: true }
+  return { code: digits.padStart(14, '0'), symbology: kinds[n], valid: true }
 }

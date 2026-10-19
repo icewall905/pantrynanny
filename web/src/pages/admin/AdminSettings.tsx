@@ -6,6 +6,7 @@ import { keys } from '../../api/queries'
 import type { HouseholdSettings } from '../../api/types'
 import { useAuth, useSettings } from '../../auth/AuthProvider'
 import { useToast } from '../../components/Toast'
+import { apiErrorText } from '../../lib/opError'
 import { Button, Card, Field, Input, Select, Toggle } from '../../components/ui'
 
 export default function AdminSettings() {
@@ -22,11 +23,11 @@ export default function AdminSettings() {
       void qc.invalidateQueries({ queryKey: ['inventory'] })
       toast.push(t('common.saved'), 'success')
     },
-    onError: () => toast.push(t('common.saveFailed'), 'error'),
+    onError: (e) => toast.push(apiErrorText(t, e, t('common.saveFailed')), 'error'),
   })
-  const numField = (k: 'expiry_soon_days' | 'remove_mode_timeout_min' | 'scan_rearm_ms', label: string, hint?: string) => (
+  const numField = (k: 'expiry_soon_days' | 'remove_mode_timeout_min' | 'scan_rearm_ms', label: string, min: number, max: number, hint?: string) => (
     <Field label={label} hint={hint}>
-      {(id) => <Input id={id} type="number" min={0} value={s[k]} onChange={(e) => setS({ ...s, [k]: Number(e.target.value) })} />}
+      {(id) => <Input id={id} type="number" min={min} max={max} value={s[k]} onChange={(e) => setS({ ...s, [k]: Number(e.target.value) })} />}
     </Field>
   )
   return (
@@ -42,9 +43,9 @@ export default function AdminSettings() {
       </Field>
       <Toggle checked={s.allow_negative_stock} onChange={(v) => setS({ ...s, allow_negative_stock: v })} label={t('admin.allowNegative')} hint={t('admin.allowNegativeHint')} />
       <Toggle checked={s.auto_shopping_low_stock} onChange={(v) => setS({ ...s, auto_shopping_low_stock: v })} label={t('admin.autoShopping')} hint={t('admin.autoShoppingHint')} />
-      {numField('expiry_soon_days', t('admin.expirySoonDays'))}
-      {numField('remove_mode_timeout_min', t('admin.removeTimeout'), t('admin.removeTimeoutHint'))}
-      {numField('scan_rearm_ms', t('admin.rearm'), t('admin.rearmHint'))}
+      {numField('expiry_soon_days', t('admin.expirySoonDays'), 0, 365)}
+      {numField('remove_mode_timeout_min', t('admin.removeTimeout'), 1, 240, t('admin.removeTimeoutHint'))}
+      {numField('scan_rearm_ms', t('admin.rearm'), 250, 3000, t('admin.rearmHint'))}
       <Button variant="primary" loading={save.isPending} onClick={() => save.mutate()}>
         {t('common.save')}
       </Button>

@@ -22,12 +22,12 @@ export function renderApp(ui: ReactElement, route = '/') {
 type Handler = (url: URL, init: RequestInit) => unknown | Response
 /** Test-only fetch mock: routes by "METHOD /path" (path without /api, no query). */
 export function mockFetch(routes: Record<string, Handler | unknown>) {
-  const calls: { method: string; path: string; body: unknown }[] = []
+  const calls: { method: string; path: string; body: unknown; headers: Record<string, string> }[] = []
   const fn = vi.fn(async (input: RequestInfo | URL, init: RequestInit = {}) => {
     const url = new URL(String(input), 'http://localhost')
     const method = (init.method ?? 'GET').toUpperCase()
     const path = url.pathname.replace(/^\/api/, '')
-    calls.push({ method, path, body: typeof init.body === 'string' ? JSON.parse(init.body) : init.body })
+    calls.push({ method, path, body: typeof init.body === 'string' ? JSON.parse(init.body) : init.body, headers: (init.headers ?? {}) as Record<string, string> })
     const h = routes[`${method} ${path}`]
     if (h === undefined) return new Response(JSON.stringify({ detail: 'nope' }), { status: 404, headers: { 'content-type': 'application/json' } })
     const out = typeof h === 'function' ? (h as Handler)(url, init) : h
