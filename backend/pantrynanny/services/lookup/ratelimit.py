@@ -36,13 +36,22 @@ class TokenBucket:
         self._refill()
         return 0.0 if self._tokens >= 1 else (1 - self._tokens) / self.rate_per_s
 
-    async def acquire(self, max_wait_s: float = 0.0) -> bool:
+    async def acquire(self, max_wait_s: float = 0.0, stop: asyncio.Event | None = None) -> bool:
         wait = self.wait_time()
         if wait > max_wait_s:
             return False
         self._tokens -= 1
         if wait > 0:
-            await self._sleep(wait)
+            if stop is None:
+                await self._sleep(wait)
+            else:
+                try:
+                    async with asyncio.timeout(wait):
+                        await stop.wait()
+                except TimeoutError:
+                    return True
+                self._tokens += 1  # interrupted by shutdown: give the token back
+                return False
         return True
 
 

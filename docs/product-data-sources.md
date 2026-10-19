@@ -48,6 +48,12 @@ placeholder + background enrichment. Provider enable/priority/API keys are edita
 * The bundled test fixture is a representative OFF v2 response for a Danish dairy product
   (barcode illustrative), not a live recording.
 
+* **Run exactly one worker** (`pantrynanny-worker.service`): its rate budget is per process and
+  the API's plus the worker's budgets together must stay under 15/min. Failed (unidentified)
+  placeholders are retried once a week; refreshes that errored are retried by the daily refresh.
+* **Names**: Danish (`product_name_da`) is preferred, then English, then the product's main
+  language name (which can be any language), then generic names; same for ingredients.
+
 ## Open Beauty Facts, Open Pet Food Facts, Open Products Facts
 
 Sister projects (same API shape, ODbL/CC BY-SA) at `world.openbeautyfacts.org`,

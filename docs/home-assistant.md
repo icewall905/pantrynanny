@@ -19,6 +19,10 @@ Store the returned `token` in HA's `secrets.yaml`:
 pantrynanny_bearer: "Bearer <token>"
 ```
 
+**Note:** this is a full member token (there is no scoped read-only token yet), so anyone with
+access to the HA secrets can act as that member. Use a dedicated account and revoke it if HA is
+compromised; a scoped read-only token may follow later.
+
 Tokens last 365 days and slide with use. Revoke them under Admin -> Devices.
 
 ## 2. Response

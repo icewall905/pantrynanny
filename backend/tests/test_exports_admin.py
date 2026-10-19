@@ -161,3 +161,17 @@ async def test_ha_summary_requires_bearer(env, client):
     assert j["low_stock"] == ["Mælk"] and j["low_stock_count"] == 1
     assert j["expired_count"] == 1 and j["products_in_stock"] == 1
     assert "shopping_open_count" in j and "generated_at" in j
+
+
+async def test_csv_formula_guard_covers_list_columns_and_leading_space(env):
+    await env.product(
+        "  =cmd|' /C calc'!A0",
+        barcodes=['=HYPERLINK("http://x")'],
+        allergens=["=1+1"],
+        countries=["@SUM(A1)"],
+    )
+    r = await env.client.get("/api/export/products.csv", headers=env.member)
+    rows = list(csv.reader(io.StringIO(r.content.decode("utf-8-sig")), delimiter=";"))
+    h, row = rows[0], rows[1]
+    for col in ("name", "barcodes", "allergens", "countries"):
+        assert row[h.index(col)].startswith("'"), (col, row[h.index(col)])

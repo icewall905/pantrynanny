@@ -15,7 +15,7 @@ from PIL import Image
 from sqlalchemy import select, text, update
 
 from pantrynanny.config import Settings
-from pantrynanny.models import EnrichmentQueue, LookupAttempt, LookupCache
+from pantrynanny.models import EnrichmentQueue, LookupAttempt, LookupCache, Product
 from pantrynanny.services.lookup import runtime
 from pantrynanny.services.lookup.parsing import map_category, parse_quantity, provider_code
 from pantrynanny.services.lookup.ratelimit import TokenBucket, reset_buckets
@@ -74,6 +74,10 @@ def off():
         m.route_off = route
         m.route_img = img
         yield m
+
+
+def api_calls(m) -> int:
+    return sum(1 for c in m.calls if "/api/v2/" in str(c.request.url))
 
 
 async def by_barcode(env, code=CODE, **params):
@@ -526,3 +530,159 @@ async def test_time_budget_is_respected(env, lookup_on, off):
     out = await by_barcode(env)
     assert out["status"] == "created_placeholder"
     assert time.monotonic() - t0 < 5
+
+
+# --------------------------------------------------------------------------- review fixes
+
+
+def test_name_language_preference():
+    from pantrynanny.services.lookup.providers import OpenFoodFactsProvider
+
+    prov = OpenFoodFactsProvider(Settings(database_url=TEST_DB_URL))
+    base = {"brands": "Lurpak", "quantity": "250 g"}
+    polish = prov.map_product(
+        {**base, "product_name": "Duńskie masło lekko solone", "product_name_en": "Danish butter"}
+    )
+    assert polish.name == "Danish butter"
+    da = prov.map_product({**base, "product_name": "Masło", "product_name_da": "Smør"})
+    assert da.name == "Smør"
+    only = prov.map_product({**base, "product_name": "Masło"})
+    assert only.name == "Masło"
+    ing = prov.map_product(
+        {**base, "product_name": "x", "ingredients_text": "Mleko", "ingredients_text_en": "Milk"}
+    )
+    assert ing.ingredients == "Milk"
+    from pantrynanny.services.lookup.providers import OFF_FIELDS
+
+    assert {"product_name_en", "generic_name_en", "ingredients_text_en"} <= set(
+        OFF_FIELDS.split(",")
+    )
+
+
+def _big_png(w, h) -> bytes:
+    buf = io.BytesIO()
+    Image.new("L", (w, h), 7).save(buf, "PNG")
+    return buf.getvalue()
+
+
+async def test_photo_rejects_huge_resolution_before_decoding(env, lookup_on):
+    p = await env.product("Stor")
+    big = _big_png(6000, 5000)  # 30 MP, tiny file
+    assert len(big) < 1_000_000
+    r = await env.client.post(
+        f"/api/products/{p['id']}/photo",
+        files={"file": ("big.png", big, "image/png")},
+        headers=env.member,
+    )
+    assert r.status_code == 422 and r.json()["code"] == "invalid_image"
+    ok = await env.client.post(
+        f"/api/products/{p['id']}/photo",
+        files={"file": ("ok.png", _big_png(4000, 3000), "image/png")},  # 12 MP is fine
+        headers=env.member,
+    )
+    assert ok.status_code == 200
+
+
+async def test_rotated_jpeg_is_still_oriented(env, lookup_on):
+    img = Image.new("RGB", (300, 100), (10, 200, 10))
+    ex = Image.Exif()
+    ex[0x0112] = 6  # rotate 90 CW when displayed
+    buf = io.BytesIO()
+    img.save(buf, "JPEG", exif=ex.tobytes())
+    from pantrynanny.services.lookup.media import reencode_webp
+
+    out = Image.open(io.BytesIO(reencode_webp(buf.getvalue())))
+    assert out.size == (100, 300)
+
+
+async def test_token_bucket_wait_interrupted_by_stop():
+    import asyncio
+
+    b = TokenBucket(6, burst=1)
+    assert await b.acquire(0)
+    stop = asyncio.Event()
+    asyncio.get_running_loop().call_later(0.05, stop.set)
+    t0 = time.monotonic()
+    assert not await b.acquire(30, stop)  # would wait ~10 s
+    assert time.monotonic() - t0 < 2
+
+
+async def test_worker_stop_releases_unprocessed_items(env, lookup_on, off):
+    import asyncio
+
+    off.get(OFF_URL).mock(return_value=httpx.Response(404, json={"status": 0}))
+    await by_barcode(env)
+    stop = asyncio.Event()
+    stop.set()
+    sm = env.app.state.sessionmaker
+    assert await run_once(sm, stop=stop) == 1
+    async with sm() as s:
+        q = (await s.execute(select(EnrichmentQueue))).scalar_one()
+        assert q.status == "pending" and q.attempts == 0
+
+
+async def test_worker_marks_items_of_deleted_products_failed(env, lookup_on, off):
+    off.get(OFF_URL).mock(return_value=httpx.Response(404, json={"status": 0}))
+    out = await by_barcode(env)
+    sm = env.app.state.sessionmaker
+    async with sm() as s, s.begin():
+        await s.execute(update(Product).values(deleted_at=datetime.now(UTC)))
+    n_calls = off.calls.call_count
+    await run_once(sm)
+    async with sm() as s:
+        q = (await s.execute(select(EnrichmentQueue))).scalar_one()
+        assert q.status == "failed" and q.last_error == "product gone"
+    assert off.calls.call_count == n_calls and out["product"]["status"] == "unknown"
+
+
+async def test_failed_placeholders_are_retried_weekly(env, lookup_on, off):
+    from pantrynanny.worker import maintenance
+
+    off.get(OFF_URL).mock(return_value=httpx.Response(404, json={"status": 0}))
+    await by_barcode(env)
+    sm = env.app.state.sessionmaker
+    async with sm() as s, s.begin():
+        await s.execute(
+            update(EnrichmentQueue).values(
+                status="failed",
+                attempts=6,
+                last_error="not found by any provider",
+                updated_at=datetime.now(UTC) - timedelta(days=8),
+            )
+        )
+    await maintenance(sm)
+    async with sm() as s:
+        q = (await s.execute(select(EnrichmentQueue))).scalar_one()
+        assert q.status == "pending" and q.attempts == 5
+
+
+async def test_refresh_stale_includes_products_whose_refresh_errored(env, lookup_on, off):
+    from pantrynanny.worker import refresh_stale
+
+    out = await by_barcode(env)
+    sm = env.app.state.sessionmaker
+    off.get(OFF_URL).mock(return_value=httpx.Response(200, json=OFF_JSON))
+    async with sm() as s, s.begin():
+        await s.execute(
+            update(LookupCache).values(
+                status="error", retry_after=datetime.now(UTC) - timedelta(minutes=1)
+            )
+        )
+    calls = api_calls(off)
+    assert await refresh_stale(sm) == 1
+    assert api_calls(off) == calls + 1 and out["product"]["status"] == "known"
+
+
+async def test_forced_refresh_honours_429_retry_after(env, lookup_on, off):
+    out = await by_barcode(env)
+    pid = out["product"]["id"]
+    off.get(OFF_URL).mock(return_value=httpx.Response(429, headers={"Retry-After": "120"}))
+    r = await env.client.post(f"/api/products/{pid}/refresh", headers=env.member)
+    assert r.status_code == 200
+    n = off.calls.call_count
+    r = await env.client.post(f"/api/products/{pid}/refresh", headers=env.member)
+    assert r.status_code == 200
+    assert off.calls.call_count == n  # blocked by the cached 429 backoff
+    async with env.app.state.sessionmaker() as s:
+        c = (await s.execute(select(LookupCache))).scalar_one()
+        assert c.retry_after > datetime.now(UTC) + timedelta(seconds=100)

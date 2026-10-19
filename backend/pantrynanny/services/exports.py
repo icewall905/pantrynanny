@@ -229,10 +229,8 @@ def _cell(v: Any, tz: ZoneInfo) -> str:
         return v.astimezone(tz).strftime("%Y-%m-%d %H:%M:%S")
     if isinstance(v, date):
         return v.isoformat()
-    if isinstance(v, list):
-        return ", ".join(str(x) for x in v)
-    s = str(v)
-    if s[:1] in ("=", "+", "-", "@", "\t", "\r"):
+    s = ", ".join(str(x) for x in v) if isinstance(v, list) else str(v)
+    if s.lstrip()[:1] in ("=", "+", "-", "@", "\t", "\r"):
         s = "'" + s  # neutralise spreadsheet formula injection
     return s
 

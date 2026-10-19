@@ -1,5 +1,6 @@
 """Product photos, provider refresh and (development fallback) media serving."""
 
+import asyncio
 import uuid
 
 from fastapi import APIRouter, Depends, File, Request, UploadFile
@@ -8,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from ..db import get_session, get_sessionmaker
 from ..errors import AppError, not_found
+from ..logging import get_logger
 from ..schemas.catalogue import ProductOut
 from ..security import Principal, get_principal
 from ..services import products as svc
@@ -19,6 +21,7 @@ from ..services.lookup.media import (
     store_image,
 )
 
+log = get_logger()
 router = APIRouter(tags=["media"])
 
 
@@ -79,7 +82,12 @@ async def refresh(
 ):
     """Re-run the external lookup now (ignores fresh cache, respects ``locked_fields``)."""
     await svc.get_product(session, principal.household_id, product_id)
-    await refresh_product(sm, principal.household_id, product_id, budget_s=12.0)
+    try:
+        await asyncio.wait_for(
+            refresh_product(sm, principal.household_id, product_id, budget_s=12.0), timeout=25.0
+        )
+    except TimeoutError:
+        log.warning("refresh_timeout", product_id=str(product_id))
     return svc.product_out(
         await svc.get_product(session, principal.household_id, product_id, refresh=True)
     )

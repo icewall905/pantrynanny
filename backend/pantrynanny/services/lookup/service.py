@@ -1,5 +1,6 @@
 """Lookup orchestration: cache, provider chain, attempt log, applying data to products."""
 
+import asyncio
 import time
 import uuid
 from dataclasses import asdict, dataclass
@@ -85,7 +86,7 @@ async def _store_cache(session: AsyncSession, code: str, provider: str, res: Pro
         n = ((prev.payload or {}).get("errors", 0) if prev is not None else 0) + 1
         wait = max(error_backoff_s(n), int(res.retry_after_s or 0))
         retry_after = now + timedelta(seconds=wait)
-        payload = {"errors": n, "error": res.error}
+        payload = {"errors": n, "error": res.error, "http_status": res.http_status}
     stmt = insert(LookupCache).values(
         code=code,
         provider=provider,
@@ -115,6 +116,7 @@ async def lookup_detailed(
     force: bool = False,
     budget_s: float | None = None,
     max_rate_wait_s: float | None = None,
+    stop: asyncio.Event | None = None,
 ) -> LookupOutcome:
     """Resolve ``code`` (normalised GTIN-14) through cache, then providers in priority order.
 
@@ -139,8 +141,8 @@ async def lookup_detailed(
             )
         ).scalar_one_or_none()
         now = datetime.now(UTC)
-        if cached is not None and not force:
-            if cached.status == "found" and cached.fetched_at + FOUND_TTL > now:
+        if cached is not None:
+            if not force and cached.status == "found" and cached.fetched_at + FOUND_TTL > now:
                 try:
                     data = ProductData(**(cached.payload or {})["data"])
                 except (KeyError, TypeError):
@@ -151,12 +153,21 @@ async def lookup_detailed(
                     )
                     await session.commit()
                     return LookupOutcome("found", data, p.name)
-            elif cached.status == "not_found" and cached.fetched_at + NOT_FOUND_TTL > now:
+            elif (
+                not force
+                and cached.status == "not_found"
+                and cached.fetched_at + NOT_FOUND_TTL > now
+            ):
                 await _log_attempt(
                     session, household_id, product_id, code, p.name, "cache_negative"
                 )
                 continue
-            elif cached.status == "error" and cached.retry_after and cached.retry_after > now:
+            elif (
+                cached.status == "error"
+                and cached.retry_after
+                and cached.retry_after > now
+                and (not force or (cached.payload or {}).get("http_status") == 429)
+            ):  # a forced refresh still honours a provider's 429 / Retry-After
                 await _log_attempt(session, household_id, product_id, code, p.name, "cache_error")
                 saw_error = True
                 continue
@@ -166,7 +177,9 @@ async def lookup_detailed(
             break
         bucket = bucket_for(p.name, p.rate_per_min())
         wait_allowed = min(max_rate_wait_s, remaining) if max_rate_wait_s else 0.0
-        if not await bucket.acquire(wait_allowed):
+        if not await bucket.acquire(wait_allowed, stop):
+            if stop is not None and stop.is_set():
+                return LookupOutcome("error")
             await _log_attempt(
                 session, household_id, product_id, code, p.name, "rate_limited", error="local limit"
             )
@@ -394,6 +407,7 @@ async def refresh_product(
     *,
     budget_s: float = 10.0,
     max_rate_wait_s: float | None = None,
+    stop: asyncio.Event | None = None,
 ) -> LookupOutcome:
     """Force a provider re-lookup for every real barcode of the product and apply the result."""
     from ..products import get_product
@@ -412,6 +426,7 @@ async def refresh_product(
                 force=True,
                 budget_s=budget_s,
                 max_rate_wait_s=max_rate_wait_s,
+                stop=stop,
             )
         if out.data is not None:
             await enrich_product(sm, household_id, product_id, out.data)

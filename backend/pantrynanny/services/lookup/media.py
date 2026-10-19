@@ -16,7 +16,8 @@ from . import runtime
 log = get_logger()
 
 MAX_DIMENSION = 1600
-MAX_PIXELS = 40_000_000  # decompression-bomb guard
+MAX_PIXELS = 40_000_000  # Pillow's own bomb guard (errors above 2x this)
+MAX_INPUT_PIXELS = 24_000_000  # we refuse anything larger before decoding it
 ALLOWED_FORMATS = {"JPEG", "PNG", "WEBP", "MPO", "HEIF", "HEIC"}
 FILE_RE = re.compile(r"^[0-9a-f]{32}\.webp$")
 # Only images served by the Open*Facts projects may be fetched by the server.
@@ -43,14 +44,18 @@ def reencode_webp(data: bytes) -> bytes:
     try:
         with Image.open(io.BytesIO(data)) as probe:
             fmt = probe.format
+            if probe.width * probe.height > MAX_INPUT_PIXELS:
+                raise InvalidImage("image resolution too large")
             probe.verify()
         if fmt not in ALLOWED_FORMATS:
             raise InvalidImage(f"unsupported image format: {fmt}")
         with Image.open(io.BytesIO(data)) as img:
+            if img.format in ("JPEG", "MPO"):
+                img.draft("RGB", (MAX_DIMENSION, MAX_DIMENSION))  # decode at reduced size
+            img.thumbnail((MAX_DIMENSION, MAX_DIMENSION), Image.Resampling.LANCZOS)
             img = ImageOps.exif_transpose(img)  # apply orientation, then drop all metadata
             has_alpha = img.mode in ("RGBA", "LA") or "transparency" in img.info
             img = img.convert("RGBA" if has_alpha else "RGB")
-            img.thumbnail((MAX_DIMENSION, MAX_DIMENSION), Image.Resampling.LANCZOS)
             img.info = {}  # no exif/icc/xmp is carried into the encoded file
             out = io.BytesIO()
             img.save(out, "WEBP", quality=82, method=4, exif=b"", icc_profile=None)

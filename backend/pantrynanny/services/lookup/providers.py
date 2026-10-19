@@ -91,8 +91,10 @@ OFF_FIELDS = ",".join(
         "code",
         "product_name",
         "product_name_da",
+        "product_name_en",
         "generic_name",
         "generic_name_da",
+        "generic_name_en",
         "brands",
         "quantity",
         "categories_tags",
@@ -100,6 +102,7 @@ OFF_FIELDS = ",".join(
         "image_url",
         "ingredients_text",
         "ingredients_text_da",
+        "ingredients_text_en",
         "allergens_tags",
         "nutriments",
         "countries_tags",
@@ -189,10 +192,14 @@ class OpenFoodFactsProvider:
         return ProviderResult("found", data=data, raw=product, http_status=200)
 
     def map_product(self, p: dict[str, Any]) -> ProductData | None:
+        # Danish first, then English; the "main language" fields can be any language (Polish
+        # butter in a Danish shop), so they come last.
         name = _first(
             p.get("product_name_da"),
+            p.get("product_name_en"),
             p.get("product_name"),
             p.get("generic_name_da"),
+            p.get("generic_name_en"),
             p.get("generic_name"),
         )
         if not name:
@@ -200,7 +207,7 @@ class OpenFoodFactsProvider:
         brands = _first(p.get("brands"))
         brand = brands.split(",")[0].strip() if brands else None
         size, unit, note = parse_quantity(p.get("quantity"))
-        generic = _first(p.get("generic_name_da"), p.get("generic_name"))
+        generic = _first(p.get("generic_name_da"), p.get("generic_name_en"), p.get("generic_name"))
         desc_parts = []
         if generic and generic.lower() != name.lower():
             desc_parts.append(generic)
@@ -224,7 +231,11 @@ class OpenFoodFactsProvider:
             package_unit=unit,
             category_hint=map_category(p.get("categories_tags")),
             image_url=_first(p.get("image_front_url"), p.get("image_url")),
-            ingredients=_first(p.get("ingredients_text_da"), p.get("ingredients_text")),
+            ingredients=_first(
+                p.get("ingredients_text_da"),
+                p.get("ingredients_text_en"),
+                p.get("ingredients_text"),
+            ),
             allergens=allergen_names(p.get("allergens_tags")),
             nutrition=nutrition or None,
             countries=countries,

@@ -4,7 +4,9 @@ import httpx
 
 from ...config import Settings
 from ...config import get_settings as _env_settings
+from ...logging import get_logger
 
+log = get_logger("pantrynanny.lookup")
 _settings: Settings | None = None
 _client: httpx.AsyncClient | None = None
 _client_ua: str | None = None
@@ -31,6 +33,11 @@ def get_client() -> httpx.AsyncClient:
     global _client, _client_ua
     ua = get_settings().off_user_agent
     if _client is None or _client.is_closed or _client_ua != ua:
+        if "@" not in ua and "http" not in ua:
+            log.warning(
+                "off_user_agent_without_contact",
+                hint="set PN_OFF_USER_AGENT to 'PantryNanny/1.0 (contact: you@example.com)'",
+            )
         _client = httpx.AsyncClient(
             headers={"User-Agent": ua, "Accept": "application/json"},
             follow_redirects=False,
