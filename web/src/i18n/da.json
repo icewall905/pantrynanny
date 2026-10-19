@@ -14,7 +14,8 @@
     "retry": "Prøv igen",
     "save": "Gem",
     "saved": "Gemt",
-    "saveFailed": "Kunne ikke gemme. Prøv igen."
+    "saveFailed": "Kunne ikke gemme. Prøv igen.",
+    "done": "Færdig"
   },
   "error": {
     "title": "Noget gik galt",
@@ -34,7 +35,8 @@
     "assistant": "Assistent",
     "export": "Eksport",
     "settings": "Indstillinger",
-    "admin": "Administration"
+    "admin": "Administration",
+    "kitchen": "Køkken"
   },
   "sync": {
     "synced": "Synkroniseret",
@@ -436,5 +438,31 @@
     "sessionMeta": "{{scans}} scanninger · {{products}} varer",
     "sessionUnknown_one": "{{count}} ukendt",
     "sessionUnknown_other": "{{count}} ukendte"
+  },
+  "kitchen": {
+    "greet_morning": "Godmorgen",
+    "greet_day": "God eftermiddag",
+    "greet_evening": "Godaften",
+    "dim": "Dæmp skærmen",
+    "bright": "Fuld lysstyrke",
+    "scanIn": "Scan ind",
+    "scanOut": "Scan ud",
+    "shopping": "Indkøbsliste",
+    "expiring": "Brug snart",
+    "quick": "Hurtigt: tog én",
+    "editFavorites": "Ret favoritter",
+    "noTiles": "Varer I scanner eller bruger tit, dukker op her. Fastgør favoritter med “Ret favoritter”.",
+    "toggleFavorite": "Fastgør eller fjern {{name}}",
+    "takeOne": "Tog én {{name}}",
+    "left": "tilbage",
+    "favorite": "Favorit",
+    "pin": "Fastgør",
+    "unpin": "Fjern",
+    "useFirst": "Brug først",
+    "lowStock": "Ved at slippe op",
+    "nothingExpiring": "Intet er ved at udløbe.",
+    "nothingLow": "Intet er ved at slippe op.",
+    "took": "Tog 1 × {{name}}",
+    "undo": "Fortryd"
   }
 }

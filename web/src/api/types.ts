@@ -76,6 +76,8 @@ export interface Product {
   source_attribution: string | null
   lookup_confidence: number | null
   locked_fields: string[]
+  /** pinned on the kitchen screen */
+  favorite?: boolean
   created_at: ISODateTime
   updated_at: ISODateTime
   deleted_at: ISODateTime | null

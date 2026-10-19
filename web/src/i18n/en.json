@@ -14,7 +14,8 @@
     "retry": "Try again",
     "save": "Save",
     "saved": "Saved",
-    "saveFailed": "Could not save. Please try again."
+    "saveFailed": "Could not save. Please try again.",
+    "done": "Done"
   },
   "error": {
     "title": "Something went wrong",
@@ -34,7 +35,8 @@
     "assistant": "Assistant",
     "export": "Export",
     "settings": "Settings",
-    "admin": "Admin"
+    "admin": "Admin",
+    "kitchen": "Kitchen"
   },
   "sync": {
     "synced": "Synced",
@@ -436,5 +438,31 @@
     "sessionMeta": "{{scans}} scans · {{products}} products",
     "sessionUnknown_one": "{{count}} unknown",
     "sessionUnknown_other": "{{count}} unknown"
+  },
+  "kitchen": {
+    "greet_morning": "Good morning",
+    "greet_day": "Good afternoon",
+    "greet_evening": "Good evening",
+    "dim": "Dim the screen",
+    "bright": "Full brightness",
+    "scanIn": "Scan in",
+    "scanOut": "Scan out",
+    "shopping": "Shopping list",
+    "expiring": "Use soon",
+    "quick": "Quick: took one",
+    "editFavorites": "Edit favourites",
+    "noTiles": "Products you scan or use often show up here. Pin favourites with “Edit favourites”.",
+    "toggleFavorite": "Pin or unpin {{name}}",
+    "takeOne": "Took one {{name}}",
+    "left": "left",
+    "favorite": "Favourite",
+    "pin": "Pin",
+    "unpin": "Unpin",
+    "useFirst": "Use first",
+    "lowStock": "Running low",
+    "nothingExpiring": "Nothing is about to expire.",
+    "nothingLow": "Nothing is running low.",
+    "took": "Took 1 × {{name}}",
+    "undo": "Undo"
   }
 }

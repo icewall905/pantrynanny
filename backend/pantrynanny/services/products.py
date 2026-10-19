@@ -103,6 +103,7 @@ def product_out(p: Product) -> ProductOut:
         source_attribution=p.source_attribution,
         lookup_confidence=p.lookup_confidence,
         locked_fields=list(p.locked_fields or []),
+        favorite=bool(p.favorite),
         created_at=p.created_at,
         updated_at=p.updated_at,
         deleted_at=p.deleted_at,

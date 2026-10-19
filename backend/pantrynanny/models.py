@@ -225,6 +225,7 @@ class Product(Base):
     locked_fields: Mapped[list[str]] = mapped_column(
         ARRAY(Text), default=list, server_default=text("'{}'")
     )
+    favorite: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
     merged_into_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     created_at: Mapped[datetime] = _ts()
     updated_at: Mapped[datetime] = _updated()

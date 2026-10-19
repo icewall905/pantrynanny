@@ -76,6 +76,8 @@ export const post = <T>(path: string, body?: Json | FormData, opts?: RequestOpti
   api<T>(path, { ...opts, method: 'POST', body })
 export const patch = <T>(path: string, body: Json, opts?: RequestOptions) =>
   api<T>(path, { ...opts, method: 'PATCH', body })
+export const put = <T>(path: string, body: Json, opts?: RequestOptions) =>
+  api<T>(path, { ...opts, method: 'PUT', body })
 export const del = <T>(path: string, opts?: RequestOptions) => api<T>(path, { ...opts, method: 'DELETE' })
 
 export function qs(params: Record<string, string | number | boolean | null | undefined>): string {

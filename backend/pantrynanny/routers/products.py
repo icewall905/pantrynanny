@@ -8,6 +8,7 @@ from ..schemas.catalogue import (
     BarcodeAddIn,
     BarcodeOut,
     ByBarcodeOut,
+    FavoriteIn,
     MergeIn,
     ProductCreate,
     ProductOut,
@@ -107,6 +108,22 @@ async def patch_product(
 ):
     p = await svc.patch_product(session, principal.household_id, product_id, body, version)
     await session.commit()
+    return svc.product_out(p)
+
+
+@router.put("/products/{product_id}/favorite", response_model=ProductOut)
+async def set_favorite(
+    product_id: uuid.UUID,
+    body: FavoriteIn,
+    principal: Principal = Depends(get_principal),
+    session: AsyncSession = Depends(get_session),
+):
+    """Pin/unpin on the kitchen screen. A preference, not an edit: no version bump, no lock."""
+    p = await svc.get_product(session, principal.household_id, product_id, for_update=True)
+    if p.favorite != body.favorite:
+        p.favorite = body.favorite
+        await session.commit()
+        p = await svc.get_product(session, principal.household_id, product_id, refresh=True)
     return svc.product_out(p)
 
 

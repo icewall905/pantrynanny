@@ -33,6 +33,7 @@ from .routers import (
     ha,
     health,
     inventory,
+    kitchen,
     locations,
     media,
     products,
@@ -192,6 +193,7 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
         stats,
         admin_catalogue,
         admin_ai,
+        kitchen,
         ha,
     ):
         app.include_router(module.router, prefix="/api")

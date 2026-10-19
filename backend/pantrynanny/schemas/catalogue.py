@@ -98,6 +98,7 @@ class ProductOut(BaseModel):
     source_attribution: str | None
     lookup_confidence: float | None
     locked_fields: list[str]
+    favorite: bool = False
     created_at: datetime
     updated_at: datetime
     deleted_at: datetime | None
@@ -163,3 +164,7 @@ class ByBarcodeOut(BaseModel):
     source: str | None
     barcode: BarcodeOut
     valid: bool
+
+
+class FavoriteIn(BaseModel):
+    favorite: bool

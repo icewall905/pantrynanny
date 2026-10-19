@@ -23,6 +23,7 @@ const ExportPage = lazy(() => import('./pages/ExportPage'))
 const AssistantPage = lazy(() => import('./pages/AssistantPage'))
 const SettingsPage = lazy(() => import('./pages/SettingsPage'))
 const AdminPage = lazy(() => import('./pages/AdminPage'))
+const KitchenPage = lazy(() => import('./pages/KitchenPage'))
 
 export default function App() {
   return (
@@ -39,6 +40,16 @@ export default function App() {
                     <ScanPage />
                   </Suspense>
                 </div>
+              }
+            />
+            <Route
+              path="/kitchen"
+              element={
+                <RequireAuth>
+                  <Suspense fallback={<Spinner />}>
+                    <KitchenPage />
+                  </Suspense>
+                </RequireAuth>
               }
             />
             <Route
