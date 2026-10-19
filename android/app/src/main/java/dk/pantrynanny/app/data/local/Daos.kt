@@ -179,6 +179,10 @@ interface HistoryDao {
     @Query("UPDATE scan_history SET productId = :productId, titleSnapshot = :title WHERE clientOpId = :clientOpId AND productId IS NULL")
     suspend fun attachProduct(clientOpId: String, productId: String, title: String)
 
+    /** The product a scan resolved to; null until the op has synced (unknown barcodes get a server placeholder). */
+    @Query("SELECT productId FROM scan_history WHERE clientOpId = :clientOpId")
+    fun observeProductId(clientOpId: String): Flow<String?>
+
     @Query("DELETE FROM scan_history WHERE clientOpId NOT IN (SELECT clientOpId FROM scan_history ORDER BY occurredAtMs DESC LIMIT 100)")
     suspend fun trim()
 
@@ -188,6 +192,7 @@ interface HistoryDao {
     @Query(
         """
         SELECT h.*, p.name AS prodName, p.brand AS prodBrand, p.imageUrl AS prodImageUrl, p.stockUnit AS prodUnit,
+               p.status AS prodStatus,
                p.totalQuantity + COALESCE((SELECT SUM(o.localDelta) FROM pending_ops o
                     WHERE o.productId = h.productId AND o.status IN ('pending','inflight')), 0.0) AS prodQuantity
         FROM scan_history h LEFT JOIN products p ON p.id = h.productId

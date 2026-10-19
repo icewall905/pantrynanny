@@ -17,8 +17,8 @@ import { cn } from '../lib/format'
 /* ---------- Button ---------- */
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger'
 const variants: Record<Variant, string> = {
-  primary: 'bg-leaf-600 text-white hover:bg-leaf-700 shadow-sm',
-  secondary: 'bg-white text-ink-900 ring-1 ring-cream-200 hover:bg-cream-200',
+  primary: 'bg-leaf-600 text-white hover:bg-leaf-800 shadow-sm',
+  secondary: 'bg-surface text-ink-900 ring-1 ring-cream-200 hover:bg-cream-200',
   ghost: 'text-ink-700 hover:bg-cream-200',
   danger: 'bg-tomato-500 text-white hover:bg-tomato-600 shadow-sm',
 }
@@ -77,7 +77,7 @@ export function IconButton({
 /* ---------- Card / Badge ---------- */
 export function Card({ className, children, ...rest }: React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn('rounded-[var(--radius-card)] bg-white p-4 shadow-card sm:p-5', className)} {...rest}>
+    <div className={cn('rounded-[var(--radius-card)] bg-surface p-4 shadow-card sm:p-5', className)} {...rest}>
       {children}
     </div>
   )
@@ -101,7 +101,7 @@ export function Badge({ tone = 'neutral', children, className }: { tone?: Tone; 
 
 /* ---------- Form fields ---------- */
 const inputCls =
-  'min-h-11 w-full rounded-xl border border-ink-300/60 bg-white px-3 text-base text-ink-900 placeholder:text-ink-300 focus:border-leaf-500 disabled:bg-cream-100 sm:text-sm'
+  'min-h-11 w-full rounded-xl border border-ink-300/60 bg-surface px-3 text-base text-ink-900 placeholder:text-ink-300 focus:border-leaf-500 disabled:bg-cream-100 sm:text-sm'
 
 export function Field({
   label,
@@ -199,14 +199,14 @@ export function Modal({
   }, [open, onClose])
   if (!open) return null
   return (
-    <div className="pn-fade fixed inset-0 z-50 flex items-end justify-center bg-ink-900/40 sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="pn-fade fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div
         ref={ref}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="pn-pop flex max-h-[92dvh] w-full flex-col rounded-t-3xl bg-white shadow-xl outline-none sm:max-w-lg sm:rounded-3xl"
+        className="pn-pop flex max-h-[92dvh] w-full flex-col rounded-t-3xl bg-surface shadow-xl outline-none sm:max-w-lg sm:rounded-3xl"
       >
         <div className="flex items-center justify-between gap-2 px-5 pt-4">
           <h2 id={titleId} className="text-lg font-bold">
@@ -252,7 +252,7 @@ export function Menu({
         {icon ?? <MoreVertical className="size-5" />}
       </IconButton>
       {open && (
-        <div role="menu" className="pn-pop absolute right-0 z-30 mt-1 min-w-52 rounded-2xl bg-white p-1.5 shadow-xl ring-1 ring-cream-200">
+        <div role="menu" className="pn-pop absolute right-0 z-30 mt-1 min-w-52 rounded-2xl bg-surface p-1.5 shadow-xl ring-1 ring-cream-200">
           {items.map((it) => (
             <button
               key={it.label}
@@ -358,7 +358,7 @@ export function Tabs<T extends string>({
           onClick={() => onChange(tb.id)}
           className={cn(
             'min-h-11 shrink-0 rounded-xl px-4 text-sm font-semibold transition-colors',
-            tb.id === value ? 'bg-ink-900 text-cream-50' : 'text-ink-700 hover:bg-cream-200',
+            tb.id === value ? 'bg-night text-white' : 'text-ink-700 hover:bg-cream-200',
           )}
         >
           {tb.label}
@@ -376,7 +376,7 @@ export function Chip({ active, children, onClick }: { active?: boolean; children
       onClick={onClick}
       className={cn(
         'min-h-10 rounded-full px-4 text-sm font-medium ring-1 transition-colors',
-        active ? 'bg-leaf-600 text-white ring-leaf-600' : 'bg-white text-ink-700 ring-cream-200 hover:bg-cream-200',
+        active ? 'bg-leaf-600 text-white ring-leaf-600' : 'bg-surface text-ink-700 ring-cream-200 hover:bg-cream-200',
       )}
     >
       {children}

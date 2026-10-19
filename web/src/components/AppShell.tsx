@@ -74,7 +74,7 @@ export default function AppShell() {
 
   return (
     <div className="min-h-dvh lg:pl-64">
-      <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-[70] focus:rounded-lg focus:bg-white focus:p-3">
+      <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-[70] focus:rounded-lg focus:bg-surface focus:p-3">
         {t('nav.skip')}
       </a>
       {/* Sidebar */}
@@ -88,7 +88,7 @@ export default function AppShell() {
             <div className="text-xs text-ink-500">{me?.household.name}</div>
           </div>
         </div>
-        <NavLink to="/scan" className="mb-2 flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-leaf-600 font-bold text-white shadow-sm hover:bg-leaf-700">
+        <NavLink to="/scan" className="mb-2 flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-leaf-600 font-bold text-white shadow-sm hover:bg-leaf-800">
           <ScanBarcode className="size-5" /> {t('nav.scan')}
         </NavLink>
         <nav aria-label={t('nav.main')} className="flex flex-col gap-1">
@@ -123,7 +123,7 @@ export default function AppShell() {
       {/* Bottom tab bar (phones/tablets) */}
       <nav
         aria-label={t('nav.main')}
-        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-cream-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-cream-200 bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
       >
         {primary.slice(0, 2).map((n) => (
           <Tab key={n.to} n={n} />

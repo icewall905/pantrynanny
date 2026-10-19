@@ -6,6 +6,9 @@ import './index.css'
 import './i18n'
 import App from './App'
 import { registerServiceWorker, startSync } from './offline'
+import { applyTheme } from './lib/theme'
+
+applyTheme()
 
 void registerServiceWorker()
 startSync()

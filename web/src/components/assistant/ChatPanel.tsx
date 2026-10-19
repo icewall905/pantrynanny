@@ -133,7 +133,7 @@ export default function ChatPanel({ locale }: { locale: 'da' | 'en' }) {
           value={text}
           maxLength={2000}
           onChange={(e) => setText(e.target.value)}
-          className="min-h-11 min-w-0 flex-1 rounded-xl border border-ink-300/60 bg-white px-3 text-base placeholder:text-ink-300 focus:border-leaf-500 sm:text-sm"
+          className="min-h-11 min-w-0 flex-1 rounded-xl border border-ink-300/60 bg-surface px-3 text-base placeholder:text-ink-300 focus:border-leaf-500 sm:text-sm"
         />
         <Button type="submit" variant="primary" disabled={!text.trim() || ask.isPending}>
           <Send className="size-4" aria-hidden /> {t('assistant.send')}

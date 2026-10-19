@@ -53,7 +53,8 @@
     "submit": "Sign in",
     "invalid": "Wrong username or password.",
     "tooMany": "Too many attempts. Wait a few minutes.",
-    "failed": "Could not sign in. Please try again."
+    "failed": "Could not sign in. Please try again.",
+    "androidApp": "Get the Android app"
   },
   "notFound": {
     "title": "Page not found",
@@ -283,7 +284,17 @@
     "language": "Language",
     "languageHint": "Applies to this device only.",
     "account": "Account",
-    "logout": "Sign out"
+    "logout": "Sign out",
+    "theme": "Appearance",
+    "themeHint": "Applies to this device only.",
+    "dark": "Dark",
+    "light": "Light",
+    "android": "Android app",
+    "androidHint": "Install the app on an Android phone for fast scanning with the camera.",
+    "androidDownload": "Download APK",
+    "androidVersion": "Version {{version}} · built {{date}} · {{size}} MB",
+    "androidInstallHint": "Open the file on the phone and allow installs from the browser when asked. New versions install over the old one.",
+    "androidNone": "No APK has been published on the server yet (deployment/deploy.sh builds it)."
   },
   "roles": {
     "owner": "Owner",

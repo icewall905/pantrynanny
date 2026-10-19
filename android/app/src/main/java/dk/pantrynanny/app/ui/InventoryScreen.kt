@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -154,6 +155,8 @@ private fun ProductRow(item: ProductWithQty, onClick: () -> Unit) {
             .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        ProductImage(p.imageUrl, null, Modifier.size(48.dp))
+        Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(p.name, fontWeight = FontWeight.Bold, maxLines = 2)
             val sub = listOfNotNull(p.brand?.takeIf { it.isNotBlank() }, if (p.status != "known") stringResource(R.string.status_unknown_badge) else null)

@@ -140,7 +140,7 @@ export default function ProductDetailPage() {
           <button
             aria-label={t('product.changePhoto')}
             onClick={() => photoRef.current?.click()}
-            className="absolute -bottom-2 -right-2 grid size-11 place-items-center rounded-full bg-white shadow-md"
+            className="absolute -bottom-2 -right-2 grid size-11 place-items-center rounded-full bg-surface shadow-md"
           >
             <Camera className="size-5" />
           </button>

@@ -58,6 +58,17 @@ class InventoryRepository(
         }
     }
 
+    /** Upload a prepared JPEG as the product photo (needs a connection, like other product edits). */
+    suspend fun uploadPhoto(productId: String, jpeg: ByteArray): EditResult =
+        when (val r = api.uploadPhoto(productId, jpeg)) {
+            is ApiResult.Ok -> {
+                cache.applyProduct(r.value)
+                EditResult.Saved
+            }
+            is ApiResult.NetworkError -> EditResult.Offline
+            is ApiResult.HttpError -> EditResult.Failed(r.detail ?: "HTTP ${r.code}")
+        }
+
     private suspend fun refreshAfterConflict(id: String, body: String?) {
         val parsed = try {
             body?.let { AppJson.decodeFromString(ProductDto.serializer(), it) }?.takeIf { it.id == id }

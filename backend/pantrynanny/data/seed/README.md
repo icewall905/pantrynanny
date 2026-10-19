@@ -24,7 +24,13 @@ uv run scripts/build_seed_catalogue.py                      # remote query (slow
 curl -L -C - -o /tmp/food.parquet \
   https://huggingface.co/datasets/openfoodfacts/product-database/resolve/main/food.parquet
 uv run scripts/build_seed_catalogue.py --source /tmp/food.parquet
+# also include products tagged for neighbouring countries (common in Danish shops; larger file)
+uv run scripts/build_seed_catalogue.py --source /tmp/food.parquet --country en:denmark --country en:sweden --country en:norway
 ```
+
+By default the builder keeps products tagged as sold in Denmark **plus every barcode with a GS1
+Denmark prefix (570-579)**, which Open Food Facts often leaves untagged (`--prefix none` turns that off).
+The bundled file was built before the prefix rule existed, so rebuilding it adds products.
 
 Import into the database (idempotent upsert; `install.sh` runs it with `--if-changed`):
 `pantrynanny-admin import-seed [--file PATH] [--if-changed]`.

@@ -34,6 +34,12 @@ that touches `android/**` (and on manual dispatch). Download the APK from the wo
 
 ## Install
 
+The easiest way: open the web app on the phone, then **Indstillinger -> Android-app -> Hent APK** (also
+linked from the login page). `deployment/deploy.sh` builds that APK from the deployed commit when the
+Android SDK is available on the deploying machine (signed release if `keystore.properties` exists,
+otherwise debug) and gives it an increasing `versionCode`, so a new download installs as an update.
+A debug and a release build have different application ids (`.debug` suffix) and install side by side.
+
 ```sh
 adb install -r app-debug.apk
 ```
@@ -60,7 +66,15 @@ For a LAN test server over plain HTTP use a debug build (`http://192.168.x.y:800
   it must be absent for `scan_rearm_ms` before it counts again; mode switches clear the state).
 * A counted scan is stored in one Room transaction as a pending op plus a history row; the displayed
   quantity is `server total + sum(pending deltas)`, so the UI updates without any network call.
-* Unknown barcodes are still queued (the server creates a placeholder) and scanning continues.
+* Unknown barcodes are still queued and scanning continues. The server names the product from the
+  bundled seed catalogue when it can, otherwise it creates a placeholder. The notice then offers
+  **Registrer** (also on the last-scan card and on unknown rows in the history): it opens the product
+  in edit mode with an empty name field, and saving makes the barcode known for every later scan, on
+  every device. Offline, the item waits under Lager -> Ukendte varer.
+* Product photos: on the product screen (and while registering) **Tag billede** uses the phone's
+  camera app and **Vælg billede** the system photo picker. The image is scaled to 1600 px, rotated per
+  EXIF and uploaded (`POST /api/products/{id}/photo`, needs a connection). Images show on the product
+  screen, the last-scan card and in the inventory list, and are cached on disk for offline use.
 * Remove mode reverts to Add on a cold start and after `remove_mode_timeout_min` idle minutes.
 * Sync: debounced foreground sync about 1.5 s after the last scan, a unique one-time WorkManager job
   (network constraint, exponential backoff), a 15 minute periodic job, and a trigger when connectivity

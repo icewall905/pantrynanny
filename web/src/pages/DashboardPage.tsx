@@ -31,7 +31,7 @@ function Stat({
   tone: string
 }) {
   return (
-    <Link to={to} className="group rounded-[var(--radius-card)] bg-white p-4 shadow-card transition hover:-translate-y-0.5 hover:shadow-lg">
+    <Link to={to} className="group rounded-[var(--radius-card)] bg-surface p-4 shadow-card transition hover:-translate-y-0.5 hover:shadow-lg">
       <div className={cn('mb-3 grid size-10 place-items-center rounded-xl', tone)}>
         <Icon className="size-5" />
       </div>
@@ -73,7 +73,7 @@ export default function DashboardPage() {
 
   return (
     <>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-[2rem] bg-gradient-to-br from-leaf-600 to-leaf-700 p-6 text-white shadow-card">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-[2rem] bg-gradient-to-br from-leaf-600 to-leaf-800 p-6 text-white shadow-card">
         <div>
           <p className="text-sm text-white/80">{t('dashboard.hello', { name: me?.user?.display_name })}</p>
           <h1 className="text-2xl font-extrabold sm:text-3xl">
@@ -82,7 +82,7 @@ export default function DashboardPage() {
         </div>
         <Link
           to="/scan"
-          className="inline-flex min-h-14 items-center gap-2 rounded-2xl bg-white px-6 text-base font-bold text-leaf-700 shadow-md transition hover:scale-[1.02]"
+          className="inline-flex min-h-14 items-center gap-2 rounded-2xl bg-surface px-6 text-base font-bold text-leaf-700 shadow-md transition hover:scale-[1.02]"
         >
           <ScanBarcode className="size-6" /> {t('nav.scan')}
         </Link>
@@ -116,7 +116,7 @@ export default function DashboardPage() {
                 <Link
                   key={location.id}
                   to={`/inventory?location=${location.id}`}
-                  className="rounded-[var(--radius-card)] bg-white p-4 shadow-card transition hover:-translate-y-0.5"
+                  className="rounded-[var(--radius-card)] bg-surface p-4 shadow-card transition hover:-translate-y-0.5"
                 >
                   <div className="truncate font-bold">{location.name}</div>
                   <div className="text-sm text-ink-500">{t('dashboard.items', { count: item_count })}</div>

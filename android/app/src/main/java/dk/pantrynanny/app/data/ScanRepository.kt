@@ -84,7 +84,8 @@ class ScanRepository(private val db: AppDatabase) {
             )
         )
         db.historyDao().trim()
-        return ScanOutcome(opId, product?.product?.id, known = product != null)
+        // A cached server placeholder (status "unknown") still needs registering, same rule as the web app.
+        return ScanOutcome(opId, product?.product?.id, known = product != null && product.product.status != "unknown")
     }
 
     /**

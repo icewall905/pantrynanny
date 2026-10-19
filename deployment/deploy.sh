@@ -29,6 +29,38 @@ mv "$work/web" "$work/web-src" && mv "$work/web-src/dist" "$work/web" && rm -rf 
 
 echo "==> exporting Python requirements"
 (cd "$work/backend" && uv export --frozen --no-dev --no-emit-project --format requirements-txt -o ../requirements.txt -q)
+# Android APK, served by the web app at /downloads/pantrynanny.apk (+ android.json with the version).
+# Built from the same exported commit. Needs the Android SDK locally (ANDROID_HOME/ANDROID_SDK_ROOT or
+# android/local.properties); signed release when android/keystore.properties exists, else debug.
+# PN_DEPLOY_APK=0 skips it; without an APK the installer keeps serving the previous release's one.
+build_apk() {
+  local a="$work/android" variant code name apk sum
+  if [[ -z "${ANDROID_HOME:-}${ANDROID_SDK_ROOT:-}" && ! -f android/local.properties ]]; then
+    echo "==> skipping Android APK (no Android SDK found; set ANDROID_HOME)"; return 0
+  fi
+  [[ -f android/local.properties ]] && cp android/local.properties "$a/"
+  variant=debug
+  if [[ -f android/keystore.properties ]]; then
+    variant=release
+    # storeFile may be relative to android/: make it absolute for the copy in $work
+    awk -v base="$PWD/android" -F= '$1=="storeFile" && $2 !~ /^\// { print "storeFile=" base "/" $2; next } { print }' \
+      android/keystore.properties >"$a/keystore.properties"
+  fi
+  code="$(git rev-list --count HEAD)"
+  name="0.1.$code"
+  echo "==> building Android APK ($variant, version $name)"
+  (cd "$a" && chmod +x gradlew && ./gradlew --no-daemon -q "-PpnVersionCode=$code" "-PpnVersionName=$name" \
+    "assemble$([[ $variant == release ]] && echo Release || echo Debug)") || { echo "warning: Android build failed; the previous APK stays online" >&2; return 0; }
+  apk="$a/app/build/outputs/apk/$variant/app-$variant.apk"
+  [[ -f $apk ]] || { echo "warning: no APK produced at $apk" >&2; return 0; }
+  mkdir -p "$work/web/downloads"
+  cp "$apk" "$work/web/downloads/pantrynanny.apk"
+  sum="$( (sha256sum "$apk" 2>/dev/null || shasum -a 256 "$apk") | cut -d' ' -f1)"
+  printf '{"version_name":"%s","version_code":%s,"variant":"%s","commit":"%s","built":"%s","size":%s,"sha256":"%s"}\n' \
+    "$name$([[ $variant == debug ]] && echo -debug)" "$code" "$variant" "$sha" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    "$(wc -c <"$apk" | tr -d ' ')" "$sum" >"$work/web/downloads/android.json"
+}
+[[ "${PN_DEPLOY_APK:-1}" == 0 ]] || build_apk
 rm -rf "$work/android"
 tarball="$work.tar.gz"; trap 'rm -rf "$work" "$tarball"' EXIT
 tar -C "$work" -czf "$tarball" .

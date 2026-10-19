@@ -1,10 +1,11 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Leaf } from 'lucide-react'
+import { Download, Leaf } from 'lucide-react'
 import { ApiError } from '../api/client'
 import { useAuth } from '../auth/AuthProvider'
 import { Button, Card, Field, Input, Spinner } from '../components/ui'
+import { ANDROID_APK_URL, useAndroidApp } from '../lib/androidApp'
 
 export default function LoginPage() {
   const { t } = useTranslation()
@@ -17,6 +18,7 @@ export default function LoginPage() {
   const [remember, setRemember] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const apk = useAndroidApp()
 
   if (loading) return <Spinner />
   if (me) return <Navigate to={me.kiosk ? '/scan' : from} replace />
@@ -71,6 +73,11 @@ export default function LoginPage() {
             {t('login.submit')}
           </Button>
         </form>
+        {apk.data && (
+          <a href={ANDROID_APK_URL} download="pantrynanny.apk" className="mt-5 flex items-center justify-center gap-2 text-sm font-semibold text-leaf-700">
+            <Download className="size-4" /> {t('login.androidApp')}
+          </a>
+        )}
       </Card>
     </div>
   )

@@ -107,6 +107,20 @@ async def _store_cache(session: AsyncSession, code: str, provider: str, res: Pro
     await session.execute(stmt)
 
 
+async def seed_data(session: AsyncSession, code: str) -> ProductData | None:
+    """Local seed-catalogue hit for ``code`` (no network, no rate limit), honouring the admin
+    on/off switch. Used where a full lookup is not allowed, e.g. while applying a sync op."""
+    if not code.isdigit():
+        return None
+    overrides = await load_overrides(session)
+    for p in build_providers(runtime.get_settings(), overrides):
+        if getattr(p, "local", False) and p.enabled():
+            res = await p.lookup(session, code)
+            if res.status == "found" and res.data is not None:
+                return res.data
+    return None
+
+
 async def lookup_detailed(
     session: AsyncSession,
     household_id: uuid.UUID | None,

@@ -121,4 +121,5 @@ data class HistoryRow(
     val prodImageUrl: String?,
     val prodUnit: String?,
     val prodQuantity: Double?,
+    val prodStatus: String?,
 )

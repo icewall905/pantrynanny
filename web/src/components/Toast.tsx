@@ -49,7 +49,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           return (
             <div
               key={t.id}
-              className="pn-pop pointer-events-auto flex max-w-md items-center gap-3 rounded-2xl bg-ink-900 px-4 py-3 text-sm text-cream-50 shadow-lg"
+              className="pn-pop pointer-events-auto flex max-w-md items-center gap-3 rounded-2xl bg-night px-4 py-3 text-sm text-white shadow-lg"
             >
               <Icon className={cn('size-5 shrink-0', tones[t.tone])} aria-hidden />
               <span className="min-w-0 flex-1">{t.message}</span>

@@ -34,9 +34,11 @@ export default function App() {
             <Route
               path="/scan"
               element={
-                <Suspense fallback={<Spinner />}>
-                  <ScanPage />
-                </Suspense>
+                <div className="pn-scan-palette">
+                  <Suspense fallback={<Spinner />}>
+                    <ScanPage />
+                  </Suspense>
+                </div>
               }
             />
             <Route

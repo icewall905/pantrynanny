@@ -23,8 +23,9 @@ android {
         applicationId = "dk.pantrynanny.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1.0"
+        // deployment/deploy.sh passes the commit count, so every deployed APK installs as an update.
+        versionCode = (findProperty("pnVersionCode") as String?)?.toIntOrNull() ?: 1
+        versionName = (findProperty("pnVersionName") as String?) ?: "0.1.0"
     }
 
     signingConfigs {

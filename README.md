@@ -24,8 +24,10 @@ on the device first and synchronised exactly once.
   Room (Android) and uploaded when the server is reachable. The server deduplicates on that id, so retries
   are safe. Clients pull changes incrementally with a database-bound cursor.
 - **Product recognition**: the household's own catalogue, then a bundled offline seed of 19,814 Danish
-  products (Open Food Facts), then Open Food Facts / Beauty / Pet Food online (rate limited, cached), then
-  optional EAN-Search. Unknown barcodes become placeholders and are enriched in the background.
+  products (Open Food Facts), then Open Food Facts and its sister projects (Beauty / Pet Food / Products
+  Facts) online (rate limited, cached), then optional EAN-Search. Unknown barcodes become placeholders,
+  are enriched in the background and can be named on the spot ("Registrer"), with a photo, so they are
+  known for every later scan.
 - **Inventory**: batches with expiry dates, multiple storage locations, minimum stock, a shopping list
   with suggestions, statistics and CSV/JSON exports.
 - **Households and users**: owner/admin/member roles, device tokens for Android, single-use pairing codes
@@ -33,7 +35,8 @@ on the device first and synchronised exactly once.
 - **Optional local AI** (any OpenAI-compatible endpoint): identify a product from a photo and an
   inventory assistant chat. Everything else works without it.
 - **Home Assistant** summary endpoint ([docs/home-assistant.md](docs/home-assistant.md)).
-- Danish UI by default, English available.
+- Danish UI by default, English available. Dark theme by default, light available (per device).
+- **Android app download** from the web app (Settings and login page), built by every deploy.
 
 ## Architecture
 
@@ -69,7 +72,9 @@ terminated by your reverse proxy (Traefik, Caddy, …).
    ```
 
    `PN_DEPLOY_TARGET` is `ssh:root@<container>` or `pct:root@<proxmox-host>:<ctid>` (push through
-   `pct`). The script builds a release from the committed `HEAD`, copies it over and runs
+   `pct`). With the Android SDK installed (`ANDROID_HOME`) it also builds the Android APK that the web
+   app offers at `/downloads/pantrynanny.apk`; `PN_DEPLOY_APK=0` skips that, and the server keeps the
+   previous APK. The script builds a release from the committed `HEAD`, copies it over and runs
    [`install.sh`](deployment/scripts/install.sh). That script is idempotent: it creates the system user,
    database, config file (with a generated DB password) and systemd units, runs migrations, imports the
    seed catalogue, switches the `current` symlink, waits for the health check, and rolls back to the
@@ -120,6 +125,7 @@ of [`.env.example`](.env.example), which documents every variable. The important
 | `PN_TIMEZONE` | `Europe/Copenhagen` | defines "today" for expiry |
 | `PN_OFF_ENABLED` / `PN_OFF_USER_AGENT` | `true` / – | Open Food Facts lookups; OFF asks for a contact address in the UA |
 | `PN_SEED_ENABLED` | `true` | the bundled offline seed catalogue |
+| `PN_OFF_SISTERS_ENABLED` | `true` | Open Beauty / Pet Food / Products Facts after an Open Food Facts miss |
 | `PN_OFF_RATE_PER_MIN` / `PN_OFF_WORKER_RATE_PER_MIN` | `8` / `6` | outgoing budget (OFF allows 15 reads/min/IP) |
 | `PN_EANSEARCH_TOKEN` | empty | optional commercial fallback |
 | `PN_AI_BASE_URL` / `PN_AI_MODEL` / `PN_AI_API_KEY` | empty | OpenAI-compatible endpoint; empty disables AI |
@@ -179,7 +185,7 @@ Android needs JDK 21 and the Android SDK; see [android/README.md](android/README
 
 | Suite | Command | Last result |
 |---|---|---|
-| Backend (real PostgreSQL) | `cd backend && uv run pytest` | 237 passed |
+| Backend (real PostgreSQL) | `cd backend && uv run pytest` | 240 passed |
 | Backend lint | `uv run ruff check . && uv run ruff format --check .` | clean |
 | Web unit | `cd web && npm test` | 111 passed |
 | Web lint / types | `npm run lint && npm run typecheck` | clean |

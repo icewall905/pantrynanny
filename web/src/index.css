@@ -23,8 +23,62 @@
   --color-honey-400: #f4b740;
   --color-honey-600: #b9810f;
   --color-sky-500: #3b82c4;
+  --color-leaf-800: #23603c; /* button hover / gradient end: stays dark in both themes */
+  --color-surface: #ffffff; /* cards, inputs, menus (bg-white stays literal white) */
+  --color-night: #22201c; /* dark pills (toasts, selection bars) in both themes */
   --radius-card: 1.25rem;
   --shadow-card: 0 1px 2px rgb(34 32 28 / 0.04), 0 4px 16px rgb(34 32 28 / 0.06);
+}
+
+/* Dark is the default theme (no flash: it needs no JS); <html data-theme="light"> opts out.
+   Only tokens are swapped, so components need no dark: variants. */
+:root:not([data-theme='light']) {
+  color-scheme: dark;
+  --color-cream-50: #1b1a17;
+  --color-cream-100: #131210;
+  --color-cream-200: #2f2c27;
+  --color-ink-900: #f3efe8;
+  --color-ink-700: #d4cec4;
+  --color-ink-500: #a49d91;
+  --color-ink-300: #6e685f;
+  --color-leaf-50: #15261b;
+  --color-leaf-100: #1c3626;
+  --color-leaf-500: #3fae6c;
+  --color-leaf-600: #2f8a55;
+  --color-leaf-700: #86d3a3;
+  --color-tomato-50: #2d1912;
+  --color-tomato-100: #4a2216;
+  --color-tomato-600: #f07a55;
+  --color-honey-50: #2a2211;
+  --color-honey-600: #e9b440;
+  --color-sky-500: #6aa7de;
+  --color-surface: #1f1d1a;
+  --color-night: #3a362f;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 16px rgb(0 0 0 / 0.35);
+}
+/* The /scan station has its own fixed high-contrast design: always the original palette. */
+.pn-scan-palette {
+  color-scheme: dark;
+  --color-cream-50: #fffdf9;
+  --color-cream-100: #fbf8f3;
+  --color-cream-200: #f3ede3;
+  --color-ink-900: #22201c;
+  --color-ink-700: #4a463f;
+  --color-ink-500: #7a746a;
+  --color-ink-300: #b8b1a5;
+  --color-leaf-50: #ecf7ef;
+  --color-leaf-100: #d3eedb;
+  --color-leaf-500: #2f9a5c;
+  --color-leaf-600: #2f7d4f;
+  --color-leaf-700: #23603c;
+  --color-tomato-50: #fff1ec;
+  --color-tomato-100: #ffdccf;
+  --color-tomato-600: #cc4a24;
+  --color-honey-50: #fff8e6;
+  --color-honey-600: #b9810f;
+  --color-sky-500: #3b82c4;
+  --color-surface: #ffffff;
+  --color-night: #22201c;
 }
 
 html,

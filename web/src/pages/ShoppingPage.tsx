@@ -31,7 +31,7 @@ export function ShoppingRow({
         onClick={() => onToggle(item)}
         className={cn(
           'grid size-9 shrink-0 place-items-center rounded-xl border-2 transition-colors',
-          item.checked ? 'border-leaf-600 bg-leaf-600 text-white' : 'border-ink-300 bg-white',
+          item.checked ? 'border-leaf-600 bg-leaf-600 text-white' : 'border-ink-300 bg-surface',
         )}
       >
         {item.checked && <Check className="size-5" />}
@@ -140,10 +140,10 @@ export default function ShoppingPage() {
             <Button onClick={() => void copy()} disabled={!items.length}>
               <ClipboardCopy className="size-4" /> {t('shopping.copy')}
             </Button>
-            <a href="/api/export/shopping.csv" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold ring-1 ring-cream-200 hover:bg-cream-200">
+            <a href="/api/export/shopping.csv" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-surface px-4 text-sm font-semibold ring-1 ring-cream-200 hover:bg-cream-200">
               <Download className="size-4" /> CSV
             </a>
-            <a href="/api/export/shopping.json" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold ring-1 ring-cream-200 hover:bg-cream-200">
+            <a href="/api/export/shopping.json" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-surface px-4 text-sm font-semibold ring-1 ring-cream-200 hover:bg-cream-200">
               <Download className="size-4" /> JSON
             </a>
           </>
@@ -165,7 +165,7 @@ export default function ShoppingPage() {
           </Button>
         </div>
         {text.trim().length >= 2 && !!matches.data?.length && (
-          <ul role="listbox" className="absolute inset-x-0 top-14 z-20 overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-cream-200">
+          <ul role="listbox" className="absolute inset-x-0 top-14 z-20 overflow-hidden rounded-2xl bg-surface shadow-xl ring-1 ring-cream-200">
             {matches.data.map((p) => (
               <li key={p.id} role="option" aria-selected={false}>
                 <button
@@ -197,7 +197,7 @@ export default function ShoppingPage() {
                 <button
                   key={p.id}
                   onClick={() => add.mutate({ product_id: p.id, name: p.name, quantity: 1, category_id: p.category_id })}
-                  className="inline-flex min-h-10 items-center gap-1.5 rounded-full bg-white px-4 text-sm font-medium shadow-sm hover:bg-leaf-50"
+                  className="inline-flex min-h-10 items-center gap-1.5 rounded-full bg-surface px-4 text-sm font-medium shadow-sm hover:bg-leaf-50"
                 >
                   <Plus className="size-4 text-leaf-600" /> {p.name}
                 </button>

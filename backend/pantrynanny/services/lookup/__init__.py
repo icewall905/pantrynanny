@@ -17,6 +17,7 @@ from .service import (
     lookup_external,
     new_product_from_data,
     refresh_product,
+    seed_data,
 )
 
 __all__ = [
@@ -29,6 +30,7 @@ __all__ = [
     "lookup_external",
     "new_product_from_data",
     "refresh_product",
+    "seed_data",
 ]
 
 

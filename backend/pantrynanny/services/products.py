@@ -38,7 +38,13 @@ from ..models import (
 )
 from ..schemas.catalogue import BarcodeOut, ProductCreate, ProductOut, ProductPatch
 from .barcodes import NormalizedBarcode, normalize, strip_barcode
-from .lookup import ProductData, enqueue_enrichment, lookup_external, new_product_from_data
+from .lookup import (
+    ProductData,
+    enqueue_enrichment,
+    lookup_external,
+    new_product_from_data,
+    seed_data,
+)
 
 log = get_logger()
 
@@ -312,13 +318,22 @@ async def create_placeholder(
 async def get_or_create_placeholder(
     session: AsyncSession, household_id: uuid.UUID, nb: NormalizedBarcode
 ) -> tuple[Product, bool]:
-    """Find the product for ``nb`` or create a placeholder. Race-safe via a savepoint."""
+    """Find the product for ``nb``, else create it from the local seed catalogue, else create a
+    placeholder. Race-safe via a savepoint. The seed check is a primary-key read (no network), so
+    scans arriving through ``/sync/ops`` (Android, offline queue) are recognised immediately too."""
     p = await find_by_code(session, household_id, nb.code)
     if p:
         return p, False
+    data = await seed_data(session, nb.code)
     try:
         async with session.begin_nested():
-            p = await create_placeholder(session, household_id, nb)
+            if data is not None:
+                p = await new_product_from_data(session, household_id, data)
+                p.barcodes.append(_new_barcode(p, nb))
+                session.add(p)
+                await session.flush()
+            else:
+                p = await create_placeholder(session, household_id, nb)
         return p, True
     except IntegrityError:
         p = await find_by_code(session, household_id, nb.code)

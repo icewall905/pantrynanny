@@ -47,6 +47,7 @@ async def lookup_on(tmp_path):
     cfg = Settings(
         database_url=TEST_DB_URL,
         off_enabled=True,
+        off_sisters_enabled=False,  # these tests count Open Food Facts calls only
         upload_dir=str(tmp_path),
         lookup_timeout_s=2.0,
         off_rate_per_min=600,
@@ -686,3 +687,24 @@ async def test_forced_refresh_honours_429_retry_after(env, lookup_on, off):
     async with env.app.state.sessionmaker() as s:
         c = (await s.execute(select(LookupCache))).scalar_one()
         assert c.retry_after > datetime.now(UTC) + timedelta(seconds=100)
+
+
+async def test_sister_projects_are_asked_after_off_miss(env, lookup_on):
+    # Default config: Open Food Facts misses, a sister project (here Open Products Facts) knows it.
+    runtime.set_settings(lookup_on.model_copy(update={"off_sisters_enabled": True}))
+    sister = {
+        "status": 1,
+        "product": {"code": CODE, "product_name": "Opvaskemiddel", "brands": "Neutral"},
+    }
+    with respx.mock(assert_all_called=False) as m:
+        m.get(OFF_URL).mock(return_value=httpx.Response(404, json={"status": 0}))
+        for host in ("openbeautyfacts", "openpetfoodfacts"):
+            m.get(f"https://world.{host}.org/api/v2/product/{CODE}.json").mock(
+                return_value=httpx.Response(404, json={"status": 0})
+            )
+        opf = m.get(f"https://world.openproductsfacts.org/api/v2/product/{CODE}.json").mock(
+            return_value=httpx.Response(200, json=sister)
+        )
+        out = await by_barcode(env)
+    assert opf.call_count == 1
+    assert out["source"] == "openproductsfacts" and out["product"]["name"] == "Opvaskemiddel"

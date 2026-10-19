@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     lookup_timeout_s: float = 3.0
     off_enabled: bool = True
     seed_enabled: bool = True
+    # Open Beauty / Pet Food / Products Facts, asked only after Open Food Facts misses.
+    off_sisters_enabled: bool = True
     off_base_url: str = "https://world.openfoodfacts.org"
     off_user_agent: str = "PantryNanny/1.0 (self-hosted household app)"
     eansearch_token: str = ""

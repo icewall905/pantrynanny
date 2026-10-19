@@ -7,7 +7,8 @@
 
 Reads the official OFF export (Hugging Face dataset ``openfoodfacts/product-database``) remotely
 with DuckDB/httpfs: only the needed columns and row groups are fetched (no full download, no
-API calls, no scraping). Keeps products marked as sold in Denmark, metadata only (no images).
+API calls, no scraping). Keeps products marked as sold in Denmark plus every Danish-registered barcode (GS1 prefix
+570-579, often untagged), metadata only (no images).
 
 Data: (c) Open Food Facts contributors, ODbL 1.0 (database) / DbCL 1.0 (contents).
 
@@ -15,7 +16,8 @@ Usage:
   uv run scripts/build_seed_catalogue.py                      # query the remote file (slow)
   curl -L -C - -o /tmp/food.parquet <PARQUET_URL>             # or download once (~8 GB) ...
   uv run scripts/build_seed_catalogue.py --source /tmp/food.parquet   # ... and build locally
-Options: [--out PATH] [--country en:denmark ...]
+Options: [--out PATH] [--country en:denmark ...] [--prefix 570 ... | --prefix none]
+  e.g. add neighbours sold in Danish shops: --country en:denmark --country en:sweden --country en:norway
 """
 
 import argparse
@@ -53,7 +55,8 @@ QUERY = """
 SELECT code, product_name, brands, quantity, categories_tags, allergens_tags,
        countries_tags, last_modified_t
 FROM read_parquet(?)
-WHERE list_has_any(countries_tags, ?) AND code IS NOT NULL AND coalesce(obsolete, false) = false
+WHERE code IS NOT NULL AND coalesce(obsolete, false) = false
+  AND (list_has_any(countries_tags, ?) OR list_contains(?, substr(code, 1, 3)))
 """
 
 
@@ -78,14 +81,22 @@ def main() -> int:
     ap.add_argument("--out", type=Path, default=DEFAULT_OUT)
     ap.add_argument("--source", default=PARQUET_URL, help="Parquet URL or local file path")
     ap.add_argument("--country", action="append", default=None, help="countries_tags value")
+    ap.add_argument(
+        "--prefix",
+        action="append",
+        default=None,
+        help="also keep codes with this GS1 prefix whatever their country tags "
+        "(default 570-579 = GS1 Denmark; '--prefix none' disables)",
+    )
     args = ap.parse_args()
     countries = args.country or ["en:denmark"]
+    prefixes = [p for p in (args.prefix or [str(n) for n in range(570, 580)]) if p != "none"]
 
     commit, last_mod = dataset_info()  # version of the published dataset (HEAD request only)
     con = duckdb.connect()
     con.execute("SET enable_progress_bar=false")
     con.execute("INSTALL httpfs; LOAD httpfs")
-    rows = con.execute(QUERY, [args.source, countries]).fetchall()
+    rows = con.execute(QUERY, [args.source, countries, prefixes]).fetchall()
 
     products: dict[str, dict] = {}
     skipped = {"no_name": 0, "bad_code": 0, "duplicate": 0}
@@ -135,6 +146,7 @@ def main() -> int:
             "dataset_last_modified": last_mod,
             "built": built,
             "countries_filter": countries,
+            "gs1_prefix_filter": prefixes,
             "count": len(products),
         }
     }

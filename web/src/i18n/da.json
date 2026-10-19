@@ -53,7 +53,8 @@
     "submit": "Log ind",
     "invalid": "Forkert brugernavn eller adgangskode.",
     "tooMany": "For mange forsøg. Vent et par minutter.",
-    "failed": "Kunne ikke logge ind. Prøv igen."
+    "failed": "Kunne ikke logge ind. Prøv igen.",
+    "androidApp": "Hent Android-appen"
   },
   "notFound": {
     "title": "Siden findes ikke",
@@ -283,7 +284,17 @@
     "language": "Sprog",
     "languageHint": "Gælder kun denne enhed.",
     "account": "Konto",
-    "logout": "Log ud"
+    "logout": "Log ud",
+    "theme": "Udseende",
+    "themeHint": "Gælder kun denne enhed.",
+    "dark": "Mørk",
+    "light": "Lys",
+    "android": "Android-app",
+    "androidHint": "Installer appen på en Android-telefon for hurtig scanning med kameraet.",
+    "androidDownload": "Hent APK",
+    "androidVersion": "Version {{version}} · bygget {{date}} · {{size}} MB",
+    "androidInstallHint": "Åbn filen på telefonen og tillad installation fra browseren, når du bliver spurgt. Nye versioner installeres oven på den gamle.",
+    "androidNone": "Der er ikke lagt en APK på serveren endnu (den bygges af deployment/deploy.sh)."
   },
   "roles": {
     "owner": "Ejer",

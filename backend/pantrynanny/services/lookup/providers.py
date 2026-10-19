@@ -255,14 +255,17 @@ class OpenBeautyFactsProvider(OpenFoodFactsProvider):
     display_name = "Open Beauty Facts"
     attribution = "Open Beauty Facts – ODbL (images CC BY-SA)"
     default_priority = 20
-    default_enabled = False
+    # On by default: only asked after Open Food Facts misses (household and non-food items).
+    default_enabled = True
 
     @property
     def base_url(self) -> str:
         return "https://world.openbeautyfacts.org"
 
     def enabled(self) -> bool:
-        return self.override_enabled if self.override_enabled is not None else False
+        if self.override_enabled is not None:
+            return self.override_enabled
+        return self.settings.off_enabled and self.settings.off_sisters_enabled
 
 
 class OpenPetFoodFactsProvider(OpenBeautyFactsProvider):

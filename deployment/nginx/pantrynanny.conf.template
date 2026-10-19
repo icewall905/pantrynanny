@@ -89,6 +89,14 @@ server {
         try_files $uri =404;
     }
 
+    # Android app (built by deployment/deploy.sh). Revalidated on every request so phones get the newest build.
+    location /downloads/ {
+        types { application/vnd.android.package-archive apk; application/json json; }
+        add_header Cache-Control "no-cache" always;
+        include /etc/nginx/snippets/pantrynanny-headers.conf;
+        try_files $uri =404;
+    }
+
     # SPA fallback (/scan, /inventory, ...)
     location / {
         try_files $uri $uri/ /index.html;

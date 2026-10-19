@@ -133,6 +133,28 @@ async def test_sync_op_for_seeded_code_creates_known_product(env, lookup_on, see
     assert prods[0]["status"] == "known" and prods[0]["source"] == "catalogue_seed"
 
 
+async def test_sync_op_result_carries_seeded_product_without_worker(env, seeded):
+    # Android posts scans to /sync/ops (no by-barcode call): the op result itself must name the
+    # product, without waiting for the enrichment worker or any network lookup.
+    with respx.mock(assert_all_called=False) as m:
+        [res] = await env.ops(env.op("add", barcode=CODE, symbology="ean_13"))
+        assert len(m.calls) == 0
+    assert res["status"] == "applied"
+    assert res["product"]["name"] == "Seed Letmælk"
+    assert res["product"]["status"] == "known" and res["product"]["source"] == "catalogue_seed"
+
+
+async def test_sync_op_respects_disabled_seed_provider(env, seeded):
+    r = await env.client.patch(
+        "/api/admin/providers",
+        json={"providers": [{"name": "catalogue_seed", "enabled": False}]},
+        headers=env.admin,
+    )
+    assert r.status_code == 200, r.text
+    [res] = await env.ops(env.op("add", barcode=CODE, symbology="ean_13"))
+    assert res["product"]["status"] == "unknown"
+
+
 async def test_enrichment_from_seed_respects_locked_fields(env, lookup_on, seeded):  # noqa: F811
     p = await env.product("Min mælk", barcodes=[CODE])
     r = await env.client.patch(

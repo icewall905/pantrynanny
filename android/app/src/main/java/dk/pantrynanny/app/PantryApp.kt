@@ -3,6 +3,7 @@ package dk.pantrynanny.app
 import android.app.Application
 import androidx.room.Room
 import dk.pantrynanny.app.data.CacheWriter
+import dk.pantrynanny.app.data.ImageRepository
 import dk.pantrynanny.app.data.InventoryRepository
 import dk.pantrynanny.app.data.NetworkMonitor
 import dk.pantrynanny.app.data.ScanRepository
@@ -37,7 +38,8 @@ class AppContainer(val app: Application) {
     val db: AppDatabase = Room.databaseBuilder(app, AppDatabase::class.java, "pantrynanny.db").build()
     val settings = SettingsStore(app)
     val tokens = TokenStore(app)
-    val api = ApiClient(settings, tokens)
+    val api = ApiClient(settings, tokens, imageCacheDir = java.io.File(app.cacheDir, "images"))
+    val images = ImageRepository(api)
     val cache = CacheWriter(db)
     val syncRepository = SyncRepository(db, api, settings, tokens, cache)
     val scanRepository = ScanRepository(db)

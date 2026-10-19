@@ -41,7 +41,7 @@ export const InventoryRow = memo(function InventoryRow({
   const p = item.product
   const unit = p.stock_unit === 'pcs' ? undefined : t(`units.${p.stock_unit}`)
   return (
-    <li className="flex items-center gap-2 rounded-[var(--radius-card)] bg-white p-3 shadow-card sm:gap-3">
+    <li className="flex items-center gap-2 rounded-[var(--radius-card)] bg-surface p-3 shadow-card sm:gap-3">
       <input
         type="checkbox"
         aria-label={t('inventory.select', { name: p.name })}
@@ -155,7 +155,7 @@ export default function InventoryPage() {
       <PageHeader
         title={t('nav.inventory')}
         actions={
-          <Link to="/products/new" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-leaf-600 px-4 text-sm font-semibold text-white hover:bg-leaf-700">
+          <Link to="/products/new" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-leaf-600 px-4 text-sm font-semibold text-white hover:bg-leaf-800">
             <Plus className="size-4" /> {t('product.new')}
           </Link>
         }
@@ -169,7 +169,7 @@ export default function InventoryPage() {
             onChange={(e) => setQ(e.target.value)}
             placeholder={t('inventory.searchPlaceholder')}
             aria-label={t('inventory.search')}
-            className="min-h-12 w-full rounded-2xl border-0 bg-white pl-11 pr-4 text-base shadow-card placeholder:text-ink-300"
+            className="min-h-12 w-full rounded-2xl border-0 bg-surface pl-11 pr-4 text-base shadow-card placeholder:text-ink-300"
           />
         </div>
         <div className="flex flex-wrap gap-2">
@@ -211,7 +211,7 @@ export default function InventoryPage() {
       </div>
 
       {selected.size > 0 && (
-        <div className="pn-pop sticky top-28 z-10 mb-3 flex flex-wrap items-center gap-2 rounded-2xl bg-ink-900 p-2 pl-4 text-cream-50 shadow-lg lg:top-16">
+        <div className="pn-pop sticky top-28 z-10 mb-3 flex flex-wrap items-center gap-2 rounded-2xl bg-night p-2 pl-4 text-white shadow-lg lg:top-16">
           <span className="mr-auto text-sm font-semibold">{t('inventory.selected', { count: selected.size })}</span>
           <Button size="sm" onClick={() => setMoveItems(chosen)}>
             <FolderInput className="size-4" /> {t('inventory.move')}

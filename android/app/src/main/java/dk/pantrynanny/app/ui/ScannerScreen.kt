@@ -10,6 +10,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,6 +32,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -69,7 +72,7 @@ private fun hasCameraPermission(context: Context) =
     ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
 
 @Composable
-fun ScannerScreen(vm: ScannerViewModel, snackbar: SnackbarHostState) {
+fun ScannerScreen(vm: ScannerViewModel, snackbar: SnackbarHostState, onRegisterProduct: (String) -> Unit) {
     val state by vm.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -80,6 +83,22 @@ fun ScannerScreen(vm: ScannerViewModel, snackbar: SnackbarHostState) {
             snackbar.currentSnackbarData?.dismiss()
             scope.launch { snackbar.showSnackbar(msg.resolve(context), duration = SnackbarDuration.Short) }
         }
+    }
+    LaunchedEffect(vm) {
+        vm.unknownScans.collect { clientOpId ->
+            snackbar.currentSnackbarData?.dismiss()
+            scope.launch {
+                val result = snackbar.showSnackbar(
+                    context.getString(R.string.snack_unknown),
+                    actionLabel = context.getString(R.string.action_register),
+                    duration = SnackbarDuration.Long,
+                )
+                if (result == SnackbarResult.ActionPerformed) vm.register(clientOpId)
+            }
+        }
+    }
+    LaunchedEffect(vm) {
+        vm.openForRegister.collect { onRegisterProduct(it) }
     }
 
     var granted by remember { mutableStateOf(hasCameraPermission(context)) }
@@ -153,7 +172,7 @@ fun ScannerScreen(vm: ScannerViewModel, snackbar: SnackbarHostState) {
         Spacer(Modifier.height(6.dp))
         ModeToggle(state.mode, onSelect = vm::setMode)
         Spacer(Modifier.height(6.dp))
-        LastScanCard(state.last, accent)
+        LastScanCard(state.last, accent, onRegister = vm::register)
         Spacer(Modifier.height(4.dp))
 
         LazyColumn(
@@ -162,7 +181,7 @@ fun ScannerScreen(vm: ScannerViewModel, snackbar: SnackbarHostState) {
                 .weight(0.7f)
         ) {
             items(state.history, key = { it.entry.clientOpId }) { row ->
-                HistoryItem(row)
+                HistoryItem(row, onRegister = vm::register)
                 HorizontalDivider()
             }
         }
@@ -263,8 +282,12 @@ private fun rowTitle(row: HistoryRow): String =
         ?: if (row.entry.barcode.isNotEmpty()) stringResource(R.string.unknown_product_with_code, row.entry.barcode)
         else stringResource(R.string.unknown_product)
 
+/** An unknown barcode that still needs a name (not synced yet, or synced to a server placeholder). */
+private fun needsRegister(row: HistoryRow): Boolean =
+    row.entry.barcode.isNotEmpty() && !row.entry.undone && (row.prodStatus == null || row.prodStatus == "unknown")
+
 @Composable
-private fun LastScanCard(last: HistoryRow?, accent: Color) {
+private fun LastScanCard(last: HistoryRow?, accent: Color, onRegister: (String) -> Unit) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(10.dp)) {
             if (last == null) {
@@ -272,6 +295,10 @@ private fun LastScanCard(last: HistoryRow?, accent: Color) {
             } else {
                 val sign = if (last.entry.type == "add") "+" else "−"
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (last.prodImageUrl != null) {
+                        ProductImage(last.prodImageUrl, rowTitle(last), Modifier.size(56.dp))
+                        Spacer(Modifier.padding(horizontal = 4.dp))
+                    }
                     Text(
                         "$sign${QuantityMath.format(last.entry.quantity)}",
                         color = accent,
@@ -297,19 +324,27 @@ private fun LastScanCard(last: HistoryRow?, accent: Color) {
                         )
                     }
                 }
+                if (needsRegister(last)) {
+                    Button(
+                        onClick = { onRegister(last.entry.clientOpId) },
+                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                    ) { Text(stringResource(R.string.register_now)) }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun HistoryItem(row: HistoryRow) {
+private fun HistoryItem(row: HistoryRow, onRegister: (String) -> Unit) {
     val time = timeFormat.format(Instant.ofEpochMilli(row.entry.occurredAtMs).atZone(ZoneId.systemDefault()))
     val sign = if (row.entry.type == "add") "+" else "−"
     val color = if (row.entry.type == "add") AddColor else RemoveColor
+    val register = needsRegister(row)
     Row(
         Modifier
             .fillMaxWidth()
+            .then(if (register) Modifier.clickable { onRegister(row.entry.clientOpId) } else Modifier)
             .padding(vertical = 4.dp, horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -321,7 +356,11 @@ private fun HistoryItem(row: HistoryRow) {
             maxLines = 1,
             textDecoration = if (row.entry.undone) TextDecoration.LineThrough else null,
         )
-        row.prodQuantity?.let { Text(QuantityMath.format(maxOf(it, 0.0)), fontWeight = FontWeight.Bold) }
+        if (register) {
+            Text(stringResource(R.string.action_register), color = WarnColor, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        } else {
+            row.prodQuantity?.let { Text(QuantityMath.format(maxOf(it, 0.0)), fontWeight = FontWeight.Bold) }
+        }
     }
 }
 

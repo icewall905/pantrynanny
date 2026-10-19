@@ -22,10 +22,16 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+
+/** How long "Registrer" waits for an unsynced unknown scan to come back with its placeholder product. */
+private const val REGISTER_WAIT_MS = 10_000L
 
 data class SyncStatusUi(
     val pending: Int = 0,
@@ -59,6 +65,14 @@ class ScannerViewModel(private val c: AppContainer) : ViewModel() {
 
     private val _events = MutableSharedFlow<UiMessage>(extraBufferCapacity = 16)
     val events: SharedFlow<UiMessage> = _events.asSharedFlow()
+
+    /** client_op_id of a scan whose barcode is not a known product yet (offer "Registrer"). */
+    private val _unknownScans = MutableSharedFlow<String>(extraBufferCapacity = 4)
+    val unknownScans: SharedFlow<String> = _unknownScans.asSharedFlow()
+
+    /** Product to open in edit mode after the user asked to register an unknown scan. */
+    private val _openForRegister = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val openForRegister: SharedFlow<String> = _openForRegister.asSharedFlow()
 
     private val status = combine(
         c.db.pendingOpDao().observePendingCount(),
@@ -119,8 +133,26 @@ class ScannerViewModel(private val c: AppContainer) : ViewModel() {
 
         viewModelScope.launch(Dispatchers.IO) {
             val outcome = c.scanRepository.recordScan(raw, symbology, mode, s.defaultLocationId)
-            if (!outcome.known) _events.tryEmit(UiMessage(R.string.snack_unknown))
+            if (!outcome.known) _unknownScans.tryEmit(outcome.clientOpId)
             c.requestSync()
+        }
+    }
+
+    /**
+     * Register the product behind an unknown scan. The server creates the placeholder when the op
+     * syncs, so a scan that has not synced yet is pushed now and given a few seconds to come back.
+     */
+    fun register(clientOpId: String) {
+        viewModelScope.launch {
+            c.requestSync()
+            val productId = withTimeoutOrNull(REGISTER_WAIT_MS) {
+                c.db.historyDao().observeProductId(clientOpId).filterNotNull().first()
+            }
+            if (productId != null) {
+                _openForRegister.tryEmit(productId)
+            } else {
+                _events.tryEmit(UiMessage(R.string.register_later))
+            }
         }
     }
 

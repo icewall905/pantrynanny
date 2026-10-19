@@ -18,6 +18,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -27,11 +28,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import dk.pantrynanny.app.ui.InventoryScreen
+import dk.pantrynanny.app.ui.LocalImages
 import dk.pantrynanny.app.ui.LoginScreen
 import dk.pantrynanny.app.ui.PantryTheme
 import dk.pantrynanny.app.ui.ProductDetailScreen
@@ -56,13 +60,15 @@ class MainActivity : ComponentActivity() {
 
 private const val ROUTE_SCAN = "scan"
 private const val ROUTE_INVENTORY = "inventory"
-private const val ROUTE_PRODUCT = "product/{id}"
+private const val ROUTE_PRODUCT = "product/{id}?register={register}"
 private const val ROUTE_SETTINGS = "settings"
 
 @Composable
 fun PantryRoot(container: AppContainer) {
     val loggedIn by container.tokens.loggedIn.collectAsStateWithLifecycle()
-    if (loggedIn) MainScaffold(container) else LoginScreen(container)
+    CompositionLocalProvider(LocalImages provides container.images) {
+        if (loggedIn) MainScaffold(container) else LoginScreen(container)
+    }
 }
 
 private data class NavItem(val route: String, val labelRes: Int, val icon: ImageVector)
@@ -104,14 +110,18 @@ private fun MainScaffold(container: AppContainer) {
         NavHost(nav, startDestination = ROUTE_SCAN, modifier = Modifier.padding(padding)) {
             composable(ROUTE_SCAN) {
                 val vm: ScannerViewModel = viewModel(factory = viewModelFactory { initializer { ScannerViewModel(container) } })
-                ScannerScreen(vm, snackbar)
+                ScannerScreen(vm, snackbar, onRegisterProduct = { id -> nav.navigate("product/$id?register=true") })
             }
             composable(ROUTE_INVENTORY) {
                 InventoryScreen(container, onOpenProduct = { id -> nav.navigate("product/$id") })
             }
-            composable(ROUTE_PRODUCT) { backStack ->
+            composable(
+                ROUTE_PRODUCT,
+                arguments = listOf(navArgument("register") { type = NavType.BoolType; defaultValue = false }),
+            ) { backStack ->
                 val id = backStack.arguments?.getString("id") ?: ""
-                ProductDetailScreen(container, id, snackbar, onBack = { nav.popBackStack() })
+                val register = backStack.arguments?.getBoolean("register") ?: false
+                ProductDetailScreen(container, id, snackbar, register = register, onBack = { nav.popBackStack() })
             }
             composable(ROUTE_SETTINGS) {
                 SettingsScreen(container)

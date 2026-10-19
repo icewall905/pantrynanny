@@ -1,5 +1,13 @@
 package dk.pantrynanny.app.ui
 
+import android.Manifest
+import android.content.ActivityNotFoundException
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -31,6 +39,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,6 +49,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
@@ -49,6 +59,8 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import dk.pantrynanny.app.AppContainer
 import dk.pantrynanny.app.R
 import dk.pantrynanny.app.data.EditResult
+import dk.pantrynanny.app.data.PhotoFiles
+import dk.pantrynanny.app.data.PhotoPrep
 import dk.pantrynanny.app.data.local.BarcodeEntity
 import dk.pantrynanny.app.data.local.BatchEntity
 import dk.pantrynanny.app.data.local.CategoryEntity
@@ -59,10 +71,12 @@ import dk.pantrynanny.app.domain.ScanMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -91,6 +105,35 @@ class ProductDetailViewModel(private val c: AppContainer, private val productId:
 
     private val _events = MutableSharedFlow<UiMessage>(extraBufferCapacity = 8)
     val events: SharedFlow<UiMessage> = _events.asSharedFlow()
+
+    private val _uploading = MutableStateFlow(false)
+    val uploading: StateFlow<Boolean> = _uploading.asStateFlow()
+
+    /** Shrink, rotate and upload a camera/gallery image as this product's photo. */
+    fun uploadPhoto(uri: Uri) {
+        if (_uploading.value) return
+        _uploading.value = true
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val jpeg = PhotoPrep.jpegFrom(c.app.contentResolver, uri)
+                if (jpeg == null) {
+                    _events.tryEmit(UiMessage(R.string.photo_invalid))
+                    return@launch
+                }
+                when (val r = c.inventoryRepository.uploadPhoto(productId, jpeg)) {
+                    EditResult.Saved -> _events.tryEmit(UiMessage(R.string.photo_saved))
+                    EditResult.Offline -> _events.tryEmit(UiMessage(R.string.photo_offline))
+                    is EditResult.Failed -> _events.tryEmit(UiMessage(R.string.edit_failed, r.message))
+                    else -> Unit
+                }
+            } catch (e: SecurityException) {
+                _events.tryEmit(UiMessage(R.string.photo_invalid))
+            } finally {
+                PhotoFiles.cleanUp(c.app)
+                _uploading.value = false
+            }
+        }
+    }
 
     /** +/- go through the same op queue as scans. */
     fun adjust(mode: ScanMode) {
@@ -138,12 +181,15 @@ fun ProductDetailScreen(
     productId: String,
     snackbar: SnackbarHostState,
     onBack: () -> Unit,
+    /** Opened from the scanner's "Registrer": start in the edit form and return to scanning after save/cancel. */
+    register: Boolean = false,
 ) {
     val vm: ProductDetailViewModel = viewModel(
         key = "product-$productId",
         factory = viewModelFactory { initializer { ProductDetailViewModel(container, productId) } },
     )
     val ui by vm.state.collectAsStateWithLifecycle()
+    val uploading by vm.uploading.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     LaunchedEffect(vm) {
@@ -154,7 +200,7 @@ fun ProductDetailScreen(
     }
 
     val item = ui.product
-    var editing by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf(register) }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
         IconButton(onClick = onBack) {
@@ -167,6 +213,8 @@ fun ProductDetailScreen(
         val p = item.product
 
         if (!editing) {
+            PhotoSection(p.imageUrl, p.name, uploading, onPhoto = vm::uploadPhoto)
+            Spacer(Modifier.height(8.dp))
             Text(p.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             p.brand?.takeIf { it.isNotBlank() }?.let { Text(it) }
             if (p.status != "known") {
@@ -212,16 +260,72 @@ fun ProductDetailScreen(
             Spacer(Modifier.height(16.dp))
             Button(onClick = { editing = true }) { Text(stringResource(R.string.edit)) }
         } else {
+            if (p.status == "unknown") {
+                Text(stringResource(R.string.register_title), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                ui.barcodes.firstOrNull()?.let { Text(stringResource(R.string.register_barcode, it.raw.ifEmpty { it.code })) }
+                Spacer(Modifier.height(8.dp))
+            }
+            PhotoSection(p.imageUrl, p.name, uploading, onPhoto = vm::uploadPhoto)
+            Spacer(Modifier.height(8.dp))
             EditForm(
                 key = p.id + ":" + p.version,
                 item = item,
                 ui = ui,
-                onCancel = { editing = false },
+                onCancel = { if (register) onBack() else editing = false },
                 onSave = { name, brand, cat, min, loc ->
-                    vm.save(name, brand, cat, min, loc) { editing = false }
+                    vm.save(name, brand, cat, min, loc) { if (register) onBack() else editing = false }
                 },
             )
         }
+    }
+}
+
+/** Product photo plus "take photo" (camera app) / "choose photo" (system photo picker, no permission). */
+@Composable
+private fun PhotoSection(imageUrl: String?, name: String, uploading: Boolean, onPhoto: (Uri) -> Unit) {
+    val context = LocalContext.current
+    var pendingUri by rememberSaveable { mutableStateOf<String?>(null) }
+    val takePicture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
+        val uri = pendingUri
+        pendingUri = null
+        if (ok && uri != null) onPhoto(Uri.parse(uri))
+    }
+    val launchCamera = {
+        val uri = PhotoFiles.newCaptureUri(context)
+        pendingUri = uri.toString()
+        try {
+            takePicture.launch(uri)
+        } catch (e: ActivityNotFoundException) {
+            pendingUri = null
+            Toast.makeText(context, R.string.photo_no_camera, Toast.LENGTH_SHORT).show()
+        }
+    }
+    // The app declares CAMERA (for the scanner), so the camera intent needs it granted too.
+    val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) launchCamera()
+    }
+    val pick = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) onPhoto(uri)
+    }
+
+    if (imageUrl != null) {
+        ProductImage(imageUrl, name, Modifier.fillMaxWidth().height(200.dp))
+        Spacer(Modifier.height(8.dp))
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        OutlinedButton(
+            enabled = !uploading,
+            onClick = {
+                val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                    PackageManager.PERMISSION_GRANTED
+                if (granted) launchCamera() else cameraPermission.launch(Manifest.permission.CAMERA)
+            },
+        ) { Text(stringResource(if (imageUrl == null) R.string.photo_take else R.string.photo_retake)) }
+        OutlinedButton(
+            enabled = !uploading,
+            onClick = { pick.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+        ) { Text(stringResource(R.string.photo_choose)) }
+        if (uploading) Text(stringResource(R.string.photo_uploading))
     }
 }
 
@@ -234,7 +338,8 @@ private fun EditForm(
     onSave: (String, String, String?, String, String?) -> Unit,
 ) {
     val p = item.product
-    var name by remember(key) { mutableStateOf(p.name) }
+    // An unknown product still carries the server placeholder name ("Ukendt vare <barcode>"): start empty.
+    var name by remember(key) { mutableStateOf(if (p.status == "unknown") "" else p.name) }
     var brand by remember(key) { mutableStateOf(p.brand ?: "") }
     var minStock by remember(key) { mutableStateOf(p.minStock?.let { QuantityMath.format(it) } ?: "") }
     var categoryId by remember(key) { mutableStateOf(p.categoryId) }

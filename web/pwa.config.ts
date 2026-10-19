@@ -37,7 +37,8 @@ export const pwaOptions: Partial<VitePWAOptions> = {
   workbox: {
     globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2,webmanifest}'],
     navigateFallback: '/index.html',
-    navigateFallbackDenylist: [/^\/api\//],
+    // /downloads/ holds the Android APK: never answer it with the cached app shell.
+    navigateFallbackDenylist: [/^\/api\//, /^\/downloads\//],
     cleanupOutdatedCaches: true,
     clientsClaim: true,
     skipWaiting: true,

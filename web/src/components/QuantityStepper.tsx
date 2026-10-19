@@ -23,7 +23,7 @@ export function QuantityStepper({
         aria-label={t('inventory.decrease', { name })}
         disabled={disableMinus ?? value <= 0}
         onClick={() => onChange(-1)}
-        className="grid size-11 place-items-center rounded-xl bg-white shadow-sm transition active:scale-95 disabled:opacity-40"
+        className="grid size-11 place-items-center rounded-xl bg-surface shadow-sm transition active:scale-95 disabled:opacity-40"
       >
         <Minus className="size-5" />
       </button>

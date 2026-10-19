@@ -20,7 +20,7 @@ function Section({ title, items }: { title: string; items: InventoryItem[] }) {
       <ul className="space-y-2">
         {sorted.map((i) => (
           <li key={i.product.id}>
-            <Link to={`/products/${i.product.id}`} className="flex items-center gap-3 rounded-[var(--radius-card)] bg-white p-3 shadow-card">
+            <Link to={`/products/${i.product.id}`} className="flex items-center gap-3 rounded-[var(--radius-card)] bg-surface p-3 shadow-card">
               <ProductThumb name={i.product.name} src={i.product.image_url} />
               <div className="min-w-0 flex-1">
                 <div className="truncate font-semibold">{i.product.name}</div>
