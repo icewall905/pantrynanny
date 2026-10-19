@@ -472,3 +472,69 @@ class AppSetting(Base):
     key: Mapped[str] = mapped_column(String(64), primary_key=True)
     value: Mapped[Any] = mapped_column(JSONB)
     updated_at: Mapped[datetime] = _ts()
+
+
+class Recipe(Base):
+    __tablename__ = "recipes"
+    id: Mapped[uuid.UUID] = _pk()
+    household_id: Mapped[uuid.UUID] = _fk("households.id", ondelete="CASCADE")
+    version: Mapped[int] = mapped_column(Integer, default=1, server_default=text("1"))
+    title: Mapped[str] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
+    servings: Mapped[int] = mapped_column(Integer, default=4, server_default=text("4"))
+    prep_min: Mapped[int | None] = mapped_column(Integer)
+    cook_min: Mapped[int | None] = mapped_column(Integer)
+    instructions: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), default=list, server_default=text("'{}'")
+    )
+    tags: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list, server_default=text("'{}'"))
+    source_url: Mapped[str | None] = mapped_column(Text)
+    source_name: Mapped[str | None] = mapped_column(Text)
+    image_url: Mapped[str | None] = mapped_column(Text)
+    created_by: Mapped[uuid.UUID | None] = _fk("users.id", nullable=True, ondelete="SET NULL")
+    created_at: Mapped[datetime] = _ts()
+    updated_at: Mapped[datetime] = _ts()
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    ingredients: Mapped[list["RecipeIngredient"]] = relationship(
+        lazy="selectin",
+        order_by="RecipeIngredient.position",
+        cascade="all, delete-orphan",
+    )
+
+    __table_args__ = (Index("ix_recipes_household", "household_id"),)
+
+
+class RecipeIngredient(Base):
+    __tablename__ = "recipe_ingredients"
+    id: Mapped[uuid.UUID] = _pk()
+    recipe_id: Mapped[uuid.UUID] = _fk("recipes.id", ondelete="CASCADE")
+    position: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    raw: Mapped[str] = mapped_column(Text)
+    name: Mapped[str] = mapped_column(Text)
+    quantity: Mapped[Decimal | None] = mapped_column(Numeric(12, 3))
+    unit: Mapped[str | None] = mapped_column(String(16))
+    note: Mapped[str | None] = mapped_column(Text)
+    optional: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
+    product_id: Mapped[uuid.UUID | None] = _fk("products.id", nullable=True, ondelete="SET NULL")
+
+    __table_args__ = (Index("ix_recipe_ingredients_recipe", "recipe_id"),)
+
+
+class MealPlanEntry(Base):
+    """A planned meal. Planning never changes stock: only 'cook' does, after confirmation."""
+
+    __tablename__ = "meal_plan_entries"
+    id: Mapped[uuid.UUID] = _pk()
+    household_id: Mapped[uuid.UUID] = _fk("households.id", ondelete="CASCADE")
+    day: Mapped[date] = mapped_column(Date)
+    slot: Mapped[str] = mapped_column(String(16), default="dinner", server_default="dinner")
+    recipe_id: Mapped[uuid.UUID | None] = _fk("recipes.id", nullable=True, ondelete="SET NULL")
+    title: Mapped[str | None] = mapped_column(Text)
+    servings: Mapped[int | None] = mapped_column(Integer)
+    note: Mapped[str | None] = mapped_column(Text)
+    cooked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = _ts()
+    updated_at: Mapped[datetime] = _ts()
+
+    __table_args__ = (Index("ix_meal_plan_household_day", "household_id", "day"),)

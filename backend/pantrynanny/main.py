@@ -35,8 +35,10 @@ from .routers import (
     inventory,
     kitchen,
     locations,
+    meal_plan,
     media,
     products,
+    recipes,
     settings,
     shopping,
     stats,
@@ -194,6 +196,8 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
         admin_catalogue,
         admin_ai,
         kitchen,
+        recipes,
+        meal_plan,
         ha,
     ):
         app.include_router(module.router, prefix="/api")
