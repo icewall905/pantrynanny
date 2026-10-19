@@ -63,7 +63,7 @@ jobs:
       # Signed release for Obtainium: every push to main that touches android/ publishes
       # android-v0.1.<commit count> with pantrynanny-0.1.<n>.apk. Needs the four ANDROID_* secrets
       # (see android/README.md); without them this step is skipped and CI stays green.
-      - name: Report signing secrets (presence only)
+      - name: Report signing secrets (presence only, never values)
         env:
           A: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
           B: ${{ secrets.ANDROID_KEYSTORE_PASSWORD != '' }}
