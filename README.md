@@ -187,10 +187,10 @@ Android needs JDK 21 and the Android SDK; see [android/README.md](android/README
 |---|---|---|
 | Backend (real PostgreSQL) | `cd backend && uv run pytest` | 240 passed |
 | Backend lint | `uv run ruff check . && uv run ruff format --check .` | clean |
-| Web unit | `cd web && npm test` | 111 passed |
+| Web unit | `cd web && npm test` | 114 passed |
 | Web lint / types | `npm run lint && npm run typecheck` | clean |
 | Web e2e (real backend, Chromium) | `PN_E2E_BASE_URL=http://127.0.0.1:4173 PN_E2E_USER=… PN_E2E_PASSWORD=… npx playwright test` | 16 passed, 2 skipped (scanner specs are desktop-only) |
-| Android (CI) | `./gradlew testDebugUnitTest assembleDebug lintDebug` | see the Android workflow |
+| Android (CI) | `./gradlew testDebugUnitTest assembleDebug lintDebug` | green (unit tests, debug APK, lint) |
 
 For the e2e run, serve a production build with `npx vite preview --port 4173` in front of a backend on
 `:8000`. Set `PN_CHROMIUM` to use an already-installed Chromium. The scanner specs feed a generated
