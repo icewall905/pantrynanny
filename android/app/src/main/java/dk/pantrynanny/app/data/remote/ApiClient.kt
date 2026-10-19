@@ -30,7 +30,7 @@ private class RawResponse(val code: Int, val body: String)
 class ApiClient(
     private val settings: SettingsStore,
     private val tokens: TokenStore,
-    /** Disk cache for product images (`/api/media/*` is immutable, so it also serves them offline). */
+    /** Disk cache for product images (media files are immutable, so the cache also serves them offline). */
     imageCacheDir: File? = null,
 ) {
     private val client: OkHttpClient = OkHttpClient.Builder()
