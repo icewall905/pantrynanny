@@ -421,5 +421,20 @@
     "settingsCard": "AI assistant",
     "settingsCardHint": "Endpoint, model and connection test.",
     "open": "Open"
+  },
+  "scanner": {
+    "title": "Scanner (this device)",
+    "hint": "Applies to the /scan screen on this device only.",
+    "hid": "Hand scanner (Bluetooth/USB)",
+    "hidHint": "Scanners in keyboard mode work automatically on the scan screen. Normal typing is not mistaken for a barcode.",
+    "camera": "Use the camera",
+    "cameraHint": "Turn off on a station that only uses a hand scanner.",
+    "quantity": "Quick quantity buttons",
+    "quantityHint": "Show +1 / +2 / +5 after each scan for several identical items.",
+    "sessions": "Recent scan sessions",
+    "noSessions": "No sessions yet on this device.",
+    "sessionMeta": "{{scans}} scans · {{products}} products",
+    "sessionUnknown_one": "{{count}} unknown",
+    "sessionUnknown_other": "{{count}} unknown"
   }
 }

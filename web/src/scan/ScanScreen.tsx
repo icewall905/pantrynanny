@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { AlertTriangle, Flashlight, Keyboard, MapPin, Minus, Plus, RefreshCw, SwitchCamera, Undo2, Volume2, VolumeX, Wifi, WifiOff, X } from 'lucide-react'
+import { AlertTriangle, Camera, CameraOff, ClipboardList, Flashlight, Keyboard, MapPin, Minus, Plus, RefreshCw, SwitchCamera, Undo2, Volume2, VolumeX, Wifi, WifiOff, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useTranslation } from 'react-i18next'
 import { get, qs } from '../api/client'
@@ -8,6 +8,7 @@ import { enqueueOp, getStore, isBlankBarcode, normalizeBarcode, useSyncStatus } 
 import type { FailedRecord } from '../offline'
 import { CameraError, type Facing } from './camera'
 import { DEFAULT_REARM_MS } from './dedupe'
+import { HidBurstDetector, isTypingTarget } from './hid'
 import { ScannerEngine, type EngineState, type ScanEvent } from './engine'
 import { beep, setSoundEnabled, vibrate } from './feedback'
 import { FRAME } from './geometry'
@@ -15,6 +16,8 @@ import { NS } from './i18n'
 import { opErrorText } from '../lib/opError'
 import { loadMode, removeTimedOut, saveMode, type ScanMode } from './mode'
 import { perf } from './perf'
+import { loadScanPrefs, saveScanPrefs, type ScanPrefs } from './prefs'
+import { expired, nameLine, recordScan, recordUndo, saveSession, summarize, type ScanRecord, type ScanSession } from './session'
 import type { WakeState } from './wakelock'
 
 // Whole-screen treatment per mode. Full class strings so Tailwind can see them.
@@ -54,7 +57,12 @@ interface Card {
   lookingUp: boolean
   /** the durable local write failed: this scan was NOT recorded */
   failed?: boolean
+  /** ops behind this card (the scan plus any +N taps) */
+  ops: { id: string; qty: number }[]
 }
+
+const cardDelta = (c: Card) => c.ops.reduce((a, o) => a + o.qty, 0)
+const MORE = [1, 2, 5]
 
 interface Toast {
   id: number
@@ -124,6 +132,23 @@ export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: 
   const [failed, setFailed] = useState<FailedRecord[]>([])
   const [failedOpen, setFailedOpen] = useState(false)
   const pillTaps = useRef<number[]>([])
+  const [prefs, setPrefsState] = useState<ScanPrefs>(() => loadScanPrefs())
+  const setPrefs = (p: ScanPrefs) => {
+    saveScanPrefs(p)
+    setPrefsState(p)
+  }
+  const [session, setSessionState] = useState<ScanSession | null>(null)
+  const sessionRef = useRef<ScanSession | null>(null)
+  const setSession = useCallback((s: ScanSession | null) => {
+    sessionRef.current = s
+    setSessionState(s)
+  }, [])
+  const track = useCallback((r: ScanRecord) => {
+    const cur = sessionRef.current
+    if (cur && expired(cur, r.at)) saveSession(cur)
+    setSession(recordScan(cur, r))
+  }, [setSession])
+  const [summary, setSummary] = useState<ScanSession | null>(null)
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const engineRef = useRef<ScannerEngine | null>(null)
@@ -159,9 +184,14 @@ export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: 
         setMode('add')
         toast(t('mode.revertedIdle'))
       }
+      const s = sessionRef.current
+      if (s && expired(s, Date.now())) {
+        saveSession(s) // ended by inactivity: kept for review in Settings › Scanner
+        setSession(null)
+      }
     }, 5000)
     return () => clearInterval(iv)
-  }, [settings?.remove_mode_timeout_min, setMode, toast, t])
+  }, [settings?.remove_mode_timeout_min, setMode, toast, t, setSession])
 
   // ---- data refresh ----
   const refresh = useCallback(async () => {
@@ -193,6 +223,7 @@ export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: 
         if (r.product) {
           await store.cacheProduct(r.product)
           if (r.product.status === 'known') dropToast(toastIdUnknown)
+          setSession(nameLine(sessionRef.current, ev.value, r.product.name, r.product.status === 'unknown'))
           const q = await store.displayedQuantity(r.product, normalizeBarcode(ev.value, ev.format))
           setCard((c) => (c && c.n === n ? { ...c, product: r.product, lookingUp: false, qty: Math.max(0, q) } : c))
           return
@@ -202,7 +233,7 @@ export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: 
       }
       setCard((c) => (c && c.n === n ? { ...c, lookingUp: false } : c))
     },
-    [store],
+    [store, setSession],
   )
 
   const handleScan = useCallback(
@@ -245,7 +276,7 @@ export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: 
         console.error('enqueue failed', e)
         beep('error')
         vibrate([200, 80, 200])
-        setCard({ n, opId: '', type, barcode: ev.value, format: ev.format, product, qty: null, lookingUp: false, failed: true })
+        setCard({ n, opId: '', type, barcode: ev.value, format: ev.format, product, qty: null, lookingUp: false, failed: true, ops: [] })
         toast(t('toast.saveFailed', { code: ev.value }), 'red')
         return
       }
@@ -253,7 +284,8 @@ export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: 
       const known = !!product && product.status !== 'unknown'
       beep(known ? type : 'unknown')
       vibrate(known ? 40 : [40, 60, 40])
-      setCard({ n, opId: op.client_op_id, type, barcode: ev.value, format: ev.format, product, qty: null, lookingUp: !known })
+      setCard({ n, opId: op.client_op_id, type, barcode: ev.value, format: ev.format, product, qty: null, lookingUp: !known, ops: [{ id: op.client_op_id, qty: 1 }] })
+      track({ opId: op.client_op_id, at: Date.now(), type, qty: 1, barcode: ev.value, name: known ? product!.name : null, unknown: !known })
       let unknownToast = 0
       if (!known) unknownToast = toast(t('toast.unknown'), 'amber')
       const q = await store.displayedQuantity(product, norm).catch(() => 0)
@@ -264,7 +296,7 @@ export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: 
       }
       if (!known) void background(ev, n, unknownToast)
     },
-    [store, toast, t, background, setMode, settings?.remove_mode_timeout_min],
+    [store, toast, t, background, setMode, track, settings?.remove_mode_timeout_min],
   )
   const handleScanRef = useRef(handleScan)
   handleScanRef.current = handleScan
@@ -274,9 +306,61 @@ export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: 
     chain.current = chain.current.then(() => handleScanRef.current(ev)).catch(() => undefined)
   }, [])
 
+  /** "+5": the same product again, k more. Its own op, so undo takes back exactly this tap. */
+  const more = (k: number) => {
+    const c = cardRef.current
+    if (!c || c.failed || !c.opId) return
+    chain.current = chain.current
+      .then(async () => {
+        lastActivity.current = Date.now()
+        try {
+          const op = await enqueueOp({
+            type: c.type,
+            barcode: c.barcode,
+            symbology: c.format ?? null,
+            product_id: c.product?.id ?? null,
+            quantity: k,
+            location_id: locationRef.current,
+          })
+          beep(c.type)
+          vibrate(30)
+          setCard((cur) => (cur && cur.n === c.n ? { ...cur, ops: [...cur.ops, { id: op.client_op_id, qty: k }] } : cur))
+          const p = c.product && c.product.status !== 'unknown' ? c.product : null
+          track({ opId: op.client_op_id, at: Date.now(), type: c.type, qty: k, barcode: c.barcode, name: p?.name ?? null, unknown: !p })
+        } catch (e) {
+          console.error('enqueue failed', e)
+          beep('error')
+          toast(t('toast.saveFailed', { code: c.barcode }), 'red')
+        }
+      })
+      .catch(() => undefined)
+  }
+
+  // ---- hardware scanner (Bluetooth/USB keyboard wedge) ----
+  const manualOpenRef = useRef(manualOpen)
+  manualOpenRef.current = manualOpen
+  useEffect(() => {
+    if (!prefs.hid) return
+    const det = new HidBurstDetector()
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || manualOpenRef.current || isTypingTarget(e.target)) {
+        det.reset()
+        return
+      }
+      const r = det.feed(e.key, performance.now())
+      if (r.consumed) e.preventDefault()
+      if (r.code) submit({ value: r.code, format: 'other' }) // digits are still recognised as EAN/UPC
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [prefs.hid, submit])
+
   useEffect(() => {
     const video = videoRef.current
-    if (!video) return
+    if (!video || !prefs.camera) {
+      setCamState('idle')
+      return
+    }
     const engine = new ScannerEngine({
       video,
       rearmMs: settings?.scan_rearm_ms ?? DEFAULT_REARM_MS,
@@ -297,9 +381,9 @@ export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: 
       engine.stop()
       engineRef.current = null
     }
-    // engine is created once per mount
+    // engine is created once per mount (and again when the camera is switched back on)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [prefs.camera])
   useEffect(() => {
     engineRef.current?.dedupe.setRearmMs(settings?.scan_rearm_ms ?? DEFAULT_REARM_MS)
   }, [settings?.scan_rearm_ms])
@@ -310,6 +394,8 @@ export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: 
     lastActivity.current = Date.now()
     const r = await store.undoScan(id)
     if (r !== 'noop') {
+      setSession(recordUndo(sessionRef.current, id))
+      setCard((c) => (c && c.ops.some((o) => o.id === id) ? { ...c, ops: c.ops.filter((o) => o.id !== id) } : c))
       beep('remove')
       toast(t('toast.undone', { name: name ?? '' }))
     }
@@ -340,6 +426,19 @@ export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: 
   }
 
   const camTitleKey = camErr ? `camera.${camErr.kind}` : null
+
+  const exit = () => {
+    const s = sessionRef.current
+    if (s && s.scans > 0) {
+      saveSession(s)
+      setSummary(s)
+    } else onExit?.()
+  }
+  const finish = () => {
+    setSession(null)
+    setSummary(null)
+    onExit?.()
+  }
 
   return (
     <div
@@ -406,10 +505,17 @@ export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: 
             style={{ width: `${FRAME.w * 100}%`, height: `${FRAME.h * 100}%`, boxShadow: '0 0 0 9999px rgba(0,0,0,0.22)' }}
           />
           {card && <div key={`f${card.n}`} className={clsx('pn-anim pointer-events-none absolute inset-0', theme.flash)} style={{ animation: 'pn-flash .5s ease-out forwards' }} />}
-          {camState !== 'running' && !camErr && (
-            <div className="absolute inset-0 grid place-items-center bg-black/60 text-xl font-semibold">{t('camera.starting')}</div>
+          {!prefs.camera ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 p-6 text-center" data-testid="camera-off">
+              <Keyboard className="size-14 text-white/80" />
+              <div className="text-2xl font-bold">{t('hid.ready')}</div>
+              <p className="max-w-md text-lg text-white/75">{t('hid.hint')}</p>
+            </div>
+          ) : (
+            camState !== 'running' &&
+            !camErr && <div className="absolute inset-0 grid place-items-center bg-black/60 text-xl font-semibold">{t('camera.starting')}</div>
           )}
-          {camErr && camTitleKey && (
+          {prefs.camera && camErr && camTitleKey && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 overflow-auto bg-black/85 p-6 text-center">
               <AlertTriangle className="size-12 text-honey-400" />
               <h2 className="text-2xl font-bold">{t(`${camTitleKey}.title`)}</h2>
@@ -425,7 +531,10 @@ export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: 
           )}
           {/* tools */}
           <div className="absolute bottom-3 right-3 flex gap-2">
-            {switchOk && (
+            <IconBtn label={prefs.camera ? t('cameraOff') : t('cameraOn')} active={!prefs.camera} onClick={() => setPrefs({ ...prefs, camera: !prefs.camera })}>
+              {prefs.camera ? <Camera className="size-6" /> : <CameraOff className="size-6" />}
+            </IconBtn>
+            {prefs.camera && switchOk && (
               <IconBtn
                 label={t('switchCamera')}
                 onClick={() => {
@@ -444,7 +553,7 @@ export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: 
                 <SwitchCamera className="size-6" />
               </IconBtn>
             )}
-            {torchOk && (
+            {prefs.camera && torchOk && (
               <IconBtn
                 label={t('torch')}
                 active={torch}
@@ -482,6 +591,23 @@ export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: 
         {/* Side panel */}
         <div className="flex min-h-0 flex-col gap-3 landscape:flex-[2]">
           <LastCard card={card} theme={theme} />
+          {prefs.quantity && card && !card.failed && card.opId && (
+            <div className="flex gap-2" data-testid="more-row">
+              {MORE.map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  data-testid={`more-${k}`}
+                  onClick={() => more(k)}
+                  aria-label={t(card.type === 'add' ? 'more.add' : 'more.remove', { count: k })}
+                  className="min-h-14 flex-1 rounded-2xl bg-white/15 text-2xl font-black ring-2 ring-white/30 active:scale-95"
+                >
+                  {card.type === 'add' ? '+' : '−'}
+                  {k}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="flex gap-3">
             <button
               type="button"
@@ -607,8 +733,19 @@ export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: 
           </button>
         )}
         <div className="flex-1" />
+        {session && session.scans > 0 && (
+          <button
+            type="button"
+            data-testid="session-pill"
+            onClick={() => setSummary(session)}
+            className="flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold"
+          >
+            <ClipboardList className="size-4" />
+            {t('session.pill', { added: session.added, removed: session.removed })}
+          </button>
+        )}
         {!kiosk && onExit && (
-          <button type="button" onClick={onExit} className="rounded-full bg-white/10 px-4 py-2 text-sm">
+          <button type="button" onClick={exit} className="rounded-full bg-white/10 px-4 py-2 text-sm" data-testid="scan-exit">
             {t('exit')}
           </button>
         )}
@@ -676,6 +813,15 @@ export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: 
         </div>
       )}
 
+      {summary && (
+        <SessionSummary
+          session={summary}
+          pending={sync.pending}
+          onContinue={() => setSummary(null)}
+          onDone={!kiosk && onExit ? finish : undefined}
+        />
+      )}
+
       {debug && <DebugOverlay pending={sync.pending} onClose={() => setDebug(false)} />}
     </div>
   )
@@ -710,7 +856,8 @@ function LastCard({ card, theme }: { card: Card | null; theme: (typeof THEME)[Sc
       <div className={clsx('grid min-h-28 place-items-center rounded-3xl p-5 text-center text-xl text-white/80', theme.soft)}>{t('last.empty')}</div>
     )
   const p = card.product && card.product.status !== 'unknown' ? card.product : null
-  const delta = card.failed ? '!' : card.type === 'add' ? '+1' : '−1'
+  const n = cardDelta(card)
+  const delta = card.failed ? '!' : card.type === 'add' ? `+${n}` : `−${n}`
   return (
     <div key={card.n} className={clsx('flex items-center gap-4 rounded-3xl p-4', theme.soft)} data-testid="last-card">
       <div className="relative grid size-24 shrink-0 place-items-center overflow-hidden rounded-2xl bg-white/90 text-5xl landscape:size-28">
@@ -729,8 +876,10 @@ function LastCard({ card, theme }: { card: Card | null; theme: (typeof THEME)[Sc
       </div>
       <div
         className={clsx('pn-anim text-[clamp(3rem,8vw,6rem)] font-black leading-none', card.failed ? 'text-red-400' : card.type === 'add' ? 'text-leaf-100' : 'text-tomato-100')}
+        key={delta}
         style={{ animation: 'pn-pop .45s ease-out' }}
         aria-label={delta}
+        data-testid="last-delta"
       >
         {delta}
       </div>
@@ -750,5 +899,70 @@ function DebugOverlay({ pending, onClose }: { pending: number; onClose: () => vo
       <div>pending ops: {pending}</div>
       <div>frames: {p.frames}</div>
     </button>
+  )
+}
+
+function SessionSummary({
+  session,
+  pending,
+  onContinue,
+  onDone,
+}: {
+  session: ScanSession
+  pending: number
+  onContinue: () => void
+  onDone?: () => void
+}) {
+  const { t } = useTranslation(NS)
+  const sum = summarize(session)
+  const min = Math.max(1, Math.round(sum.durationMs / 60_000))
+  return (
+    <div className="absolute inset-0 z-50 grid place-items-center bg-black/70 p-4" data-testid="session-summary">
+      <div className="flex max-h-full w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-ink-900 p-5">
+        <h2 className="text-2xl font-bold">{t('session.title')}</h2>
+        <p className="mb-3 text-white/70">{t('session.meta', { scans: session.scans, count: sum.products, min })}</p>
+        <div className="mb-3 grid grid-cols-3 gap-2 text-center">
+          <Stat label={t('session.added')} value={session.added ? `+${session.added}` : '0'} tone="text-leaf-300" />
+          <Stat label={t('session.removed')} value={session.removed ? `−${session.removed}` : '0'} tone="text-tomato-300" />
+          <Stat label={t('session.unknown')} value={String(sum.unknown.length)} tone={sum.unknown.length ? 'text-honey-400' : 'text-white'} />
+        </div>
+        {pending > 0 && <p className="mb-2 rounded-xl bg-white/10 px-3 py-2 text-sm">{t('session.pending', { count: pending })}</p>}
+        <ul className="min-h-0 flex-1 divide-y divide-white/10 overflow-auto">
+          {sum.lines.map((l) => (
+            <li key={l.barcode} className="flex items-center gap-3 py-2">
+              <span className="min-w-0 flex-1 truncate text-lg">
+                {l.name && !l.unknown ? l.name : <span className="font-mono text-honey-400">{l.barcode}</span>}
+              </span>
+              {l.added > 0 && <span className="font-bold text-leaf-300">+{l.added}</span>}
+              {l.removed > 0 && <span className="font-bold text-tomato-300">−{l.removed}</span>}
+            </li>
+          ))}
+        </ul>
+        {sum.unknown.length > 0 && (
+          <a href="/unknown" className="mt-3 rounded-2xl bg-honey-400 px-4 py-3 text-center text-lg font-bold text-ink-900" data-testid="session-unknown">
+            {t('session.identify', { count: sum.unknown.length })}
+          </a>
+        )}
+        <div className="mt-3 flex gap-2">
+          <button type="button" onClick={onContinue} className="flex-1 rounded-2xl bg-white/15 py-3 text-lg font-bold">
+            {t('session.continue')}
+          </button>
+          {onDone && (
+            <button type="button" onClick={onDone} className="flex-1 rounded-2xl bg-white py-3 text-lg font-bold text-ink-900" data-testid="session-done">
+              {t('session.done')}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Stat({ label, value, tone }: { label: string; value: string; tone: string }) {
+  return (
+    <div className="rounded-2xl bg-white/10 p-3">
+      <div className={clsx('text-3xl font-black', tone)}>{value}</div>
+      <div className="text-xs uppercase tracking-wide text-white/60">{label}</div>
+    </div>
   )
 }

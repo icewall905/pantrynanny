@@ -114,5 +114,31 @@
     "close": "Close"
   },
   "exit": "Leave scanner",
-  "switchCamera": "Switch camera (front/rear)"
+  "switchCamera": "Switch camera (front/rear)",
+  "more": {
+    "add_one": "Add {{count}} more",
+    "add_other": "Add {{count}} more",
+    "remove_one": "Remove {{count}} more",
+    "remove_other": "Remove {{count}} more"
+  },
+  "hid": {
+    "ready": "Ready for the hand scanner",
+    "hint": "Scan with a Bluetooth or USB barcode scanner. The camera is off; turn it on with the camera button."
+  },
+  "cameraOn": "Turn camera on",
+  "cameraOff": "Turn camera off (hand scanner only)",
+  "session": {
+    "pill": "+{{added}} / −{{removed}}",
+    "title": "Scan session",
+    "meta_one": "{{scans}} scans · {{count}} product · {{min}} min",
+    "meta_other": "{{scans}} scans · {{count}} products · {{min}} min",
+    "added": "added",
+    "removed": "removed",
+    "unknown": "unknown",
+    "pending": "{{count}} change(s) still waiting to sync – they upload automatically.",
+    "identify_one": "Name {{count}} unknown item",
+    "identify_other": "Name {{count}} unknown items",
+    "continue": "Keep scanning",
+    "done": "Done"
+  }
 }

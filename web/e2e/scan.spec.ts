@@ -31,7 +31,7 @@ const PRODUCT = {
 }
 const SETTINGS = { locale: 'da', allow_negative_stock: false, expiry_soon_days: 3, auto_shopping_low_stock: true, remove_mode_timeout_min: 10, scan_rearm_ms: 600 }
 
-async function mockBackend(page: Page, state: { online: boolean; ops: { client_op_id: string; type: string; barcode?: string }[] }) {
+async function mockBackend(page: Page, state: { online: boolean; ops: { client_op_id: string; type: string; barcode?: string; quantity?: number }[] }, kiosk = true) {
   const json = (body: unknown, status = 200) => ({ status, contentType: 'application/json', body: JSON.stringify(body) })
   let total = 0
   await page.route('**/api/**', async (route) => {
@@ -39,7 +39,7 @@ async function mockBackend(page: Page, state: { online: boolean; ops: { client_o
     if (!state.online) return route.abort('connectionrefused')
     const p = url.pathname
     if (p === '/api/auth/me')
-      return route.fulfill(json({ user: { id: 'u', username: 'kiosk', display_name: 'Kiosk', role: 'member' }, household: { id: 'h', name: 'Hjem' }, kiosk: true, settings: SETTINGS }))
+      return route.fulfill(json({ user: { id: 'u', username: 'kiosk', display_name: 'Kiosk', role: 'member' }, household: { id: 'h', name: 'Hjem' }, kiosk, settings: SETTINGS }))
     if (p === '/api/sync/snapshot')
       return route.fulfill(json({ cursor: '1', products: [PRODUCT], inventory: [{ product_id: PRODUCT.id, total_quantity: total, batches: [] }], locations: [], categories: [], settings: SETTINGS }))
     if (p === '/api/sync/changes') return route.fulfill(json({ cursor: '2', products: [], inventory: [], locations: [], categories: [], full_resync_required: false }))
@@ -104,5 +104,42 @@ test.describe('continuous scanner (fake camera)', () => {
     await expect.poll(() => state.ops.length, { timeout: 45_000 }).toBeGreaterThan(before)
     const ids = state.ops.map((o) => o.client_op_id)
     expect(new Set(ids).size).toBe(ids.length) // exactly once
+  })
+})
+
+test.describe('hand scanner, quantity and sessions', () => {
+  test.skip(!E2E, 'PN_E2E_BASE_URL not set')
+
+  test('keyboard-wedge bursts scan, typing does not; +5 is one op; exit shows the session', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'desktop only')
+    test.setTimeout(60_000)
+    const state = { online: true, ops: [] as { client_op_id: string; type: string; barcode?: string; quantity?: number }[] }
+    await mockBackend(page, state, false)
+    // station without camera: hand scanner only
+    await page.addInitScript(() => localStorage.setItem('pn.scan.prefs', JSON.stringify({ camera: false })))
+    await page.goto('/scan')
+    await page.getByTestId('start-scanning').click()
+    await expect(page.getByTestId('camera-off')).toBeVisible()
+
+    // a person typing digits slowly is not a scan
+    await page.keyboard.type('5701234', { delay: 150 })
+    await page.keyboard.press('Enter')
+    // the scanner types fast and ends with Enter
+    await page.keyboard.type(BARCODE_A, { delay: 5 })
+    await page.keyboard.press('Enter')
+    await expect(page.getByTestId('last-name')).toHaveText('Letmælk')
+    await page.getByTestId('more-5').click()
+    await expect(page.getByTestId('last-delta')).toHaveText('+6')
+    await expect.poll(() => state.ops.map((o) => [o.barcode, o.quantity]), { timeout: 20_000 }).toEqual([
+      [BARCODE_A, 1],
+      [BARCODE_A, 5],
+    ])
+
+    await page.getByTestId('scan-exit').click()
+    const sum = page.getByTestId('session-summary')
+    await expect(sum).toContainText('+6')
+    await expect(sum).toContainText('Letmælk')
+    await page.getByTestId('session-done').click()
+    await expect(page.getByTestId('start-scanning')).toBeVisible()
   })
 })

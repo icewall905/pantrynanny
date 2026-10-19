@@ -8,6 +8,7 @@ import { Button, Card, Chip, PageHeader } from '../components/ui'
 import { ANDROID_APK_URL, useAndroidApp } from '../lib/androidApp'
 import { formatDate } from '../lib/format'
 import { getTheme, setTheme, type Theme } from '../lib/theme'
+import ScannerSettingsCard from './ScannerSettingsCard'
 
 export default function SettingsPage() {
   const { t, i18n } = useTranslation()
@@ -64,6 +65,7 @@ export default function SettingsPage() {
             !apk.isLoading && <p className="text-sm text-ink-500">{t('settings.androidNone')}</p>
           )}
         </Card>
+        <ScannerSettingsCard />
         {isAdmin && (
           <Card>
             <h2 className="mb-1 flex items-center gap-2 text-lg font-bold">

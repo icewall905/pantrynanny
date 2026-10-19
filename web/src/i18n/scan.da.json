@@ -114,5 +114,31 @@
     "close": "Luk"
   },
   "exit": "Forlad scanner",
-  "switchCamera": "Skift kamera (front/bag)"
+  "switchCamera": "Skift kamera (front/bag)",
+  "more": {
+    "add_one": "Tilføj {{count}} mere",
+    "add_other": "Tilføj {{count}} mere",
+    "remove_one": "Fjern {{count}} mere",
+    "remove_other": "Fjern {{count}} mere"
+  },
+  "hid": {
+    "ready": "Klar til håndscanneren",
+    "hint": "Scan med en Bluetooth- eller USB-stregkodescanner. Kameraet er slukket; tænd det med kameraknappen."
+  },
+  "cameraOn": "Tænd kamera",
+  "cameraOff": "Sluk kamera (kun håndscanner)",
+  "session": {
+    "pill": "+{{added}} / −{{removed}}",
+    "title": "Scanning",
+    "meta_one": "{{scans}} scanninger · {{count}} vare · {{min}} min",
+    "meta_other": "{{scans}} scanninger · {{count}} varer · {{min}} min",
+    "added": "tilføjet",
+    "removed": "fjernet",
+    "unknown": "ukendte",
+    "pending": "{{count}} ændring(er) venter på synkronisering – de sendes automatisk.",
+    "identify_one": "Navngiv {{count}} ukendt vare",
+    "identify_other": "Navngiv {{count}} ukendte varer",
+    "continue": "Scan videre",
+    "done": "Færdig"
+  }
 }

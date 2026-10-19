@@ -421,5 +421,20 @@
     "settingsCard": "AI-assistent",
     "settingsCardHint": "Endpoint, model og forbindelsestest.",
     "open": "Åbn"
+  },
+  "scanner": {
+    "title": "Scanner (denne enhed)",
+    "hint": "Gælder kun scanneskærmen (/scan) på denne enhed.",
+    "hid": "Håndscanner (Bluetooth/USB)",
+    "hidHint": "Scannere i tastaturtilstand virker automatisk på scanneskærmen. Almindelig tastning forveksles ikke med en stregkode.",
+    "camera": "Brug kameraet",
+    "cameraHint": "Slå fra på en station, der kun bruger håndscanner.",
+    "quantity": "Hurtige antalsknapper",
+    "quantityHint": "Vis +1 / +2 / +5 efter hver scanning, når der er flere ens varer.",
+    "sessions": "Seneste scanninger",
+    "noSessions": "Ingen scanninger endnu på denne enhed.",
+    "sessionMeta": "{{scans}} scanninger · {{products}} varer",
+    "sessionUnknown_one": "{{count}} ukendt",
+    "sessionUnknown_other": "{{count}} ukendte"
   }
 }
