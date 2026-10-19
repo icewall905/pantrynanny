@@ -41,7 +41,7 @@ export const InventoryRow = memo(function InventoryRow({
   const p = item.product
   const unit = p.stock_unit === 'pcs' ? undefined : t(`units.${p.stock_unit}`)
   return (
-    <li className="flex items-center gap-2 rounded-[var(--radius-card)] bg-surface p-3 shadow-card ring-1 ring-cream-200/70 sm:gap-3">
+    <li className="flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-surface p-3 shadow-card ring-1 ring-cream-200/70 sm:flex-nowrap sm:gap-3">
       <input
         type="checkbox"
         aria-label={t('inventory.select', { name: p.name })}
@@ -61,13 +61,16 @@ export const InventoryRow = memo(function InventoryRow({
           </div>
         </div>
       </Link>
-      <QuantityStepper
-        name={p.name}
-        value={item.total_quantity}
-        unit={unit}
-        disableMinus={!allowNegative && item.total_quantity <= 0}
-        onChange={(d) => onDelta(item, d)}
-      />
+      {/* phones: the stepper gets its own line so the name stays readable */}
+      <div className="order-last flex w-full justify-end sm:order-none sm:w-auto">
+        <QuantityStepper
+          name={p.name}
+          value={item.total_quantity}
+          unit={unit}
+          disableMinus={!allowNegative && item.total_quantity <= 0}
+          onChange={(d) => onDelta(item, d)}
+        />
+      </div>
       <Menu
         label={t('inventory.actions', { name: p.name })}
         items={[
@@ -172,8 +175,9 @@ export default function InventoryPage() {
             className="min-h-12 w-full rounded-2xl border-0 bg-surface pl-11 pr-4 text-base shadow-card ring-1 ring-cream-200/70 transition-shadow placeholder:text-ink-300 focus:shadow-[0_0_0_4px_color-mix(in_oklab,var(--color-leaf-500)_18%,transparent)] focus:outline-none focus:ring-leaf-500"
           />
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-          <Select aria-label={t('inventory.location')} className="sm:w-auto!" value={location_id} onChange={(e) => setParam('location', e.target.value)}>
+        {/* one scrollable row on phones, wrapping row on wider screens */}
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&>*]:shrink-0">
+          <Select aria-label={t('inventory.location')} className="w-auto!" value={location_id} onChange={(e) => setParam('location', e.target.value)}>
             <option value="">{t('inventory.allLocations')}</option>
             {locs.data?.map((l) => (
               <option key={l.id} value={l.id}>
@@ -181,7 +185,7 @@ export default function InventoryPage() {
               </option>
             ))}
           </Select>
-          <Select aria-label={t('inventory.category')} className="sm:w-auto!" value={category_id} onChange={(e) => setParam('category', e.target.value)}>
+          <Select aria-label={t('inventory.category')} className="w-auto!" value={category_id} onChange={(e) => setParam('category', e.target.value)}>
             <option value="">{t('inventory.allCategories')}</option>
             {cats.data?.map((c) => (
               <option key={c.id} value={c.id}>
@@ -189,7 +193,7 @@ export default function InventoryPage() {
               </option>
             ))}
           </Select>
-          <Select aria-label={t('inventory.sort')} className="sm:w-auto!" value={sort} onChange={(e) => setParam('sort', e.target.value)}>
+          <Select aria-label={t('inventory.sort')} className="w-auto!" value={sort} onChange={(e) => setParam('sort', e.target.value)}>
             {(['name', 'quantity', 'expiry', 'updated'] as const).map((s) => (
               <option key={s} value={s}>
                 {t(`inventory.sort_${s}`)}
