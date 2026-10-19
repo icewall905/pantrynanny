@@ -12,11 +12,13 @@ import dk.pantrynanny.app.data.SyncRepository
 import dk.pantrynanny.app.data.TokenStore
 import dk.pantrynanny.app.data.local.AppDatabase
 import dk.pantrynanny.app.data.remote.ApiClient
+import dk.pantrynanny.app.domain.ScanMode
 import dk.pantrynanny.app.sync.SyncScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -46,6 +48,9 @@ class AppContainer(val app: Application) {
     val inventoryRepository = InventoryRepository(api, cache)
     val network = NetworkMonitor(app)
     val scheduler = SyncScheduler(app)
+
+    /** Scanner mode asked for by a launcher shortcut; the scanner consumes it (sets back to null). */
+    val requestedMode = MutableStateFlow<ScanMode?>(null)
 
     private val syncTrigger = Channel<Unit>(Channel.CONFLATED)
 

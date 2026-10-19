@@ -97,7 +97,16 @@ class ScannerViewModel(private val c: AppContainer) : ViewModel() {
 
     init {
         // Cold start: the app always starts in Add mode (a persisted Remove mode is reset).
-        viewModelScope.launch { c.settings.setMode(ScanMode.ADD) }
+        viewModelScope.launch {
+            c.settings.setMode(ScanMode.ADD)
+            // ...unless a launcher shortcut asked for a mode ("Scan out").
+            c.requestedMode.collect { m ->
+                if (m != null) {
+                    c.requestedMode.value = null
+                    setMode(m)
+                }
+            }
+        }
         viewModelScope.launch {
             settings.collect { dedup.rearmMs = it.effectiveRearmMs.toLong() }
         }

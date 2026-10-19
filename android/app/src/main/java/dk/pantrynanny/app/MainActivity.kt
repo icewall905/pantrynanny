@@ -1,10 +1,16 @@
 package dk.pantrynanny.app
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
+import androidx.core.net.toUri
+import androidx.lifecycle.lifecycleScope
+import dk.pantrynanny.app.domain.ScanMode
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
@@ -20,6 +26,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -53,6 +60,8 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
         )
         val container = (application as PantryApp).container
+        Shortcuts.publish(this)
+        handleLaunch(intent)
         setContent {
             PantryTheme {
                 Surface {
@@ -60,6 +69,26 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleLaunch(intent)
+    }
+
+    /** Launcher shortcuts: open the scanner in a mode, or the shopping list in the web app. */
+    private fun handleLaunch(intent: Intent?) {
+        val container = (application as PantryApp).container
+        when (intent?.action) {
+            Shortcuts.ACTION_SCAN_ADD -> container.requestedMode.value = ScanMode.ADD
+            Shortcuts.ACTION_SCAN_REMOVE -> container.requestedMode.value = ScanMode.REMOVE
+            Shortcuts.ACTION_SHOPPING -> lifecycleScope.launch {
+                val base = container.settings.flow.first().serverUrl.trimEnd('/')
+                runCatching { startActivity(Intent(Intent.ACTION_VIEW, "$base/shopping".toUri())) }
+            }
+        }
+        // a shortcut is handled once; a later configuration change must not repeat it
+        intent?.action = Intent.ACTION_MAIN
     }
 }
 
@@ -84,6 +113,16 @@ private fun MainScaffold(container: AppContainer) {
     val snackbar = remember { SnackbarHostState() }
     val entry by nav.currentBackStackEntryAsState()
     val route = entry?.destination?.route
+
+    val requested by container.requestedMode.collectAsStateWithLifecycle()
+    LaunchedEffect(requested) {
+        if (requested != null && route != null && route != ROUTE_SCAN) {
+            nav.navigate(ROUTE_SCAN) {
+                popUpTo(ROUTE_SCAN)
+                launchSingleTop = true
+            }
+        }
+    }
 
     val items = listOf(
         NavItem(ROUTE_SCAN, R.string.nav_scan, Icons.Filled.Search),

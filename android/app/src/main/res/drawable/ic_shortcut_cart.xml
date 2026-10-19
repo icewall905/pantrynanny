@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Launcher shortcut: shopping list (basket on a dark disc). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path android:fillColor="#1F2A24" android:pathData="M24,24m-24,0a24,24 0,1 1,48 0a24,24 0,1 1,-48 0" />
+    <path android:fillColor="#FFFFFF" android:pathData="M12,19h24l-2.5,13.5c-0.2,1.1 -1.1,1.9 -2.2,1.9h-14.6c-1.1,0 -2,-0.8 -2.2,-1.9z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M18.6,12.2l3.4,1.8l-3,5.6l-3.4,-1.8zM29.4,12.2l-3.4,1.8l3,5.6l3.4,-1.8z" />
+</vector>

@@ -2,6 +2,9 @@
 <resources>
     <string name="app_name">PantryNanny</string>
     <string name="nav_scan">Scan</string>
+    <string name="shortcut_scan_add">Scan ind</string>
+    <string name="shortcut_scan_remove">Scan ud</string>
+    <string name="shortcut_shopping">Indkøbsliste</string>
     <string name="nav_inventory">Lager</string>
     <string name="nav_settings">Indstillinger</string>
     <string name="back">Tilbage</string>
