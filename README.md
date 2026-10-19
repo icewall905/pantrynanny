@@ -228,7 +228,6 @@ Automated tests run in headless Chromium and on the JVM. These need a real devic
 - [docs/data-licences.md](docs/data-licences.md): Open Food Facts ODbL attribution, seed catalogue
 - [backend/README.md](backend/README.md): backend layout, admin CLI, design notes
 - [CHANGELOG.md](CHANGELOG.md): what changed
-- [docs/HANDOVER.md](docs/HANDOVER.md): deployment and verification checklist for the next session
 - [docs/product-brief.md](docs/product-brief.md): the original brief
 
 ## Data
