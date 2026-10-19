@@ -17,7 +17,7 @@ mkdir "$dir"
 runuser -u postgres -- pg_dump -Fc --no-owner --no-acl -d "$DB_NAME" >"$dir/pantrynanny.dump"
 tar -C "$(dirname "$UPLOADS")" -czf "$dir/uploads.tar.gz" "$(basename "$UPLOADS")"
 # verify the dump is readable before trusting it
-runuser -u postgres -- pg_restore --list "$dir/pantrynanny.dump" >/dev/null
+runuser -u postgres -- pg_restore --list <"$dir/pantrynanny.dump" >/dev/null
 tar -tzf "$dir/uploads.tar.gz" >/dev/null
 (cd "$dir" && sha256sum pantrynanny.dump uploads.tar.gz >SHA256SUMS)
 cp /etc/pantrynanny/pantrynanny.env "$dir/pantrynanny.env"   # contains secrets; dir is 0700 root

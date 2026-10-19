@@ -19,7 +19,7 @@ if [[ -n $TARGET ]]; then
   [[ $TARGET != "$LIVE_DB" ]] || { echo "target equals live DB; omit --target-db instead"; exit 2; }
   psql_su -c "DROP DATABASE IF EXISTS \"$TARGET\""
   psql_su -c "CREATE DATABASE \"$TARGET\" OWNER \"$DB_USER\" TEMPLATE template0 ENCODING 'UTF8'"
-  runuser -u postgres -- pg_restore --no-owner --role="$DB_USER" -d "$TARGET" "$SRC/pantrynanny.dump"
+  runuser -u postgres -- pg_restore --no-owner --role="$DB_USER" -d "$TARGET" <"$SRC/pantrynanny.dump"
   echo "restored into $TARGET"
   exit 0
 fi
@@ -32,7 +32,7 @@ systemctl stop pantrynanny-api pantrynanny-worker
 psql_su -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='$LIVE_DB' AND pid<>pg_backend_pid()" >/dev/null
 psql_su -c "DROP DATABASE IF EXISTS \"$LIVE_DB\""
 psql_su -c "CREATE DATABASE \"$LIVE_DB\" OWNER \"$DB_USER\" TEMPLATE template0 ENCODING 'UTF8'"
-runuser -u postgres -- pg_restore --no-owner --role="$DB_USER" -d "$LIVE_DB" "$SRC/pantrynanny.dump"
+runuser -u postgres -- pg_restore --no-owner --role="$DB_USER" -d "$LIVE_DB" <"$SRC/pantrynanny.dump"
 if [[ -f $SRC/uploads.tar.gz ]]; then
   rm -rf /var/lib/pantrynanny/uploads.restore-old
   [[ -d /var/lib/pantrynanny/uploads ]] && mv /var/lib/pantrynanny/uploads /var/lib/pantrynanny/uploads.restore-old
