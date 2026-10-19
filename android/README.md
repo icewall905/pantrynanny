@@ -114,6 +114,10 @@ keystore **outside** the repository.
 
 ### GitHub Releases / Obtainium
 
+Install with [Obtainium](https://github.com/ImranR98/Obtainium): *Add app* → `https://github.com/icewall905/pantrynanny`.
+Obtainium then offers each new signed `android-v*` release as an update. (A debug build installed by hand is
+signed with a different key: uninstall it once before installing the release.)
+
 When these four repository secrets exist, every push to `main` that touches `android/` also publishes a
 signed release, `android-v0.1.<commit count>`, with `pantrynanny-0.1.<n>.apk` attached. Obtainium can
 track and update from it. Without the secrets, the step is skipped and CI only builds the debug APK.
