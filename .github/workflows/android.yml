@@ -22,12 +22,18 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    permissions:
+      contents: write # publish the signed APK as a GitHub Release (Obtainium tracks these)
+    env:
+      HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
     defaults:
       run:
         working-directory: android
     steps:
       - name: Check out
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # versionCode = commit count (same numbering as deployment/deploy.sh)
 
       - name: Set up JDK
         uses: actions/setup-java@v6
@@ -53,6 +59,35 @@ jobs:
           name: pantrynanny-debug-apk
           path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+
+      # Signed release for Obtainium: every push to main that touches android/ publishes
+      # android-v0.1.<commit count> with pantrynanny-0.1.<n>.apk. Needs the four ANDROID_* secrets
+      # (see android/README.md); without them this step is skipped and CI stays green.
+      - name: Publish signed release APK
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && env.HAS_KEYSTORE == 'true'
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          printf 'storeFile=%s\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+            "$RUNNER_TEMP/release.jks" "$STORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" > keystore.properties
+          code="$(git rev-list --count HEAD)"
+          name="0.1.$code"
+          ./gradlew --no-daemon "-PpnVersionCode=$code" "-PpnVersionName=$name" assembleRelease
+          apk="$RUNNER_TEMP/pantrynanny-$name.apk"
+          cp app/build/outputs/apk/release/app-release.apk "$apk"
+          if gh release view "android-v$name" >/dev/null 2>&1; then
+            echo "release android-v$name already exists (re-run): skipping"
+          else
+            gh release create "android-v$name" "$apk" --target "$GITHUB_SHA" \
+              --title "PantryNanny Android $name" \
+              --notes "Signed release build of $GITHUB_SHA (versionCode $code). Install or update with Obtainium."
+          fi
+          rm -f keystore.properties "$RUNNER_TEMP/release.jks"
 
       - name: Upload lint report
         if: always()

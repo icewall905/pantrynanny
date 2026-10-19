@@ -112,9 +112,26 @@ keystore **outside** the repository.
 3. Build: `./gradlew assembleRelease` -> `app/build/outputs/apk/release/app-release.apk`
    (minified with R8; keep rules for kotlinx.serialization are in `app/proguard-rules.pro`).
 
-To sign in CI, store the keystore (base64) and passwords as GitHub Actions secrets, write them to
-`keystore.properties` and the keystore file in a workflow step, and run `assembleRelease`. The shipped
-workflow only builds the debug APK so that it needs no secrets.
+### GitHub Releases / Obtainium
+
+When these four repository secrets exist, every push to `main` that touches `android/` also publishes a
+signed release, `android-v0.1.<commit count>`, with `pantrynanny-0.1.<n>.apk` attached. Obtainium can
+track and update from it. Without the secrets, the step is skipped and CI only builds the debug APK.
+
+| Secret | Value |
+|---|---|
+| `ANDROID_KEYSTORE_BASE64` | `base64 -w0 pantrynanny-release.jks` |
+| `ANDROID_KEYSTORE_PASSWORD` | keystore password |
+| `ANDROID_KEY_ALIAS` | e.g. `pantrynanny` |
+| `ANDROID_KEY_PASSWORD` | key password |
+
+Use the **same** keystore in `android/keystore.properties` on the machine that runs `deployment/deploy.sh`.
+Then the APK offered by the web app and the GitHub release share one signature and version numbering, so
+either can update the other. Never lose the keystore: an app signed with a different key can't update
+the installed one, so you would have to uninstall it (and its local queue) first.
+
+Release builds currently ship without R8 minification (`isMinifyEnabled = false`) until a minified build
+has been verified on a device.
 
 ## Project layout
 
