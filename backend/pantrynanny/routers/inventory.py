@@ -1,8 +1,8 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from ..db import get_session, get_sessionmaker
@@ -87,19 +87,43 @@ async def patch_batch(
     return batch
 
 
+def _parse_before(value: str | None) -> tuple[datetime, uuid.UUID | None] | None:
+    """``before`` is an ISO timestamp, or the composite ``<iso timestamp>|<uuid>`` cursor that
+    ``X-Next-Before`` returns (created_at ties are broken by id)."""
+    if not value:
+        return None
+    ts_part, _, id_part = value.partition("|")
+    try:
+        ts = datetime.fromisoformat(ts_part.replace(" ", "+"))
+        tid = uuid.UUID(id_part) if id_part else None
+    except ValueError as exc:
+        raise AppError(422, "invalid_cursor", "before must be an ISO timestamp[|id]") from exc
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=UTC)
+    return ts, tid
+
+
 @router.get("/transactions", response_model=list[TransactionOut])
 async def list_transactions(
+    response: Response,
     product_id: uuid.UUID | None = None,
     limit: int = Query(default=50, ge=1, le=200),
-    before: datetime | None = None,
+    before: str | None = Query(default=None, max_length=80),
     principal: Principal = Depends(get_principal),
     session: AsyncSession = Depends(get_session),
 ):
     if product_id:
         await get_product(session, principal.household_id, product_id, include_deleted=True)
     rows = await svc.recent_transactions(
-        session, principal.household_id, product_id=product_id, limit=limit, before=before
+        session,
+        principal.household_id,
+        product_id=product_id,
+        limit=limit,
+        before=_parse_before(before),
     )
+    if len(rows) == limit:  # full page: hand out the keyset cursor for the next one
+        last = rows[-1]
+        response.headers["X-Next-Before"] = f"{last.created_at.isoformat()}|{last.id}"
     return [txn_out(t) for t in rows]
 
 

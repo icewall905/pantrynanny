@@ -133,8 +133,19 @@ async def lookup_detailed(
     providers = [p for p in build_providers(settings, overrides) if p.enabled()]
     if not providers:
         return LookupOutcome("skipped")
+    has_remote = any(not getattr(p, "local", False) for p in providers)
     saw_error = False
     for p in providers:
+        if getattr(p, "local", False):
+            # local seed catalogue: no network, rate limit or lookup cache involved
+            res = await p.lookup(session, code)
+            if res.status == "found" and res.data is not None:
+                await _log_attempt(
+                    session, household_id, product_id, code, p.name, "found", duration_ms=0
+                )
+                await session.commit()
+                return LookupOutcome("found", res.data, p.name)
+            continue
         cached = (
             await session.execute(
                 select(LookupCache).where(LookupCache.code == code, LookupCache.provider == p.name)
@@ -208,6 +219,8 @@ async def lookup_detailed(
             saw_error = True
             log.warning("lookup_provider_error", provider=p.name, code=code, error=res.error)
     await session.commit()
+    if not has_remote and not saw_error:
+        return LookupOutcome("skipped")  # only the local seed was consulted and it missed
     return LookupOutcome("error" if saw_error else "not_found")
 
 

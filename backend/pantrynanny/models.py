@@ -403,7 +403,11 @@ class LookupAttempt(Base):
     error: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = _ts()
 
-    __table_args__ = (Index("ix_lookup_attempts_created", "created_at"),)
+    __table_args__ = (
+        Index("ix_lookup_attempts_created", "created_at"),
+        Index("ix_lookup_attempts_code", "code"),
+        Index("ix_lookup_attempts_status", "status", "created_at"),
+    )
 
 
 class EnrichmentQueue(Base):
@@ -435,4 +439,26 @@ class ProviderSetting(Base):
     enabled: Mapped[bool | None] = mapped_column(Boolean)
     priority: Mapped[int | None] = mapped_column(Integer)
     api_key: Mapped[str | None] = mapped_column(Text)
+    updated_at: Mapped[datetime] = _ts()
+
+
+class CatalogueSeed(Base):
+    """Global (not household-scoped) read-only seed catalogue of retail barcodes.
+
+    Imported from ``data/seed/*.jsonl.gz`` (Open Food Facts metadata, ODbL); see
+    ``docs/data-licences.md``. Never written by request handlers.
+    """
+
+    __tablename__ = "catalogue_seed"
+    code: Mapped[str] = mapped_column(String(14), primary_key=True)
+    name: Mapped[str] = mapped_column(Text)
+    brand: Mapped[str | None] = mapped_column(Text)
+    package_size: Mapped[Decimal | None] = mapped_column(Numeric(12, 3))
+    package_unit: Mapped[str | None] = mapped_column(String(8))
+    category_hint: Mapped[str | None] = mapped_column(Text)
+    allergens: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default=text("'{}'"))
+    countries: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default=text("'{}'"))
+    source: Mapped[str] = mapped_column(String(32))
+    license: Mapped[str] = mapped_column(Text)
+    dataset_version: Mapped[str] = mapped_column(String(64))
     updated_at: Mapped[datetime] = _ts()

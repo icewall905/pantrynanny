@@ -1,4 +1,10 @@
+import re
+
 import httpx
+
+
+def xmin(cursor: str) -> int:
+    return int(cursor.split(".")[2])
 
 
 async def test_health(client, app):
@@ -60,11 +66,11 @@ async def test_snapshot_and_changes_cursor(env):
     assert len(snap["locations"]) == 5 and len(snap["categories"]) == 12
     assert snap["settings"]["scan_rearm_ms"] == 600
     cursor = snap["cursor"]
-    assert cursor.isdigit() and int(cursor) > 0
+    assert re.fullmatch(r"x1\.\d+\.\d+", cursor)
 
     # nothing changed beyond the safety window re-read; replaying is harmless but ordered
     r = (await client.get("/api/sync/changes", params={"since": cursor}, headers=env.member)).json()
-    assert r["full_resync_required"] is False and int(r["cursor"]) >= int(cursor)
+    assert r["full_resync_required"] is False and xmin(r["cursor"]) >= xmin(cursor)
 
     # a new change appears after the cursor and advances it
     other = await env.product("Smør")
@@ -72,7 +78,7 @@ async def test_snapshot_and_changes_cursor(env):
     ch = (
         await client.get("/api/sync/changes", params={"since": cursor}, headers=env.member)
     ).json()
-    assert int(ch["cursor"]) >= int(cursor)
+    assert xmin(ch["cursor"]) >= xmin(cursor)
     pids = {x["id"] for x in ch["products"]}
     assert other["id"] in pids
     inv = {x["product_id"]: x["total_quantity"] for x in ch["inventory"]}
@@ -100,7 +106,11 @@ async def test_snapshot_and_changes_cursor(env):
 
     # cursors from the future / garbage require a full resync
     r = (
-        await client.get("/api/sync/changes", params={"since": "999999999"}, headers=env.member)
+        await client.get(
+            "/api/sync/changes",
+            params={"since": f"x1.{cursor.split('.')[1]}.999999999999"},
+            headers=env.member,
+        )
     ).json()
     assert r["full_resync_required"] is True
     r = (await client.get("/api/sync/changes", params={"since": "abc"}, headers=env.member)).json()
@@ -113,7 +123,32 @@ async def test_changes_are_household_scoped(env, other_env):
     assert snap["products"] == []
     ch = (
         await other_env.client.get(
-            "/api/sync/changes", params={"since": "0"}, headers=other_env.admin
+            "/api/sync/changes", params={"since": snap["cursor"]}, headers=other_env.admin
         )
     ).json()
     assert ch["products"] == [] and ch["inventory"] == []
+
+
+async def test_legacy_and_foreign_cursors_force_full_resync(env):
+    client = env.client
+    snap = (await client.get("/api/sync/snapshot", headers=env.member)).json()
+    _, oid, x = snap["cursor"].split(".")
+    for bad in (
+        "5",
+        "0",
+        "123456",
+        f"x1.{int(oid) + 1}.{x}",
+        f"x1.{oid}",
+        f"x2.{oid}.{x}",
+        f"x1.{oid}.-1",
+        f"x1.{oid}.\u0665",
+    ):
+        r = (
+            await client.get("/api/sync/changes", params={"since": bad}, headers=env.member)
+        ).json()
+        assert r["full_resync_required"] is True, bad
+        assert r["products"] == [] and re.fullmatch(r"x1\.\d+\.\d+", r["cursor"])
+    ok = (
+        await client.get("/api/sync/changes", params={"since": snap["cursor"]}, headers=env.member)
+    ).json()
+    assert ok["full_resync_required"] is False

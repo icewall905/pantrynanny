@@ -201,7 +201,7 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type", "If-Match", "X-PN-CSRF"],
-        expose_headers=["X-Request-Id", "X-Total-Count"],
+        expose_headers=["X-Request-Id", "X-Total-Count", "X-Next-Before"],
     )
     app.add_middleware(
         BodyLimitMiddleware, json_limit=cfg.max_json_body, upload_limit=cfg.max_upload_body

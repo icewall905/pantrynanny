@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
 
-from sqlalchemy import case, func, select
+from sqlalchemy import case, func, select, tuple_
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -413,6 +413,8 @@ async def _resolve_product(
             tried_barcode = True
             found, _ = await get_or_create_placeholder(session, hh, nb)
             pid = found.id
+        elif op.product_id is None and op.type != "undo":
+            raise RetryOp  # barcode-resolved product was deleted before we locked it; re-resolve
         else:
             raise OpRejected("product_not_found", "Product has been deleted")
     return product, original
@@ -559,8 +561,9 @@ async def process_op(
         except OpRejected as exc:
             return OpResult(op.client_op_id, "rejected", exc.message, exc.code)
         except (DataError, ArithmeticError, ValueError):
-            # e.g. NUMERIC overflow: reject this one op, never fail the whole sync batch.
-            return OpResult(op.client_op_id, "rejected", "Invalid quantity", "invalid_quantity")
+            # Anything the DB/decimal layer refuses: reject this one op, never fail the batch.
+            # (Quantity range/precision problems are caught earlier as `invalid_quantity`.)
+            return OpResult(op.client_op_id, "rejected", "Invalid operation", "invalid_op")
         except (IntegrityError, RetryOp):
             # Either a concurrent identical op won the unique(client_op_id) race, or a barcode
             # placeholder was created concurrently. Re-run: the dedupe check will catch the former.
@@ -671,17 +674,25 @@ async def recent_transactions(
     *,
     product_id: uuid.UUID | None = None,
     limit: int = 50,
-    before: datetime | None = None,
+    before: tuple[datetime, uuid.UUID | None] | None = None,
     types: tuple[str, ...] | None = None,
 ) -> list[StockTransaction]:
     stmt = select(StockTransaction).where(StockTransaction.household_id == household_id)
     if product_id:
         stmt = stmt.where(StockTransaction.product_id == product_id)
     if before:
-        stmt = stmt.where(StockTransaction.created_at < before)
+        ts, tid = before
+        if tid is None:
+            stmt = stmt.where(StockTransaction.created_at < ts)
+        else:  # composite keyset cursor: ties on created_at are broken by id
+            stmt = stmt.where(
+                tuple_(StockTransaction.created_at, StockTransaction.id) < tuple_(ts, tid)
+            )
     if types:
         stmt = stmt.where(StockTransaction.type.in_(types))
-    stmt = stmt.order_by(StockTransaction.created_at.desc(), StockTransaction.id).limit(limit)
+    stmt = stmt.order_by(StockTransaction.created_at.desc(), StockTransaction.id.desc()).limit(
+        limit
+    )
     return list((await session.execute(stmt)).scalars().all())
 
 

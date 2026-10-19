@@ -28,21 +28,49 @@ class Changes:
     full_resync_required: bool = False
 
 
-async def current_cursor(session: AsyncSession) -> tuple[int, int]:
-    """(xmin, xmax) of a fresh snapshot: the cursor to hand out and the next unused xid."""
+CURSOR_PREFIX = "x1"
+
+
+def format_cursor(db_oid: int, xmin: int) -> str:
+    return f"{CURSOR_PREFIX}.{db_oid}.{xmin}"
+
+
+def parse_cursor(value: str, db_oid: int) -> int | None:
+    """xmin from a v1 cursor issued by *this* database, else None (=> full resync).
+
+    The database OID changes on DROP/CREATE DATABASE (restore.sh), and legacy numeric cursors
+    (pre-xid change_seq values) have no prefix, so both force clients to start over.
+    """
+    parts = value.split(".")
+    if len(parts) != 3 or parts[0] != CURSOR_PREFIX:
+        return None
+    if not (
+        parts[1].isascii() and parts[1].isdigit() and parts[2].isascii() and parts[2].isdigit()
+    ):
+        return None
+    if int(parts[1]) != db_oid:
+        return None
+    return int(parts[2])
+
+
+async def current_cursor(session: AsyncSession) -> tuple[int, int, int]:
+    """(db_oid, xmin, xmax) of a fresh snapshot: xmin is the cursor, xmax the next unused xid."""
     row = (
         await session.execute(
             text(
-                "SELECT pg_snapshot_xmin(pg_current_snapshot())::text::bigint AS lo, "
+                "SELECT (SELECT oid::text::bigint FROM pg_database "
+                "WHERE datname = current_database()) AS db, "
+                "pg_snapshot_xmin(pg_current_snapshot())::text::bigint AS lo, "
                 "pg_snapshot_xmax(pg_current_snapshot())::text::bigint AS hi"
             )
         )
     ).one()
-    return int(row.lo), int(row.hi)
+    return int(row.db), int(row.lo), int(row.hi)
 
 
 async def snapshot(session: AsyncSession, household_id: uuid.UUID) -> Changes:
-    cursor, _ = await current_cursor(session)
+    db_oid, xmin, _ = await current_cursor(session)
+    cursor = format_cursor(db_oid, xmin)
     products = list(
         (
             await session.execute(
@@ -78,18 +106,16 @@ async def snapshot(session: AsyncSession, household_id: uuid.UUID) -> Changes:
         .scalars()
         .all()
     )
-    return Changes(str(cursor), products, inventory, locations, categories)
+    return Changes(cursor, products, inventory, locations, categories)
 
 
 async def changes_since(session: AsyncSession, household_id: uuid.UUID, since: str) -> Changes:
-    cursor, xmax = await current_cursor(session)
-    try:
-        since_n = int(since)
-    except ValueError:
-        return Changes(str(cursor), full_resync_required=True)
-    if since_n < 0 or since_n > xmax:
-        # Cursor from the future: the database was restored/reset. Client must start over.
-        return Changes(str(cursor), full_resync_required=True)
+    db_oid, xmin, xmax = await current_cursor(session)
+    cursor = format_cursor(db_oid, xmin)
+    since_n = parse_cursor(since, db_oid)
+    if since_n is None or since_n > xmax:
+        # Foreign/legacy cursor, restored or recreated database, or one from the future.
+        return Changes(cursor, full_resync_required=True)
     floor = since_n
 
     products = list(
@@ -143,4 +169,4 @@ async def changes_since(session: AsyncSession, household_id: uuid.UUID, since: s
         .scalars()
         .all()
     )
-    return Changes(str(cursor), products, inventory, locations, categories)
+    return Changes(cursor, products, inventory, locations, categories)

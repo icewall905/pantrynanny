@@ -5,8 +5,11 @@ from dataclasses import dataclass, field
 from typing import Any, ClassVar, Literal, Protocol
 
 import httpx
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...config import Settings
+from ...models import CatalogueSeed
 from . import runtime
 from .parsing import allergen_names, map_category, parse_quantity, provider_code
 
@@ -367,7 +370,67 @@ class EanSearchProvider:
         return ProviderResult("found", data=data, raw=raw, http_status=200)
 
 
+# --- local seed catalogue ---
+SEED_CONFIDENCE = 0.8  # >= 0.6: products created from the seed are "known"
+
+
+class SeedCatalogueProvider:
+    """Reads ``catalogue_seed``. Flagged ``local``: the lookup chain calls ``lookup(session)``
+    instead of ``fetch`` and skips rate limiting and the HTTP-oriented lookup cache."""
+
+    name: ClassVar[str] = "catalogue_seed"
+    display_name: ClassVar[str] = "Seed catalogue (Open Food Facts, local)"
+    license: ClassVar[str] = "ODbL 1.0 (database), DbCL 1.0 (contents)"
+    attribution: ClassVar[str] = "Open Food Facts – ODbL"
+    requires_key: ClassVar[bool] = False
+    default_priority: ClassVar[int] = 1
+    default_enabled: ClassVar[bool] = True
+    local: ClassVar[bool] = True
+
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        override_enabled: bool | None = None,
+        api_key: str | None = None,
+    ):
+        self.settings = settings
+        self.override_enabled = override_enabled
+
+    def enabled(self) -> bool:
+        if self.override_enabled is not None:
+            return self.override_enabled
+        return self.settings.seed_enabled
+
+    def rate_per_min(self) -> float:
+        return 0.0
+
+    async def fetch(self, code: str, timeout_s: float | None = None) -> ProviderResult:
+        raise NotImplementedError("local provider: use lookup(session, code)")
+
+    async def lookup(self, session: AsyncSession, code: str) -> ProviderResult:
+        row = (
+            await session.execute(select(CatalogueSeed).where(CatalogueSeed.code == code))
+        ).scalar_one_or_none()
+        if row is None:
+            return ProviderResult("not_found")
+        data = ProductData(
+            name=row.name[:200],
+            brand=row.brand,
+            package_size=float(row.package_size) if row.package_size is not None else None,
+            package_unit=row.package_unit,
+            category_hint=row.category_hint,
+            allergens=list(row.allergens or []),
+            countries=[c.replace("-", " ").title() for c in row.countries or []],
+            source=self.name,
+            source_attribution=self.attribution,
+            confidence=SEED_CONFIDENCE,
+        )
+        return ProviderResult("found", data=data, raw={"dataset_version": row.dataset_version})
+
+
 PROVIDER_CLASSES: list[type] = [
+    SeedCatalogueProvider,
     OpenFoodFactsProvider,
     OpenBeautyFactsProvider,
     OpenPetFoodFactsProvider,

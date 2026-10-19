@@ -1,5 +1,7 @@
 """Uniform error bodies: ``{"detail": str, "code": str}``."""
 
+import errno
+import socket
 from typing import Any
 
 import asyncpg
@@ -60,6 +62,27 @@ _DB_DOWN_SQLSTATES = (
 )  # connection exceptions; admin/crash shutdown, cannot connect now
 
 
+_CONNECTION_ERRNOS = {
+    errno.ECONNREFUSED,
+    errno.ECONNRESET,
+    errno.ECONNABORTED,
+    errno.EPIPE,
+    errno.ETIMEDOUT,
+    errno.EHOSTUNREACH,
+    errno.ENETUNREACH,
+    errno.ENETDOWN,
+    errno.EHOSTDOWN,
+}
+
+
+def _is_connection_oserror(exc: OSError) -> bool:
+    """Socket-level failures only; disk full (ENOSPC), permissions etc. stay real 500s."""
+    return (
+        isinstance(exc, ConnectionError | socket.gaierror | TimeoutError)
+        or exc.errno in _CONNECTION_ERRNOS
+    )
+
+
 def is_db_unavailable(exc: BaseException) -> bool:
     """True for failures that mean "the database cannot be reached right now" (restart, network,
     pool exhaustion) as opposed to a bug or a constraint violation."""
@@ -67,7 +90,9 @@ def is_db_unavailable(exc: BaseException) -> bool:
     cur: BaseException | None = exc
     while cur is not None and id(cur) not in seen:
         seen.add(id(cur))
-        if isinstance(cur, OSError | SQLTimeoutError | asyncpg.PostgresConnectionError):
+        if isinstance(cur, SQLTimeoutError | asyncpg.PostgresConnectionError):
+            return True
+        if isinstance(cur, OSError) and _is_connection_oserror(cur):
             return True
         if isinstance(cur, DBAPIError) and (
             cur.connection_invalidated or isinstance(cur, InterfaceError)

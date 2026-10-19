@@ -5,6 +5,7 @@ import asyncio
 import getpass
 import secrets
 import sys
+import time
 from datetime import timedelta
 
 from sqlalchemy import select, update
@@ -122,6 +123,19 @@ async def _dispatch(session: AsyncSession, args: argparse.Namespace) -> None:
         for user, hh_name in rows.all():
             state = "active" if user.is_active else "disabled"
             print(f"{user.username}\t{user.role}\t{state}\t{user.display_name}\t{hh_name}")
+    elif cmd == "import-seed":
+        from pathlib import Path
+
+        from .services.seed import DEFAULT_SEED_FILE, import_seed, read_meta
+
+        path = Path(args.file) if args.file else DEFAULT_SEED_FILE
+        if not path.exists():
+            raise CliError(f"seed file not found: {path}")
+        t0 = time.monotonic()
+        status, rows = await import_seed(session, path, if_changed=args.if_changed)
+        version = read_meta(path)["dataset_version"]
+        secs = time.monotonic() - t0
+        print(f"seed catalogue {status}: {rows} rows, version {version}, {secs:.1f}s")
     elif cmd == "create-kiosk-code":
         hh = await _household(session, args.household)
         code = new_kiosk_code()
@@ -161,6 +175,10 @@ def build_parser() -> argparse.ArgumentParser:
     g.add_argument("--generate", action="store_true")
 
     sub.add_parser("list-users", help="List users")
+
+    s = sub.add_parser("import-seed", help="Import the bundled open-data barcode seed catalogue")
+    s.add_argument("--file", help="alternative .jsonl.gz seed file (default: bundled Danish seed)")
+    s.add_argument("--if-changed", action="store_true", help="skip when this version is loaded")
 
     s = sub.add_parser("create-kiosk-code", help="Print a 15 minute kiosk pairing code")
     s.add_argument("--name", required=True, help="device label, e.g. 'Kitchen iPad'")

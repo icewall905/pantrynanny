@@ -11,5 +11,8 @@ wall-mounted iPad (PWA) or an Android phone, see what you have, what is expiring
 - `deployment/` – systemd/nginx based install, deploy, backup and restore scripts
 - `docs/` – API contract, iPad PWA notes, product brief
 
+## Data
+
 Product data from [Open Food Facts](https://world.openfoodfacts.org) is available under the
-[Open Database License](https://opendatacommons.org/licenses/odbl/1-0/).
+[Open Database License](https://opendatacommons.org/licenses/odbl/1-0/). The bundled barcode seed
+catalogue and all data licences are described in [docs/data-licences.md](docs/data-licences.md).

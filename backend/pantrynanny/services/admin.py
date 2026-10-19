@@ -12,6 +12,7 @@ from .lookup import runtime
 from .lookup.providers import PROVIDER_CLASSES, build_providers
 from .lookup.service import load_overrides
 from .products import product_out
+from .seed import seed_stats
 
 STATUSES = ("known", "unknown", "needs_review")
 ATTEMPT_STATUSES = (
@@ -168,6 +169,7 @@ async def catalogue(session: AsyncSession, household_id: uuid.UUID) -> dict:
         "failed_lookups": await failed_lookups(session, household_id),
         "duplicate_candidates": await duplicate_candidates(session, household_id),
         "lookup_stats": await lookup_stats(session, household_id),
+        "seed_catalogue": await seed_stats(session),
     }
 
 

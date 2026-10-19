@@ -178,8 +178,13 @@ Rules:
 `{cursor, products:[Product], inventory:[{product_id, total_quantity, batches}], locations, categories, settings}`
 
 `GET /api/sync/changes?since=<cursor>` → `{cursor, products:[...changed incl. deleted], inventory:[...changed product totals], locations, categories, full_resync_required: bool}`.
-Cursor = opaque string (server uses a monotonically increasing `change_seq` bigint sequence
-stamped on products/batches/locations/categories rows).
+Cursor = opaque string; clients store and echo it verbatim and must never parse it. The server
+issues `x1.<database oid>.<oldest in-progress transaction id>`: rows are stamped with the writing
+transaction id, so a pull returns every row written by a transaction that was still open at the
+previous pull (never skipping a slow writer; rows may repeat, so upsert). A cursor that does not
+start with `x1.` (legacy), names another database (restore / re-create), or lies in the future
+yields `full_resync_required: true` with empty lists: discard local catalogue state and call
+`/sync/snapshot`.
 
 ### 3.3 Conflict strategy
 
@@ -245,7 +250,7 @@ format as `symbology` (op field / `?symbology=` query param) using the names
 
 1. `Me.user` is `null` for a kiosk principal.
 2. 409 `version_conflict` bodies carry the current object: `{detail, code:"version_conflict", product}` (products) or `{..., item}` (shopping). 409 `barcode_exists` carries `product_id`.
-3. Every sync `OpResult` also has `error_code` (`clamped`, `already_undone`, `not_found`, `product_not_found`, `invalid_quantity`, `missing_target`, `location_not_found`). Rejected ops are not stored, so a retry is rejected again (deterministic).
+3. Every sync `OpResult` also has `error_code` (`clamped`, `already_undone`, `not_found`, `product_not_found`, `invalid_quantity`, `missing_target`, `location_not_found`, `invalid_barcode`, `no_location`, `invalid_op`). Rejected ops are not stored, so a retry is rejected again (deterministic).
 4. `GET /api/products/by-barcode/{raw}` additionally returns `barcode: {code, raw, symbology}` and `valid`. A provider hit is stored in the catalogue and returned with `status:"found"` and `source:<provider>`.
 5. Kiosk allowlist additionally includes `GET /api/auth/me`, `POST /api/auth/logout`, `GET /api/settings`, `GET /api/shopping/suggestions`, `GET /api/products`, `GET /api/products/{id}`.
 6. `GET /api/products` returns a plain JSON array.
@@ -254,5 +259,6 @@ format as `symbology` (op field / `?symbology=` query param) using the names
 9. Per-batch effects are stored in `stock_transaction_lines` so undo restores exactly the batches touched.
 10. `GET /api/inventory?location_id=` limits `total_quantity`/`batches` to that location; `low_stock` uses the overall total.
 11. `PN_TIMEZONE` (default `Europe/Copenhagen`) defines "today" for expiry. Deleting a product frees its barcodes. Deleting a location is refused (409) if it is the default or holds stock. Deactivating a user revokes all their sessions.
-12. `GET /api/sync/changes` re-sends rows from slightly before the cursor (sequence values may commit out of order); clients must upsert idempotently.
+12. `GET /api/sync/changes` may re-send rows already seen (transaction-id based cursor, see §3.2); clients must upsert idempotently. Cursors are versioned (`x1.<db oid>.<xid>`) and tied to the database instance; anything else triggers `full_resync_required`.
+12a. `GET /api/transactions?before=` takes an ISO timestamp or the composite `<iso>|<uuid>` cursor returned in the `X-Next-Before` response header (sent when a page is full); ordering is `(created_at, id)` descending, so ties are never skipped. Database outages answer `503 {code:"db_unavailable"}` with `Retry-After`.
 13. **Lookup / media / export / stats / admin (T1b).** Sources, limits and licences: `product-data-sources.md`. Provider hits are cached (`lookup_cache`: found 30 d, not_found 7 d, errors with exponential `retry_after`) and every attempt is logged (`lookup_attempts`: `found, not_found, error, rate_limited, cache_hit, cache_negative, cache_error`). Provider data never overwrites `locked_fields`; products with `source:"user"` only get empty fields filled; low confidence (< 0.6) gives `status:"needs_review"`. `POST /products/{id}/photo` adds `"image"` to `locked_fields` (422 `invalid_image`, 413 when > 8 MB). `POST /products/{id}/refresh` returns the Product (kiosk: 403). `GET /media/{name}` is unauthenticated (uuid file names). Exports: CSV = UTF-8 BOM, `;`, CRLF, decimal comma, local-time timestamps, `'`-prefix against formula injection; JSON = pretty array with numeric values; `expiring` takes `?days=`. `GET /stats?days=&product_id=` returns `{days, top_added, top_consumed:[{product_id,name,quantity,count}], daily:[{date,added,removed}], series?:[{date,quantity}]}`. `GET /admin/lookups?status=&limit=&offset=`. `GET/PATCH /admin/providers` use `{providers:[{id,name,enabled,priority,requires_key,has_key,api_key(masked),key_source,license,attribution,rate_limit_per_min}]}`; PATCH items `{name, enabled?, priority?, api_key?}` (`""` clears a stored key). `GET /ha/summary`: see `home-assistant.md` (bearer token only). Migration `0002` adds `provider_settings`. Worker: `python -m pantrynanny.worker`.

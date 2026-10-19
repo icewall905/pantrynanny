@@ -192,7 +192,7 @@ async def test_changes_do_not_skip_slow_writer(env):
     ).json()
     assert "Langsom" in {p["name"] for p in ch2["products"]}  # not lost
     # the feed never goes backwards (it may re-send rows while other transactions are open)
-    assert int(ch2["cursor"]) >= int(ch1["cursor"])
+    assert int(ch2["cursor"].split(".")[2]) >= int(ch1["cursor"].split(".")[2])
 
 
 # 8a. locked_fields only for changed values ------------------------------------------------------------------
@@ -381,3 +381,73 @@ async def test_unicode_digit_barcode_is_422_free(env):
     assert r.status_code == 422
     (res,) = await env.ops(env.op("add", barcode="\x1d\xa0"))
     assert res["status"] == "rejected" and res["error_code"] == "missing_target"
+
+
+async def test_barcode_op_retries_when_product_deleted_before_lock(env, monkeypatch):
+    from pantrynanny.services import inventory as inv_svc
+
+    real = inv_svc.get_or_create_placeholder
+    calls = {"n": 0}
+
+    async def flaky(session, hh, nb):
+        found, created = await real(session, hh, nb)
+        calls["n"] += 1
+        if calls["n"] == 1:  # simulate a concurrent delete between lookup and lock
+            from sqlalchemy import text
+
+            await session.execute(
+                text("UPDATE products SET deleted_at = now() WHERE id = :i"), {"i": found.id}
+            )
+        return found, created
+
+    monkeypatch.setattr(inv_svc, "get_or_create_placeholder", flaky)
+    (res,) = await env.ops(env.op("add", barcode="5701234567899"))
+    assert res["status"] == "applied" and calls["n"] >= 2
+
+
+async def test_generic_data_errors_are_invalid_op(env, monkeypatch):
+    from sqlalchemy.exc import DataError
+
+    from pantrynanny.services import inventory as inv_svc
+
+    async def boom(*a, **k):
+        raise DataError("s", {}, Exception("bad"))
+
+    p = await env.product()
+    monkeypatch.setattr(inv_svc, "_add_stock", boom)
+    (res,) = await env.ops(env.op("add", product_id=p["id"]))
+    assert res["status"] == "rejected" and res["error_code"] == "invalid_op"
+
+
+def test_disk_full_is_not_db_unavailable():
+    import errno
+
+    from pantrynanny.errors import is_db_unavailable
+
+    assert not is_db_unavailable(OSError(errno.ENOSPC, "No space left on device"))
+    assert not is_db_unavailable(PermissionError(errno.EACCES, "denied"))
+    assert is_db_unavailable(OSError(errno.ECONNRESET, "reset"))
+    assert is_db_unavailable(ConnectionRefusedError())
+
+
+async def test_transactions_composite_cursor_survives_created_at_ties(app, env):
+    p = await env.product()
+    await env.ops(*[env.op("add", product_id=p["id"]) for _ in range(5)])
+    async with app.state.sessionmaker() as s, s.begin():
+        await s.execute(text("UPDATE stock_transactions SET created_at = '2026-01-01T00:00:00Z'"))
+    seen, before = [], None
+    for _ in range(10):
+        params = {"limit": 2, **({"before": before} if before else {})}
+        r = await env.client.get("/api/transactions", params=params, headers=env.member)
+        assert r.status_code == 200
+        seen += [t["id"] for t in r.json()]
+        before = r.headers.get("x-next-before")
+        if not before:
+            break
+    assert len(seen) == 5 and len(set(seen)) == 5
+    r = await env.client.get("/api/transactions", params={"before": "garbage"}, headers=env.member)
+    assert r.status_code == 422
+    r = await env.client.get(
+        "/api/transactions", params={"before": "2027-01-01T00:00:00Z"}, headers=env.member
+    )
+    assert len(r.json()) == 5

@@ -89,6 +89,8 @@ fi
 # --- 6. migrate, activate, (re)start ---------------------------------------------
 log "running database migrations"
 runuser -u pantrynanny -- bash -c "cd '$RELEASE_DIR/backend' && set -a && . '$ENV_FILE' && set +a && exec '$RELEASE_DIR/venv/bin/alembic' -c alembic.ini upgrade head"
+log "importing the open-data seed catalogue (skipped when unchanged)"
+runuser -u pantrynanny -- bash -c "cd '$RELEASE_DIR/backend' && set -a && . '$ENV_FILE' && set +a && exec '$RELEASE_DIR/venv/bin/pantrynanny-admin' import-seed --if-changed" || log "WARNING: seed catalogue import failed (non-fatal); retry: pantrynanny-admin import-seed"
 
 PREVIOUS="$(readlink -f $APP_ROOT/current 2>/dev/null || true)"
 ln -sfn "$RELEASE_DIR" $APP_ROOT/current.new && mv -T $APP_ROOT/current.new $APP_ROOT/current
