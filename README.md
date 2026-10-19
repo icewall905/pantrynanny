@@ -28,15 +28,25 @@ on the device first and synchronised exactly once.
   Facts) online (rate limited, cached), then optional EAN-Search. Unknown barcodes become placeholders,
   are enriched in the background and can be named on the spot ("Registrer"), with a photo, so they are
   known for every later scan.
+- **Hand scanners** (Bluetooth/USB keyboard mode) on `/scan`, an optional camera-off station mode, `+N` quantity
+  buttons and automatic scan sessions with a summary.
+- **Kitchen mode** (`/kitchen`): big actions and one-tap "took one" tiles for favourite and frequent products,
+  with undo.
+- **Recipes and meal plan**: pantry-aware "what can we cook", safe import from recipe links, "Cook this"
+  (shows the deductions and asks first, with undo), missing items to the shopping list, a week planner that
+  never touches stock.
 - **Inventory**: batches with expiry dates, multiple storage locations, minimum stock, a shopping list
-  with suggestions, statistics and CSV/JSON exports.
+  with suggestions, shops and "put the shopping away", an activity timeline, run-out forecasts, statistics and
+  CSV/JSON exports.
 - **Households and users**: owner/admin/member roles, device tokens for Android, single-use pairing codes
   for kiosk iPads.
-- **Optional local AI** (any OpenAI-compatible endpoint): identify a product from a photo and an
-  inventory assistant chat. Everything else works without it.
+- **Optional local AI** (any OpenAI-compatible endpoint, configured and tested in Admin › AI): identify a
+  product from a photo, plus an assistant grounded in stock, recipes and the meal plan. It can suggest actions
+  that you confirm with a tap. It never changes anything by itself. Everything else works without it.
 - **Home Assistant** summary endpoint ([docs/home-assistant.md](docs/home-assistant.md)).
 - Danish UI by default, English available. Dark theme by default, light available (per device).
-- **Android app download** from the web app (Settings and login page), built by every deploy.
+- **Android app download** from the web app (Settings and login page), built by every deploy, plus signed GitHub
+  Releases for Obtainium. Launcher shortcuts for Scan in/out and the shopping list.
 
 ## Architecture
 
@@ -185,11 +195,11 @@ Android needs JDK 21 and the Android SDK; see [android/README.md](android/README
 
 | Suite | Command | Last result |
 |---|---|---|
-| Backend (real PostgreSQL) | `cd backend && uv run pytest` | 240 passed |
+| Backend (real PostgreSQL) | `cd backend && uv run pytest` | 279 passed |
 | Backend lint | `uv run ruff check . && uv run ruff format --check .` | clean |
-| Web unit | `cd web && npm test` | 114 passed |
+| Web unit | `cd web && npm test` | 132 passed |
 | Web lint / types | `npm run lint && npm run typecheck` | clean |
-| Web e2e (real backend, Chromium) | `PN_E2E_BASE_URL=http://127.0.0.1:4173 PN_E2E_USER=… PN_E2E_PASSWORD=… npx playwright test` | 16 passed, 2 skipped (scanner specs are desktop-only) |
+| Web e2e (real backend, Chromium) | `PN_E2E_BASE_URL=http://127.0.0.1:4173 PN_E2E_USER=… PN_E2E_PASSWORD=… npx playwright test` | 21 passed, 3 skipped (scanner specs are desktop-only) |
 | Android (CI) | `./gradlew testDebugUnitTest assembleDebug lintDebug` | green (unit tests, debug APK, lint) |
 
 For the e2e run, serve a production build with `npx vite preview --port 4173` in front of a backend on
@@ -205,6 +215,8 @@ Automated tests run in headless Chromium and on the JVM. These need a real devic
   ([docs/ipad-pwa.md](docs/ipad-pwa.md)).
 - ML Kit scanning, sound/vibration feedback and background sync on a physical Android phone.
 - Safari-specific PWA behaviour: storage eviction, Add to Home Screen, Wake Lock.
+- A real Bluetooth/USB hand scanner (tested with simulated keystroke bursts only), Android launcher shortcuts.
+- The AI features against the actual local model endpoint (tested against scripted fakes).
 
 ## Documentation
 
@@ -215,6 +227,8 @@ Automated tests run in headless Chromium and on the JVM. These need a real devic
 - [docs/product-data-sources.md](docs/product-data-sources.md): lookup providers, limits, caching
 - [docs/data-licences.md](docs/data-licences.md): Open Food Facts ODbL attribution, seed catalogue
 - [backend/README.md](backend/README.md): backend layout, admin CLI, design notes
+- [CHANGELOG.md](CHANGELOG.md): what changed
+- [docs/HANDOVER.md](docs/HANDOVER.md): deployment and verification checklist for the next session
 - [docs/product-brief.md](docs/product-brief.md): the original brief
 
 ## Data

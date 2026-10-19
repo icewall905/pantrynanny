@@ -16,7 +16,7 @@ from ..schemas.recipes import MealIn, MealOut, MealPatch, PlanShoppingIn, Shoppi
 from ..schemas.shopping import ShoppingCreate
 from ..security import Principal, get_principal
 from ..services import recipes as rsvc
-from ..services.shopping import add_item
+from ..services.shopping import add_item, has_open_named
 
 router = APIRouter(tags=["meal-plan"])
 
@@ -192,6 +192,9 @@ async def plan_to_shopping(
         await add_item(session, hh, ShoppingCreate(product_id=pid, quantity=qty, note=title[:500]))
         added.append(p.name)
     for name in by_name.values():
+        if await has_open_named(session, hh, name):
+            skipped.append(name)
+            continue
         await add_item(session, hh, ShoppingCreate(name=name[:200], quantity=Decimal(1)))
         added.append(name)
     await session.commit()

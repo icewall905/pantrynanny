@@ -208,6 +208,9 @@ async def test_recipe_crud_availability_and_shopping(env):
     assert r.json()["added"] == ["hvedemel"]
     shop = (await c.get("/api/shopping", headers=h)).json()
     assert [s["name"] for s in shop] == ["hvedemel"]
+    # asking again does not put a second "hvedemel" on the list
+    r = await c.post(f"/api/recipes/{rec['id']}/shopping", json={}, headers=h)
+    assert r.json() == {"added": [], "skipped": ["hvedemel"]}
 
     # editing replaces the ingredient list; a stale version is refused
     body = {**PANCAKES, "title": "Pandekager (dobbelt)", "ingredients": [{"raw": "6 æg"}]}

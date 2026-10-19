@@ -262,3 +262,42 @@ format as `symbology` (op field / `?symbology=` query param) using the names
 12. `GET /api/sync/changes` may re-send rows already seen (transaction-id based cursor, see §3.2); clients must upsert idempotently. Cursors are versioned (`x1.<db oid>.<xid>`) and tied to the database instance; anything else triggers `full_resync_required`.
 12a. `GET /api/transactions?before=` takes an ISO timestamp or the composite `<iso>|<uuid>` cursor returned in the `X-Next-Before` response header (sent when a page is full); ordering is `(created_at, id)` descending, so ties are never skipped. Database outages answer `503 {code:"db_unavailable"}` with `Retry-After`.
 13. **Lookup / media / export / stats / admin (T1b).** Sources, limits and licences: `product-data-sources.md`. Provider hits are cached (`lookup_cache`: found 30 d, not_found 7 d, errors with exponential `retry_after`) and every attempt is logged (`lookup_attempts`: `found, not_found, error, rate_limited, cache_hit, cache_negative, cache_error`). Provider data never overwrites `locked_fields`; products with `source:"user"` only get empty fields filled; low confidence (< 0.6) gives `status:"needs_review"`. `POST /products/{id}/photo` adds `"image"` to `locked_fields` (422 `invalid_image`, 413 when > 8 MB). `POST /products/{id}/refresh` returns the Product (kiosk: 403). `GET /media/{name}` is unauthenticated (uuid file names). Exports: CSV = UTF-8 BOM, `;`, CRLF, decimal comma, local-time timestamps, `'`-prefix against formula injection; JSON = pretty array with numeric values; `expiring` takes `?days=`. `GET /stats?days=&product_id=` returns `{days, top_added, top_consumed:[{product_id,name,quantity,count}], daily:[{date,added,removed}], series?:[{date,quantity}]}`. `GET /admin/lookups?status=&limit=&offset=`. `GET/PATCH /admin/providers` use `{providers:[{id,name,enabled,priority,requires_key,has_key,api_key(masked),key_source,license,attribution,rate_limit_per_min}]}`; PATCH items `{name, enabled?, priority?, api_key?}` (`""` clears a stored key). `GET /ha/summary`: see `home-assistant.md` (bearer token only). Migration `0002` adds `provider_settings`. Worker: `python -m pantrynanny.worker`.
+
+## 8. Additions (October 2026)
+
+All endpoints are household-scoped and need a session or device token like the rest of the API.
+None of them change stock except through the normal ops in §3 (`POST /sync/ops`, `/transactions/{id}/undo`).
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /kitchen/tiles?limit=12` | Favourites first, then most-used products (60 days), with stock. Used by `/kitchen`. |
+| `PUT /products/{id}/favorite {favorite}` | Pin/unpin on the kitchen screen. No version bump, no field lock. |
+| `GET /activity?limit&before` | Timeline: transactions with product and user name. Keyset cursor in `X-Next-Before`. |
+| `GET /stats/runout?days=14[&product_id]` | Run-out forecast from the household's own removals (90-day window). `confidence` is `medium` (≥3 events) or `high` (≥6 events over ≥21 days); products with less history get no forecast. |
+| `GET/POST /recipes`, `GET/PUT/DELETE /recipes/{id}` | Recipe CRUD. Ingredients are sent as raw lines and parsed server-side. `PUT` accepts `If-Match`. |
+| `POST /recipes/parse {lines}` | Preview how ingredient lines are understood. |
+| `POST /recipes/import {url}` | Read a schema.org Recipe (JSON-LD) from a public page. Returns a draft; nothing is saved. See below. |
+| `GET /recipes/suggest?max_minutes&servings` | "What can we cook": saved recipes ranked by availability. |
+| `GET /recipes/{id}/availability?servings` | Per ingredient: `have`/`low`/`missing`/`staple`/`optional`, matched product, `need` in the product's stock unit. |
+| `POST /recipes/{id}/shopping {servings?, ingredient_ids?}` | Add missing ingredients to the shopping list (no duplicate free-text items). |
+| `GET /meal-plan?start&days`, `POST /meal-plan`, `PATCH/DELETE /meal-plan/{id}` | Meal plan. `PATCH {cooked}` only stamps the entry. Planning never changes stock. |
+| `POST /meal-plan/shopping {start, days}` | Sums the needs of uncooked planned recipes per product, subtracts stock and adds the shortfall. |
+| `GET/PATCH /admin/ai`, `POST /admin/ai/test` | Admin-only AI endpoint settings (DB overrides on top of env) and a connectivity/vision test. The API key is never returned. |
+
+Shopping items have an optional `store` (≤60 chars).
+
+**Recipe import safety.** Only `http(s)` on ports 80/443/8080/8443 and no credentials in the URL. Every hop, redirects
+included, is resolved first. The request is refused unless all addresses are public: no loopback, private, link-local,
+CGNAT, multicast or IPv4-mapped private addresses. The connection is pinned to the checked address, with SNI/Host set
+to the real name, so DNS rebinding cannot redirect it. Size is capped at 3 MB and the timeout is 10 s. Page content
+is reduced to plain text and never rendered as HTML.
+
+**Cooking.** The client shows the proposed deductions (`need`, capped at stock). Unknown amounts are unticked. After
+the user confirms, the client sends one `remove` op per product with `reason: "recipe"`. Undo sends `undo` ops for
+exactly those op ids.
+
+**AI tools.** These are read-only in addition to §5: `what_can_we_cook`, `get_meal_plan`, `get_running_out`. The
+`propose_add_to_shopping`, `propose_plan_meal` and `propose_use_up` tools only record a suggestion. Each one is
+validated and resolved to a real product or recipe (quantity capped at stock, date between today and 60 days ahead,
+at most 5). It is returned in `ChatOut.proposals`. The server never executes a proposal. The client runs it through
+the normal endpoint when the user taps it.

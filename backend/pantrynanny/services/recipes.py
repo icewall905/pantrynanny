@@ -31,7 +31,7 @@ from ..schemas.recipes import (
 )
 from ..schemas.shopping import ShoppingCreate
 from .inventory import batches_for, build_view
-from .shopping import add_item
+from .shopping import add_item, has_open_named
 
 ZERO = Decimal(0)
 
@@ -341,7 +341,9 @@ async def add_missing_to_shopping(
                 continue
         elif it.status not in ("missing", "low"):
             continue
-        if it.status == "staple":
+        if it.status == "staple" or (
+            not it.product and await has_open_named(session, household_id, ing.name)
+        ):
             skipped.append(ing.name)
             continue
         # whole packages: 0.2 l of a 1 l carton still means buying one carton

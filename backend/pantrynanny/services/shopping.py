@@ -4,7 +4,7 @@ import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -211,3 +211,20 @@ async def suggestions(session: AsyncSession, household_id: uuid.UUID) -> list[St
     )
     views = await list_inventory(session, household_id, include_empty=True)
     return [v for v in views if v.low_stock and v.product.id not in open_ids]
+
+
+async def has_open_named(session: AsyncSession, household_id: uuid.UUID, name: str) -> bool:
+    """An unchecked free-text item with this name is already on the list (case-insensitive)."""
+    row = (
+        await session.execute(
+            select(ShoppingItem.id)
+            .where(
+                ShoppingItem.household_id == household_id,
+                ShoppingItem.checked.is_(False),
+                ShoppingItem.deleted_at.is_(None),
+                func.lower(ShoppingItem.name) == name.strip().lower(),
+            )
+            .limit(1)
+        )
+    ).first()
+    return row is not None
