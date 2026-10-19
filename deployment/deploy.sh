@@ -46,6 +46,21 @@ build_apk() {
     awk -v base="$PWD/android" -F= '$1=="storeFile" && $2 !~ /^\// { print "storeFile=" base "/" $2; next } { print }' \
       android/keystore.properties >"$a/keystore.properties"
   fi
+  # Gradle needs a JDK (17+). Android Studio ships one ("jbr") that is not on PATH: use it if needed.
+  if [[ -z "${JAVA_HOME:-}" ]] && ! command -v java >/dev/null 2>&1; then
+    local jbr
+    for jbr in "$HOME/android-studio/jbr" /opt/android-studio/jbr /usr/local/android-studio/jbr \
+      /snap/android-studio/current/jbr "$HOME"/.local/share/JetBrains/Toolbox/apps/*android-studio*/jbr \
+      "$HOME"/.local/share/JetBrains/Toolbox/apps/AndroidStudio/ch-*/*/jbr \
+      "/Applications/Android Studio.app/Contents/jbr/Contents/Home"; do
+      if [[ -x "$jbr/bin/java" ]]; then export JAVA_HOME="$jbr"; break; fi
+    done
+    if [[ -z "${JAVA_HOME:-}" ]]; then
+      echo "warning: no Java found for the Android build (set JAVA_HOME, e.g. to Android Studio's jbr folder); skipping the APK" >&2
+      return 0
+    fi
+    echo "==> using Android Studio's Java: $JAVA_HOME"
+  fi
   code="$(git rev-list --count HEAD)"
   name="0.1.$code"
   echo "==> building Android APK ($variant, version $name)"
