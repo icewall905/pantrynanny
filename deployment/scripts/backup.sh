@@ -22,10 +22,11 @@ tar -tzf "$dir/uploads.tar.gz" >/dev/null
 (cd "$dir" && sha256sum pantrynanny.dump uploads.tar.gz >SHA256SUMS)
 cp /etc/pantrynanny/pantrynanny.env "$dir/pantrynanny.env"   # contains secrets; dir is 0700 root
 
-[[ "$(date +%u)" == 7 ]] && cp -a "$dir" "$BACKUPS/weekly/$ts"
-[[ "$(date +%d)" == 01 ]] && cp -a "$dir" "$BACKUPS/monthly/$ts"
+if [[ "$(date +%u)" == 7 ]]; then cp -a "$dir" "$BACKUPS/weekly/$ts"; fi
+if [[ "$(date +%d)" == 01 ]]; then cp -a "$dir" "$BACKUPS/monthly/$ts"; fi
 
-prune() { ls -1d "$1"/*/ 2>/dev/null | sort | head -n -"$2" | xargs -r rm -rf; }
+# keep the newest $2 backup dirs in $1 (works on empty dirs, unlike a glob under pipefail)
+prune() { find "$1" -mindepth 1 -maxdepth 1 -type d -print0 | sort -z | head -z -n -"$2" | xargs -0 -r rm -rf; }
 prune "$BACKUPS/daily" 14
 prune "$BACKUPS/weekly" 8
 prune "$BACKUPS/monthly" 12
