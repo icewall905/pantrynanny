@@ -1,0 +1,35 @@
+{
+  "code": "5705830010018",
+  "status": 1,
+  "status_verbose": "product found",
+  "product": {
+    "code": "5705830010018",
+    "product_name": "Letmælk 1,5%",
+    "product_name_da": "Arla Letmælk",
+    "generic_name_da": "Letmælk",
+    "brands": "Arla,Arla Foods",
+    "quantity": "1 l",
+    "categories_tags": [
+      "en:beverages-and-beverages-preparations",
+      "en:dairies",
+      "en:milks",
+      "en:semi-skimmed-milks"
+    ],
+    "image_front_url": "https://images.openfoodfacts.org/images/products/570/583/001/0018/front_da.12.400.jpg",
+    "image_url": "https://images.openfoodfacts.org/images/products/570/583/001/0018/front_da.12.400.jpg",
+    "ingredients_text_da": "Letmælk (mælk)",
+    "ingredients_text": "Semi-skimmed milk",
+    "allergens_tags": ["en:milk"],
+    "countries_tags": ["en:denmark"],
+    "nutriments": {
+      "energy-kcal_100g": 46,
+      "fat_100g": 1.5,
+      "saturated-fat_100g": 1,
+      "carbohydrates_100g": 4.8,
+      "sugars_100g": 4.8,
+      "proteins_100g": 3.5,
+      "salt_100g": 0.1,
+      "fiber_100g": 0
+    }
+  }
+}

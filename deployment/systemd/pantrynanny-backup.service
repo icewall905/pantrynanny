@@ -1,0 +1,9 @@
+[Unit]
+Description=PantryNanny backup (PostgreSQL dump + uploads)
+After=postgresql.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/pantrynanny/current/deployment/scripts/backup.sh
+Nice=10
+IOSchedulingClass=idle

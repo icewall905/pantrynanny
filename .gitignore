@@ -1,0 +1,45 @@
+# secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.keystore
+*.jks
+keystore.properties
+# python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+.coverage
+htmlcov/
+# node
+node_modules/
+web/dist/
+web/dev-dist/
+web/test-results/
+web/playwright-report/
+*.tsbuildinfo
+# android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/captures/
+*.apk
+*.aab
+# runtime
+backend/uploads/
+backups/
+*.log
+.DS_Store
+.idea/
+.vscode/
+# site-specific / private material (never published)
+private/
+deployment/site.env

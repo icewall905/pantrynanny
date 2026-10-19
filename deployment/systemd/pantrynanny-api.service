@@ -1,0 +1,33 @@
+[Unit]
+Description=PantryNanny API (FastAPI/uvicorn)
+After=network-online.target postgresql.service
+Wants=network-online.target
+Requires=postgresql.service
+
+[Service]
+# One worker: login/kiosk rate limiters are in-process. Proxy headers are handled by the app
+# itself (PN_TRUSTED_PROXIES); nginx is the only direct client and is trusted via 127.0.0.1.
+Type=simple
+User=pantrynanny
+Group=pantrynanny
+WorkingDirectory=/opt/pantrynanny/current/backend
+EnvironmentFile=/etc/pantrynanny/pantrynanny.env
+ExecStart=/opt/pantrynanny/current/venv/bin/uvicorn pantrynanny.main:app \
+    --host 127.0.0.1 --port 8000 --workers 1 \
+    --no-access-log --no-server-header --log-level warning
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=20
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/pantrynanny
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

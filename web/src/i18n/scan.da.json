@@ -1,0 +1,116 @@
+{
+  "pair": {
+    "title": "Forbind denne enhed",
+    "intro": "Denne skærm bruges som scannerstation. Indtast den 8-tegns parringskode fra PantryNanny (Indstillinger › Enheder), eller log ind.",
+    "codeLabel": "Parringskode",
+    "codePlaceholder": "ABCD1234",
+    "submit": "Forbind",
+    "error": "Koden blev ikke accepteret. Tjek koden (gyldig i 15 minutter) og prøv igen.",
+    "offline": "Ingen forbindelse til serveren.",
+    "or": "eller",
+    "loginTitle": "Log ind med brugernavn",
+    "username": "Brugernavn",
+    "password": "Adgangskode",
+    "login": "Log ind",
+    "loginError": "Forkert brugernavn eller adgangskode.",
+    "tooMany": "For mange forsøg. Vent lidt og prøv igen."
+  },
+  "start": {
+    "title": "Klar til at scanne",
+    "button": "Start scanning",
+    "hint": "Tryk én gang for at aktivere kamera og lyd. Derefter skal du ikke røre skærmen igen.",
+    "offlineReady": "Offline: scanninger gemmes og sendes, når forbindelsen er tilbage.",
+    "logout": "Skift enhed / log ud",
+    "dropped": "{{count}} ikke-synkroniserede scanninger fra en anden husstand blev kasseret."
+  },
+  "mode": {
+    "add": "TILFØJ",
+    "remove": "FJERN",
+    "adding": "TILFØJER VARER",
+    "removing": "FJERNER VARER",
+    "label": "Scanningstilstand",
+    "revertedIdle": "Tilbage til TILFØJ efter inaktivitet"
+  },
+  "last": {
+    "empty": "Hold en stregkode foran kameraet",
+    "unknown": "Ukendt vare",
+    "lookingUp": "Slår op…",
+    "stock": "På lager",
+    "pending": "venter på synkronisering"
+  },
+  "toast": {
+    "unknown": "Ukendt vare gemt – kan navngives senere",
+    "undone": "Fortrudt: {{name}}",
+    "undoNothing": "Intet at fortryde",
+    "saveFailed": "KUNNE IKKE GEMME scanning ({{code}}) – scan igen",
+    "notSaved": "Ikke gemt – scan igen"
+  },
+  "undo": "Fortryd",
+  "history": {
+    "title": "Seneste scanninger",
+    "empty": "Ingen scanninger endnu",
+    "undone": "fortrudt",
+    "undoRow": "Fortryd denne scanning"
+  },
+  "status": {
+    "online": "Online",
+    "offlinePending": "Offline – {{count}} venter",
+    "offline": "Offline",
+    "syncing": "Synkroniserer…",
+    "pending": "{{count}} venter",
+    "error": "Synkroniseringsfejl",
+    "unauthorized": "Log ind igen"
+  },
+  "location": {
+    "to": "Til: {{name}}",
+    "from": "Fra: {{name}}",
+    "auto": "automatisk",
+    "choose": "Vælg placering"
+  },
+  "sound": {
+    "on": "Lyd til",
+    "off": "Lyd fra"
+  },
+  "torch": "Lommelygte",
+  "manual": {
+    "open": "Manuel indtastning",
+    "placeholder": "Stregkode",
+    "submit": "Registrer"
+  },
+  "camera": {
+    "starting": "Starter kamera…",
+    "retry": "Prøv igen",
+    "denied": {
+      "title": "Kameraet er blokeret",
+      "body": "Tillad kameraadgang til PantryNanny i Safari: Indstillinger › Safari › Kamera › Spørg/Tillad, eller tryk på aA i adresselinjen › Webstedsindstillinger › Kamera › Tillad. Hvis appen er lagt på hjemmeskærmen, kan du skulle slette og tilføje den igen. Du kan stadig bruge manuel indtastning."
+    },
+    "notfound": {
+      "title": "Intet kamera fundet",
+      "body": "Enheden har ikke et tilgængeligt kamera. Brug manuel indtastning."
+    },
+    "busy": {
+      "title": "Kameraet er optaget",
+      "body": "Et andet program bruger kameraet. Luk det og prøv igen."
+    },
+    "insecure": {
+      "title": "Kræver HTTPS",
+      "body": "Kameraet virker kun over en sikker (HTTPS) forbindelse."
+    },
+    "other": {
+      "title": "Kameraet kunne ikke startes",
+      "body": "Prøv igen eller genindlæs siden."
+    }
+  },
+  "wake": {
+    "unsupported": "Skærmen kan gå i dvale. Sæt Automatisk lås til Aldrig i Indstillinger › Skærm & lysstyrke, og brug Guidet adgang.",
+    "failed": "Kunne ikke holde skærmen vågen. Sæt Automatisk lås til Aldrig."
+  },
+  "failed": {
+    "banner": "{{count}} ændring(er) blev afvist af serveren",
+    "title": "Afviste ændringer",
+    "dismiss": "Fjern",
+    "retry": "Prøv igen",
+    "close": "Luk"
+  },
+  "exit": "Forlad scanner"
+}

@@ -1,0 +1,6 @@
+[Unit]
+Description=PantryNanny health check (restarts the API after repeated failures)
+
+[Service]
+Type=oneshot
+ExecStart=/opt/pantrynanny/current/deployment/scripts/healthcheck.sh

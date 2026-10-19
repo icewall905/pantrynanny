@@ -1,0 +1,23 @@
+[Unit]
+Description=PantryNanny background worker (catalogue enrichment)
+After=network-online.target postgresql.service pantrynanny-api.service
+Wants=network-online.target
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=pantrynanny
+Group=pantrynanny
+WorkingDirectory=/opt/pantrynanny/current/backend
+EnvironmentFile=/etc/pantrynanny/pantrynanny.env
+ExecStart=/opt/pantrynanny/current/venv/bin/python -m pantrynanny.worker
+Restart=always
+RestartSec=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/pantrynanny
+
+[Install]
+WantedBy=multi-user.target

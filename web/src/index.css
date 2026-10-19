@@ -1,0 +1,82 @@
+@import 'tailwindcss';
+
+/* PantryNanny design tokens. Warm, bright, restrained. */
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --color-cream-50: #fffdf9;
+  --color-cream-100: #fbf8f3;
+  --color-cream-200: #f3ede3;
+  --color-ink-900: #22201c;
+  --color-ink-700: #4a463f;
+  --color-ink-500: #7a746a;
+  --color-ink-300: #b8b1a5;
+  --color-leaf-50: #ecf7ef;
+  --color-leaf-100: #d3eedb;
+  --color-leaf-500: #2f9a5c;
+  --color-leaf-600: #2f7d4f;
+  --color-leaf-700: #23603c;
+  --color-tomato-50: #fff1ec;
+  --color-tomato-100: #ffdccf;
+  --color-tomato-500: #e8613a;
+  --color-tomato-600: #cc4a24;
+  --color-honey-50: #fff8e6;
+  --color-honey-400: #f4b740;
+  --color-honey-600: #b9810f;
+  --color-sky-500: #3b82c4;
+  --radius-card: 1.25rem;
+  --shadow-card: 0 1px 2px rgb(34 32 28 / 0.04), 0 4px 16px rgb(34 32 28 / 0.06);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+body {
+  @apply bg-cream-100 text-ink-900 antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ---- web app additions ---- */
+:focus-visible {
+  outline: 3px solid var(--color-leaf-500);
+  outline-offset: 2px;
+  border-radius: 0.5rem;
+}
+.pn-pop {
+  animation: pn-pop 0.18s ease-out;
+}
+.pn-fade {
+  animation: pn-fade 0.15s ease-out;
+}
+@keyframes pn-pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+@keyframes pn-fade {
+  from {
+    opacity: 0;
+  }
+}
+.pn-skeleton {
+  background: linear-gradient(90deg, var(--color-cream-200) 25%, var(--color-cream-100) 50%, var(--color-cream-200) 75%);
+  background-size: 200% 100%;
+  animation: pn-shimmer 1.4s infinite linear;
+}
+@keyframes pn-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

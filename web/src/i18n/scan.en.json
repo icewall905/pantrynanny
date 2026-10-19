@@ -1,0 +1,116 @@
+{
+  "pair": {
+    "title": "Pair this device",
+    "intro": "This screen is used as a scanning station. Enter the 8-character pairing code from PantryNanny (Settings › Devices), or sign in.",
+    "codeLabel": "Pairing code",
+    "codePlaceholder": "ABCD1234",
+    "submit": "Pair",
+    "error": "The code was not accepted. Check it (valid for 15 minutes) and try again.",
+    "offline": "Cannot reach the server.",
+    "or": "or",
+    "loginTitle": "Sign in with username",
+    "username": "Username",
+    "password": "Password",
+    "login": "Sign in",
+    "loginError": "Wrong username or password.",
+    "tooMany": "Too many attempts. Wait a moment and try again."
+  },
+  "start": {
+    "title": "Ready to scan",
+    "button": "Start scanning",
+    "hint": "Tap once to enable the camera and sound. After that you should not need to touch the screen.",
+    "offlineReady": "Offline: scans are saved and uploaded when the connection returns.",
+    "logout": "Switch device / sign out",
+    "dropped": "{{count}} unsynced scans from another household were discarded."
+  },
+  "mode": {
+    "add": "ADD",
+    "remove": "REMOVE",
+    "adding": "ADDING ITEMS",
+    "removing": "REMOVING ITEMS",
+    "label": "Scan mode",
+    "revertedIdle": "Back to ADD after inactivity"
+  },
+  "last": {
+    "empty": "Hold a barcode in front of the camera",
+    "unknown": "Unknown item",
+    "lookingUp": "Looking up…",
+    "stock": "In stock",
+    "pending": "waiting to sync"
+  },
+  "toast": {
+    "unknown": "Unknown item saved – can be named later",
+    "undone": "Undone: {{name}}",
+    "undoNothing": "Nothing to undo",
+    "saveFailed": "COULD NOT SAVE scan ({{code}}) – scan again",
+    "notSaved": "Not saved – scan again"
+  },
+  "undo": "Undo",
+  "history": {
+    "title": "Recent scans",
+    "empty": "No scans yet",
+    "undone": "undone",
+    "undoRow": "Undo this scan"
+  },
+  "status": {
+    "online": "Online",
+    "offlinePending": "Offline – {{count}} waiting",
+    "offline": "Offline",
+    "syncing": "Syncing…",
+    "pending": "{{count}} waiting",
+    "error": "Sync error",
+    "unauthorized": "Sign in again"
+  },
+  "location": {
+    "to": "To: {{name}}",
+    "from": "From: {{name}}",
+    "auto": "automatic",
+    "choose": "Choose location"
+  },
+  "sound": {
+    "on": "Sound on",
+    "off": "Sound off"
+  },
+  "torch": "Torch",
+  "manual": {
+    "open": "Manual entry",
+    "placeholder": "Barcode",
+    "submit": "Register"
+  },
+  "camera": {
+    "starting": "Starting camera…",
+    "retry": "Try again",
+    "denied": {
+      "title": "Camera is blocked",
+      "body": "Allow camera access for PantryNanny in Safari: Settings › Safari › Camera › Ask/Allow, or tap aA in the address bar › Website Settings › Camera › Allow. If the app is on the Home Screen you may need to delete and re-add it. You can still use manual entry."
+    },
+    "notfound": {
+      "title": "No camera found",
+      "body": "This device has no usable camera. Use manual entry."
+    },
+    "busy": {
+      "title": "Camera is in use",
+      "body": "Another app is using the camera. Close it and try again."
+    },
+    "insecure": {
+      "title": "Requires HTTPS",
+      "body": "The camera only works over a secure (HTTPS) connection."
+    },
+    "other": {
+      "title": "Camera could not start",
+      "body": "Try again or reload the page."
+    }
+  },
+  "wake": {
+    "unsupported": "The screen may go to sleep. Set Auto-Lock to Never in Settings › Display & Brightness and use Guided Access.",
+    "failed": "Could not keep the screen awake. Set Auto-Lock to Never."
+  },
+  "failed": {
+    "banner": "{{count}} change(s) were rejected by the server",
+    "title": "Rejected changes",
+    "dismiss": "Dismiss",
+    "retry": "Retry",
+    "close": "Close"
+  },
+  "exit": "Leave scanner"
+}

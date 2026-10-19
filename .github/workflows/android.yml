@@ -1,0 +1,73 @@
+name: Android
+
+on:
+  push:
+    paths:
+      - "android/**"
+      - ".github/workflows/android.yml"
+  pull_request:
+    paths:
+      - "android/**"
+      - ".github/workflows/android.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+
+      - name: Set up JDK
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Android SDK (accepts licences, AGP downloads the platform it needs)
+        uses: android-actions/setup-android@v4
+
+      - name: Set up Gradle (wrapper validation + caching)
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Make wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: Unit tests, debug APK, lint
+        run: ./gradlew --no-daemon testDebugUnitTest assembleDebug lintDebug
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: pantrynanny-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-lint-report
+          path: android/app/build/reports/lint-results-debug.html
+          if-no-files-found: ignore
+
+      - name: Upload test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-test-reports
+          path: |
+            android/app/build/reports/tests/
+            android/app/build/test-results/
+          if-no-files-found: ignore
