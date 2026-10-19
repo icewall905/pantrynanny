@@ -136,6 +136,7 @@ fun LoginScreen(container: AppContainer) {
             value = vm.serverUrl,
             onValueChange = { vm.serverUrl = it },
             label = { Text(stringResource(R.string.server_url)) },
+            placeholder = { Text("https://pantry.example.com") },
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
             modifier = Modifier.fillMaxWidth(),
