@@ -102,7 +102,7 @@ async def test_admin_can_set_endpoint_and_member_cannot(env, app):
         "/api/admin/ai",
         headers=env.admin,
         json={
-            "base_url": "http://10.0.10.23:8080/v1/",
+            "base_url": "http://192.0.2.20:8080/v1/",
             "api_key": "sk-local-secret-123456",
             "model": "qwen3-vl",
             "timeout_s": 180,
@@ -112,7 +112,7 @@ async def test_admin_can_set_endpoint_and_member_cannot(env, app):
     )
     assert r.status_code == 200, r.text
     cfg = r.json()["config"]
-    assert cfg["base_url"] == "http://10.0.10.23:8080/v1"
+    assert cfg["base_url"] == "http://192.0.2.20:8080/v1"
     assert cfg["api_key"] is None and cfg["has_api_key"] is True  # never echoed
     assert cfg["timeout_s"] == 180 and cfg["disable_thinking"] is True
     assert cfg["features"] == {"chat": True, "recipes": False, "photo": True}

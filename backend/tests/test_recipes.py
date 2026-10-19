@@ -112,7 +112,7 @@ async def _resolver_for(table):
     [
         ("http://localhost/x", ["127.0.0.1"]),
         ("http://router.lan/", ["192.168.1.1"]),
-        ("http://pantry.example/", ["10.0.10.163"]),
+        ("http://pantry.example/", ["10.1.2.3"]),
         ("http://metadata/", ["169.254.169.254"]),
         ("http://v6.example/", ["::1"]),
         ("http://mapped.example/", ["::ffff:10.0.0.1"]),
