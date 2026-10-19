@@ -4,7 +4,9 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import {
   BarChart3,
+  BookOpen,
   CalendarClock,
+  CalendarDays,
   CookingPot,
   ChefHat,
   Download,
@@ -58,6 +60,8 @@ export default function AppShell() {
     { to: '/shopping', label: t('nav.shopping'), icon: <ShoppingBasket />, badge: dash.data?.shopping_open_count },
   ]
   const secondary: NavDef[] = [
+    { to: '/recipes', label: t('nav.recipes'), icon: <BookOpen /> },
+    { to: '/plan', label: t('nav.plan'), icon: <CalendarDays /> },
     { to: '/kitchen', label: t('nav.kitchen'), icon: <CookingPot /> },
     { to: '/expiring', label: t('nav.expiring'), icon: <CalendarClock /> },
     { to: '/unknown', label: t('nav.unknown'), icon: <HelpCircle />, badge: unknown },

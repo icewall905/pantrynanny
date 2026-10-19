@@ -24,6 +24,10 @@ const AssistantPage = lazy(() => import('./pages/AssistantPage'))
 const SettingsPage = lazy(() => import('./pages/SettingsPage'))
 const AdminPage = lazy(() => import('./pages/AdminPage'))
 const KitchenPage = lazy(() => import('./pages/KitchenPage'))
+const RecipesPage = lazy(() => import('./pages/recipes/RecipesPage'))
+const RecipeDetailPage = lazy(() => import('./pages/recipes/RecipeDetailPage'))
+const RecipeEditPage = lazy(() => import('./pages/recipes/RecipeEditPage'))
+const MealPlanPage = lazy(() => import('./pages/MealPlanPage'))
 
 export default function App() {
   return (
@@ -66,6 +70,11 @@ export default function App() {
               <Route path="unknown" element={<UnknownPage />} />
               <Route path="shopping" element={<ShoppingPage />} />
               <Route path="expiring" element={<ExpiringPage />} />
+              <Route path="recipes" element={<RecipesPage />} />
+              <Route path="recipes/new" element={<RecipeEditPage />} />
+              <Route path="recipes/:id" element={<RecipeDetailPage />} />
+              <Route path="recipes/:id/edit" element={<RecipeEditPage />} />
+              <Route path="plan" element={<MealPlanPage />} />
               <Route path="stats" element={<StatsPage />} />
               <Route path="export" element={<ExportPage />} />
               <Route path="assistant" element={<AssistantPage />} />
