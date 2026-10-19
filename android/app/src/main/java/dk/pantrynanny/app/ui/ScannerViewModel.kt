@@ -44,6 +44,7 @@ data class SyncStatusUi(
 data class ScannerUiState(
     val mode: ScanMode = ScanMode.ADD,
     val torch: Boolean = false,
+    val frontCamera: Boolean = false,
     val last: HistoryRow? = null,
     val history: List<HistoryRow> = emptyList(),
     val status: SyncStatusUi = SyncStatusUi(),
@@ -89,8 +90,9 @@ class ScannerViewModel(private val c: AppContainer) : ViewModel() {
         _torch,
         c.db.historyDao().observeRecent(30),
         status,
-    ) { mode, torch, history, st ->
-        ScannerUiState(mode, torch, history.firstOrNull(), history, st)
+        settings.map { it.frontCamera },
+    ) { mode, torch, history, st, front ->
+        ScannerUiState(mode, torch, front, history.firstOrNull(), history, st)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ScannerUiState())
 
     init {
@@ -111,6 +113,14 @@ class ScannerViewModel(private val c: AppContainer) : ViewModel() {
         if (_mode.value == mode) return
         applyMode(mode, clearDedup = true)
         touch()
+    }
+
+    /** Flip between rear and front camera (remembered); the dedup state belongs to the old view. */
+    fun toggleCamera() {
+        val front = !settings.value.frontCamera
+        _torch.value = false
+        dedup.clear()
+        viewModelScope.launch { c.settings.setFrontCamera(front) }
     }
 
     fun toggleTorch() {

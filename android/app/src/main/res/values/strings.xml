@@ -45,6 +45,8 @@
     <string name="snack_nothing_to_undo">Intet at fortryde</string>
     <string name="torch_on">Lommelygte: til</string>
     <string name="torch_off">Lommelygte: fra</string>
+    <string name="camera_use_front">Frontkamera</string>
+    <string name="camera_use_rear">Bagkamera</string>
     <string name="perm_title">Kameraadgang kræves</string>
     <string name="perm_body">PantryNanny bruger kameraet til at scanne stregkoder på dine varer. Der gemmes eller sendes aldrig billeder.</string>
     <string name="perm_grant">Giv adgang</string>

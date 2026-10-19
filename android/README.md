@@ -75,6 +75,9 @@ For a LAN test server over plain HTTP use a debug build (`http://192.168.x.y:800
   camera app and **Vælg billede** the system photo picker. The image is scaled to 1600 px, rotated per
   EXIF and uploaded (`POST /api/products/{id}/photo`, needs a connection). Images show on the product
   screen, the last-scan card and in the inventory list, and are cached on disk for offline use.
+* **Frontkamera / Bagkamera** (top right of the camera view, shown when the phone has both) switches
+  the scanning camera; the choice is remembered. Front cameras have no torch and usually fixed focus,
+  so hold items a little further away.
 * Remove mode reverts to Add on a cold start and after `remove_mode_timeout_min` idle minutes.
 * Sync: debounced foreground sync about 1.5 s after the last scan, a unique one-time WorkManager job
   (network constraint, exponential backoff), a 15 minute periodic job, and a trigger when connectivity

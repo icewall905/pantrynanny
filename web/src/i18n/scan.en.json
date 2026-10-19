@@ -113,5 +113,6 @@
     "retry": "Retry",
     "close": "Close"
   },
-  "exit": "Leave scanner"
+  "exit": "Leave scanner",
+  "switchCamera": "Switch camera (front/rear)"
 }

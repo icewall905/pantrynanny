@@ -1,5 +1,5 @@
 // Continuous scanner: camera → throttled centre-crop → decoder → duplicate suppression.
-import { Camera, CameraError, OpenSuperseded } from './camera'
+import { Camera, CameraError, OpenSuperseded, type Facing } from './camera'
 import { createDecoder, type FrameDecoder } from './decoder'
 import { readIsTrusted, ScanDeduplicator } from './dedupe'
 import { cropRect } from './geometry'
@@ -61,6 +61,17 @@ export class ScannerEngine {
 
   get torchSupported() {
     return this.camera.torchSupported
+  }
+
+  get canSwitchCamera() {
+    return this.camera.canSwitch
+  }
+
+  /** Switch between rear and front camera; reopens the camera when it is running. */
+  setFacing(facing: Facing) {
+    if (this.camera.facing === facing) return
+    this.camera.facing = facing
+    if (this.wanted && document.visibilityState === 'visible') void this.run()
   }
 
   private set(s: EngineState, err?: CameraError) {

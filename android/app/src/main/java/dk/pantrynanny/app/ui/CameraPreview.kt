@@ -112,6 +112,9 @@ fun CameraPreview(
     torchOn: Boolean,
     onBarcode: (String, Int) -> Unit,
     modifier: Modifier = Modifier,
+    frontCamera: Boolean = false,
+    /** Called once the camera provider is known: true when the device has both a front and a rear camera. */
+    onCanSwitch: (Boolean) -> Unit = {},
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -120,8 +123,10 @@ fun CameraPreview(
     }
     var camera by remember { mutableStateOf<Camera?>(null) }
     val currentOnBarcode by rememberUpdatedState(onBarcode)
+    val currentOnCanSwitch by rememberUpdatedState(onCanSwitch)
 
-    DisposableEffect(lifecycleOwner) {
+    // Keyed on the lens too: switching cameras unbinds and rebinds the use cases.
+    DisposableEffect(lifecycleOwner, frontCamera) {
         val executor = Executors.newSingleThreadExecutor()
         val scanner = BarcodeScanning.getClient(scannerOptions())
         val providerFuture = ProcessCameraProvider.getInstance(context)
@@ -145,8 +150,17 @@ fun CameraPreview(
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .build()
                 analysis.setAnalyzer(executor, BarcodeAnalyzer(scanner, executor) { v, f -> currentOnBarcode(v, f) })
+                val hasFront = p.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA)
+                val hasBack = p.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA)
+                currentOnCanSwitch(hasFront && hasBack)
+                // PreviewView mirrors the front camera itself; ML Kit reads the unmirrored frames.
+                val selector = if ((frontCamera && hasFront) || !hasBack) {
+                    CameraSelector.DEFAULT_FRONT_CAMERA
+                } else {
+                    CameraSelector.DEFAULT_BACK_CAMERA
+                }
                 p.unbindAll()
-                camera = p.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
+                camera = p.bindToLifecycle(lifecycleOwner, selector, preview, analysis)
             } catch (e: Exception) {
                 Log.e(TAG, "Camera start failed", e)
             }

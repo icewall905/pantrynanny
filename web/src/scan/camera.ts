@@ -1,4 +1,12 @@
-// Camera access: rear camera, continuous focus, torch where available.
+// Camera access: rear camera by default (front on request), continuous focus, torch where available.
+
+export type Facing = 'environment' | 'user'
+
+/** Device labels that identify each side (several languages; labels are only known after permission). */
+const LABEL: Record<Facing, RegExp> = {
+  environment: /back|rear|bak|environment|hinten|arrière/i,
+  user: /front|user|forside|facetime|vorne|avant/i,
+}
 
 export type CameraErrorKind = 'denied' | 'notfound' | 'insecure' | 'busy' | 'other'
 
@@ -30,6 +38,10 @@ export class Camera {
   track: MediaStreamTrack | null = null
   torchSupported = false
   focusContinuous = false
+  /** Which camera open() asks for. */
+  facing: Facing = 'environment'
+  /** More than one camera present (known after the first successful open). */
+  canSwitch = false
   onEnded: (() => void) | null = null
 
   async open(video: HTMLVideoElement): Promise<void> {
@@ -39,24 +51,31 @@ export class Camera {
     this.close() // bumps gen: any older pending open() will discard its stream
     const my = this.gen
     const live = () => my === this.gen
+    const want = this.facing
     let stream = await this.request({
-      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+      video: { facingMode: { ideal: want }, width: { ideal: 1280 }, height: { ideal: 720 } },
       audio: false,
     })
     if (!live()) {
       stopStream(stream)
       throw new OpenSuperseded()
     }
-    // Make sure we really got a rear camera; pick one by label if not.
+    // Make sure we really got the requested side; pick a camera by label if not.
     const fm = stream.getVideoTracks()[0]?.getSettings().facingMode
-    if (fm && fm !== 'environment') {
+    let devices: MediaDeviceInfo[] = []
+    try {
+      devices = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput')
+    } catch {
+      /* ignore */
+    }
+    this.canSwitch = devices.length > 1
+    if (fm && fm !== want) {
       try {
-        const devices = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput')
-        const back = devices.find((d) => /back|rear|bak|environment|hinten|arrière/i.test(d.label))
-        if (back && live()) {
+        const match = devices.find((d) => LABEL[want].test(d.label))
+        if (match && live()) {
           stopStream(stream)
           stream = await this.request({
-            video: { deviceId: { exact: back.deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } },
+            video: { deviceId: { exact: match.deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } },
             audio: false,
           })
         }

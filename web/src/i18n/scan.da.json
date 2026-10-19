@@ -113,5 +113,6 @@
     "retry": "Prøv igen",
     "close": "Luk"
   },
-  "exit": "Forlad scanner"
+  "exit": "Forlad scanner",
+  "switchCamera": "Skift kamera (front/bag)"
 }

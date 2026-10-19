@@ -132,19 +132,32 @@ fun ScannerScreen(vm: ScannerViewModel, snackbar: SnackbarHostState, onRegisterP
                 .background(Color.Black)
         ) {
             if (granted) {
+                var canSwitch by remember { mutableStateOf(false) }
                 CameraPreview(
                     torchOn = state.torch,
                     onBarcode = vm::onDecoded,
                     modifier = Modifier.fillMaxSize(),
+                    frontCamera = state.frontCamera,
+                    onCanSwitch = { canSwitch = it },
                 )
-                TextButton(
-                    onClick = vm::toggleTorch,
-                    modifier = Modifier.align(Alignment.TopEnd),
-                ) {
-                    Text(
-                        stringResource(if (state.torch) R.string.torch_on else R.string.torch_off),
-                        color = Color.White,
-                    )
+                Row(Modifier.align(Alignment.TopEnd)) {
+                    if (canSwitch) {
+                        TextButton(onClick = vm::toggleCamera) {
+                            Text(
+                                stringResource(if (state.frontCamera) R.string.camera_use_rear else R.string.camera_use_front),
+                                color = Color.White,
+                            )
+                        }
+                    }
+                    // Front cameras have no torch.
+                    if (!state.frontCamera) {
+                        TextButton(onClick = vm::toggleTorch) {
+                            Text(
+                                stringResource(if (state.torch) R.string.torch_on else R.string.torch_off),
+                                color = Color.White,
+                            )
+                        }
+                    }
                 }
             } else {
                 CameraPermissionRationale(

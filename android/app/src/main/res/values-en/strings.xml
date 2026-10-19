@@ -45,6 +45,8 @@
     <string name="snack_nothing_to_undo">Nothing to undo</string>
     <string name="torch_on">Torch: on</string>
     <string name="torch_off">Torch: off</string>
+    <string name="camera_use_front">Front camera</string>
+    <string name="camera_use_rear">Rear camera</string>
     <string name="perm_title">Camera access required</string>
     <string name="perm_body">PantryNanny uses the camera to scan barcodes on your groceries. Pictures are never stored or sent.</string>
     <string name="perm_grant">Grant access</string>

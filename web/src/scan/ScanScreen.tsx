@@ -1,12 +1,12 @@
 import clsx from 'clsx'
-import { AlertTriangle, Flashlight, Keyboard, MapPin, Minus, Plus, RefreshCw, Undo2, Volume2, VolumeX, Wifi, WifiOff, X } from 'lucide-react'
+import { AlertTriangle, Flashlight, Keyboard, MapPin, Minus, Plus, RefreshCw, SwitchCamera, Undo2, Volume2, VolumeX, Wifi, WifiOff, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useTranslation } from 'react-i18next'
 import { get, qs } from '../api/client'
 import type { BarcodeLookupResult, HouseholdSettings, Location, Product } from '../api/types'
 import { enqueueOp, getStore, isBlankBarcode, normalizeBarcode, useSyncStatus } from '../offline'
 import type { FailedRecord } from '../offline'
-import { CameraError } from './camera'
+import { CameraError, type Facing } from './camera'
 import { DEFAULT_REARM_MS } from './dedupe'
 import { ScannerEngine, type EngineState, type ScanEvent } from './engine'
 import { beep, setSoundEnabled, vibrate } from './feedback'
@@ -106,6 +106,16 @@ export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: 
   })
   const [torch, setTorch] = useState(false)
   const [torchOk, setTorchOk] = useState(false)
+  const [facing, setFacing] = useState<Facing>(() => {
+    try {
+      return localStorage.getItem('pn.scan.facing') === 'user' ? 'user' : 'environment'
+    } catch {
+      return 'environment'
+    }
+  })
+  const [switchOk, setSwitchOk] = useState(false)
+  const facingRef = useRef(facing)
+  facingRef.current = facing
   const [camState, setCamState] = useState<EngineState>('idle')
   const [camErr, setCamErr] = useState<CameraError | null>(null)
   const [manualOpen, setManualOpen] = useState(false)
@@ -274,9 +284,13 @@ export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: 
       onState: (s, err) => {
         setCamState(s)
         setCamErr(err ?? null)
-        if (s === 'running') setTorchOk(engine.torchSupported)
+        if (s === 'running') {
+          setTorchOk(engine.torchSupported)
+          setSwitchOk(engine.canSwitchCamera)
+        }
       },
     })
+    engine.camera.facing = facingRef.current
     engineRef.current = engine
     void engine.start()
     return () => {
@@ -377,7 +391,15 @@ export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: 
         <div
           className={clsx('relative min-h-[30vh] flex-1 overflow-hidden rounded-3xl border-[10px] bg-black landscape:flex-[3]', theme.ring, theme.glow)}
         >
-          <video ref={videoRef} playsInline muted autoPlay className="absolute inset-0 size-full object-cover" data-testid="scan-video" />
+          {/* the front camera is mirrored like a selfie view; decoding reads the raw frames */}
+          <video
+            ref={videoRef}
+            playsInline
+            muted
+            autoPlay
+            className={clsx('absolute inset-0 size-full object-cover', facing === 'user' && '-scale-x-100')}
+            data-testid="scan-video"
+          />
           {/* aiming frame (decoder looks only inside it) */}
           <div
             className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-2xl border-2 border-white/70"
@@ -403,6 +425,25 @@ export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: 
           )}
           {/* tools */}
           <div className="absolute bottom-3 right-3 flex gap-2">
+            {switchOk && (
+              <IconBtn
+                label={t('switchCamera')}
+                onClick={() => {
+                  const next: Facing = facing === 'user' ? 'environment' : 'user'
+                  setFacing(next)
+                  setTorch(false)
+                  setTorchOk(false)
+                  try {
+                    localStorage.setItem('pn.scan.facing', next)
+                  } catch {
+                    /* ignore */
+                  }
+                  engineRef.current?.setFacing(next)
+                }}
+              >
+                <SwitchCamera className="size-6" />
+              </IconBtn>
+            )}
             {torchOk && (
               <IconBtn
                 label={t('torch')}

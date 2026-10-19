@@ -65,11 +65,13 @@ come from prior knowledge of WebKit release notes (13.4) - **verify on device**.
 * Present the barcode flat, bars vertical or horizontal, inside the framed rectangle, about 15-25 cm from the lens; hold for ~0.3 s.
 * Matte/dark background behind the scan area improves contrast.
 
-#### Known limitation: rear camera only
+#### Front or rear camera
 
-The scanner requests `facingMode: environment`. If the browser reports only a front camera it will be used, but there is
-no front/rear toggle and front cameras focus poorly at 15-25 cm. **Verify on device** which camera and field of view suit
-your mount.
+The scanner starts with the rear camera (`facingMode: environment`). When the device has more than one camera, the
+**switch-camera** button (bottom right of the camera view) flips to the front camera and back; the choice is remembered
+on the device. The front camera's preview is mirrored like a selfie view (decoding is unaffected). On a wall mount the
+front camera is often the one facing the room, but front cameras usually have fixed focus and need the item a little
+further away (about 25-40 cm). **Verify on device** which camera and distance suit your mount.
 
 ## 3. Safety behaviours implemented
 

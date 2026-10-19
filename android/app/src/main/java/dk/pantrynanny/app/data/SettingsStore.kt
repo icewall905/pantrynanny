@@ -24,6 +24,8 @@ data class AppSettings(
     val mode: ScanMode = ScanMode.ADD,
     val sound: Boolean = true,
     val vibrate: Boolean = true,
+    /** Scan with the front (selfie) camera instead of the rear one. */
+    val frontCamera: Boolean = false,
     val defaultLocationId: String? = null,
     /** User override; null = use the household setting from the server. */
     val rearmMsOverride: Int? = null,
@@ -49,6 +51,7 @@ class SettingsStore(private val context: Context) {
         val mode = stringPreferencesKey("scan_mode")
         val sound = booleanPreferencesKey("sound")
         val vibrate = booleanPreferencesKey("vibrate")
+        val frontCamera = booleanPreferencesKey("front_camera")
         val defaultLocation = stringPreferencesKey("default_location")
         val rearm = intPreferencesKey("rearm_ms")
         val cursor = stringPreferencesKey("sync_cursor")
@@ -66,6 +69,7 @@ class SettingsStore(private val context: Context) {
             mode = ScanMode.fromKey(p[Keys.mode]),
             sound = p[Keys.sound] ?: true,
             vibrate = p[Keys.vibrate] ?: true,
+            frontCamera = p[Keys.frontCamera] ?: false,
             defaultLocationId = p[Keys.defaultLocation],
             rearmMsOverride = p[Keys.rearm],
             syncCursor = p[Keys.cursor],
@@ -99,6 +103,7 @@ class SettingsStore(private val context: Context) {
     suspend fun setMode(mode: ScanMode) = context.dataStore.edit { it[Keys.mode] = mode.name.lowercase() }
     suspend fun setSound(on: Boolean) = context.dataStore.edit { it[Keys.sound] = on }
     suspend fun setVibrate(on: Boolean) = context.dataStore.edit { it[Keys.vibrate] = on }
+    suspend fun setFrontCamera(on: Boolean) = context.dataStore.edit { it[Keys.frontCamera] = on }
     suspend fun setDefaultLocation(id: String?) = context.dataStore.edit {
         if (id == null) it.remove(Keys.defaultLocation) else it[Keys.defaultLocation] = id
     }

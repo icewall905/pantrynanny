@@ -112,3 +112,48 @@ describe('ScannerEngine lifecycle', () => {
     expect(calls.every((c) => !c.made || c.made.track.readyState === 'ended')).toBe(true)
   })
 })
+
+describe('Camera facing', () => {
+  function gumWith(facingOf: (c: MediaStreamConstraints) => string, devices: Partial<MediaDeviceInfo>[]) {
+    const gum = vi.fn(async (c: MediaStreamConstraints) => {
+      const s = fakeStream()
+      s.track.getSettings = () => ({ facingMode: facingOf(c) })
+      return s.stream
+    })
+    Object.defineProperty(navigator, 'mediaDevices', {
+      value: { getUserMedia: gum, enumerateDevices: async () => devices },
+      configurable: true,
+    })
+    return gum
+  }
+  const cams = [
+    { kind: 'videoinput', deviceId: 'b', label: 'Back Camera' },
+    { kind: 'videoinput', deviceId: 'f', label: 'Front Camera' },
+  ] as Partial<MediaDeviceInfo>[]
+
+  it('asks for the front camera when facing is user, and reports that switching is possible', async () => {
+    const gum = gumWith(() => 'user', cams)
+    const cam = new Camera()
+    cam.facing = 'user'
+    await cam.open(video)
+    expect((gum.mock.calls[0][0].video as MediaTrackConstraints).facingMode).toEqual({ ideal: 'user' })
+    expect(gum).toHaveBeenCalledTimes(1)
+    expect(cam.canSwitch).toBe(true)
+  })
+
+  it('falls back to the front camera by label when the browser ignores facingMode', async () => {
+    const gum = gumWith((c) => ((c.video as MediaTrackConstraints).deviceId ? 'user' : 'environment'), cams)
+    const cam = new Camera()
+    cam.facing = 'user'
+    await cam.open(video)
+    expect(gum).toHaveBeenCalledTimes(2)
+    expect((gum.mock.calls[1][0].video as MediaTrackConstraints).deviceId).toEqual({ exact: 'f' })
+  })
+
+  it('a single camera cannot be switched', async () => {
+    gumWith(() => 'environment', [cams[0]])
+    const cam = new Camera()
+    await cam.open(video)
+    expect(cam.canSwitch).toBe(false)
+  })
+})
