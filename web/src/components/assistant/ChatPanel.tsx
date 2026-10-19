@@ -27,6 +27,16 @@ export function errorKey(e: unknown): string {
   return 'assistant.errorGeneric'
 }
 
+const MAX_HISTORY = 12
+const MAX_CHARS = 4000
+
+/** What is sent to the API: the last few turns, starting at a user message, each capped in size. */
+export function historyPayload(entries: ChatMessage[]): ChatMessage[] {
+  const tail = entries.slice(-MAX_HISTORY)
+  const first = tail.findIndex((m) => m.role === 'user')
+  return (first < 0 ? [] : tail.slice(first)).map(({ role, content }) => ({ role, content: content.slice(0, MAX_CHARS) }))
+}
+
 interface Entry extends ChatMessage {
   tools?: string[]
 }
@@ -54,9 +64,9 @@ export default function ChatPanel({ locale }: { locale: 'da' | 'en' }) {
     const next = [...entries, { role: 'user' as const, content: q }]
     setEntries(next)
     setText('')
-    ask.mutate(next.map(({ role, content: c }) => ({ role, content: c })))
+    ask.mutate(historyPayload(next))
   }
-  const retry = () => ask.mutate(entries.map(({ role, content: c }) => ({ role, content: c })))
+  const retry = () => ask.mutate(historyPayload(entries))
 
   const starters = [t('assistant.starter1'), t('assistant.starter2'), t('assistant.starter3'), t('assistant.starter4')]
 

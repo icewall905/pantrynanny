@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { mockFetch, renderApp } from '../test/utils'
+import { jsonError, mockFetch, renderApp } from '../test/utils'
 import AssistantPage from './AssistantPage'
+import { historyPayload } from '../components/assistant/ChatPanel'
 
 const status = { enabled: true, reachable: true, model: 'm' }
 const recipe = {
@@ -60,5 +61,40 @@ describe('AssistantPage', () => {
     expect(calls.filter((c) => c.path === '/shopping').map((c) => (c.body as { name: string }).name)).toEqual(['Løg', 'Fløde'])
     await user.click(screen.getByRole('button', { name: /Vis fremgangsmåde/ }))
     expect(screen.getByText('Kog ærterne')).toBeInTheDocument()
+  })
+
+  it('trims long chat history and over-long replies before posting', () => {
+    const entries = Array.from({ length: 40 }, (_, i) => ({
+      role: (i % 2 === 0 ? 'user' : 'assistant') as 'user' | 'assistant',
+      content: i === 39 ? 'x'.repeat(9000) : `m${i}`,
+    }))
+    entries.push({ role: 'user', content: 'sidst' })
+    const out = historyPayload(entries)
+    expect(out.length).toBeLessThanOrEqual(12)
+    expect(out[0].role).toBe('user')
+    expect(out[out.length - 1].content).toBe('sidst')
+    expect(out.every((m) => m.content.length <= 4000)).toBe(true)
+  })
+
+  it('does not duplicate already-added items when retrying a failed bulk add', async () => {
+    const user = userEvent.setup()
+    let n = 0
+    const calls = mockFetch({
+      'GET /ai/status': status,
+      'POST /ai/recipes': { recipes: [recipe] },
+      'POST /shopping': () => {
+        n += 1
+        return n === 2 ? jsonError(500) : { id: 's' }
+      },
+    })
+    renderApp(<AssistantPage />)
+    await user.click(await screen.findByRole('tab', { name: 'Opskrifter' }))
+    await user.click(screen.getByRole('button', { name: /Foreslå opskrifter/ }))
+    const add = await screen.findByRole('button', { name: /Tilføj manglende til indkøbsliste/ })
+    await user.click(add)
+    await waitFor(() => expect(calls.filter((c) => c.path === '/shopping' && c.method === 'POST')).toHaveLength(2))
+    await user.click(screen.getByRole('button', { name: /Tilføj manglende til indkøbsliste/ }))
+    await waitFor(() => expect(calls.filter((c) => c.path === '/shopping' && c.method === 'POST')).toHaveLength(3))
+    expect(calls.filter((c) => c.path === '/shopping' && c.method === 'POST').map((c) => (c.body as { name: string }).name)).toEqual(['Løg', 'Fløde', 'Fløde'])
   })
 })

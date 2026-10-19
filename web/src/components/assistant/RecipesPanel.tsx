@@ -30,21 +30,30 @@ export function RecipeCard({ recipe }: { recipe: Recipe }) {
   const toast = useToast()
   const qc = useQueryClient()
   const [open, setOpen] = useState(false)
-  const [added, setAdded] = useState(false)
+  const [done, setDone] = useState<Set<string>>(new Set())
+  const added = recipe.missing.every((n) => done.has(n))
 
   // Explicit user click only: the AI never writes; this uses the normal shopping API.
   const add = useMutation({
     mutationFn: async () => {
-      for (const name of recipe.missing) await post<ShoppingItem>('/shopping', { name, quantity: 1 })
+      // Per-item progress is kept, so a retry after a failure never duplicates earlier items.
+      for (const name of recipe.missing) {
+        if (done.has(name)) continue
+        await post<ShoppingItem>('/shopping', { name, quantity: 1 })
+        done.add(name)
+        setDone(new Set(done))
+      }
     },
     onSuccess: () => {
-      setAdded(true)
       toast.push(t('assistant.addedMissing', { count: recipe.missing.length }), 'success')
       void qc.invalidateQueries({ queryKey: keys.shopping })
       void qc.invalidateQueries({ queryKey: keys.suggestions })
       void qc.invalidateQueries({ queryKey: keys.dashboard })
     },
-    onError: () => toast.push(t('assistant.addFailed'), 'error'),
+    onError: () => {
+      void qc.invalidateQueries({ queryKey: keys.shopping })
+      toast.push(t('assistant.addFailed'), 'error')
+    },
   })
 
   return (

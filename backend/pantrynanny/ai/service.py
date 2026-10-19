@@ -34,6 +34,7 @@ HISTORY_KEEP = 12
 HISTORY_CHARS = 8000
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
 MAX_IMAGE_PIXELS = 50_000_000
+MAX_IMAGE_MEGAPIXELS = 25
 
 SYSTEM = {
     "da": (
@@ -169,7 +170,7 @@ async def chat(
     calls_out: list[dict] = []
     if ai.tools_supported:
         try:
-            reply = await _tool_loop(ai, ctx, convo, calls_out)
+            reply = await _tool_loop(ai, ctx, convo, calls_out, locale)
             return {"reply": reply, "tool_calls": calls_out, "model": model}
         except ToolsUnsupported:
             log.info("ai_tools_unsupported_fallback")
@@ -195,7 +196,7 @@ def _reply_text(msg: dict) -> str:
 
 
 async def _tool_loop(
-    ai: AIClient, ctx: ToolContext, convo: list[dict], calls_out: list[dict]
+    ai: AIClient, ctx: ToolContext, convo: list[dict], calls_out: list[dict], locale: str = "da"
 ) -> str:
     schemas = tool_schemas()
     for _ in range(MAX_ROUNDS):
@@ -225,7 +226,12 @@ async def _tool_loop(
                 )
             convo.append({"role": "tool", "tool_call_id": tc.get("id", ""), "content": result})
     # Out of rounds: force a final answer without tools.
-    convo.append({"role": "user", "content": "Giv nu dit endelige svar ud fra de data du har."})
+    final = (
+        "Giv nu dit endelige svar ud fra de data du har."
+        if locale == "da"
+        else "Now give your final answer based on the data you have."
+    )
+    convo.append({"role": "user", "content": final})
     return _reply_text(await ai.chat(convo, max_tokens=2048))
 
 
@@ -259,6 +265,16 @@ def _strs(v: Any, n: int, each: int) -> list[str]:
     ][:n]
 
 
+def _put(seen: set[str], bucket: list[str], item: str) -> None:
+    if norm(item) not in seen:
+        seen.add(norm(item))
+        bucket.append(item)
+
+
+def _tokens(s: str) -> str:
+    return " ".join(re.findall(r"[a-z0-9]+", norm(s)))
+
+
 def validate_recipes(
     raw: dict, stock_names: list[tuple[str, set[str]]], count: int
 ) -> list[Recipe]:
@@ -266,25 +282,31 @@ def validate_recipes(
     items = raw.get("recipes")
     if not isinstance(items, list):
         raise ValueError("missing recipes list")
-    stock = {norm(n) for n, _ in stock_names} | {norm(a) for _, al in stock_names for a in al}
+    stock = {_tokens(n) for n, _ in stock_names} | {_tokens(a) for _, al in stock_names for a in al}
     stock.discard("")
 
     def in_stock(item: str) -> bool:
-        k = norm(item)
-        if len(k) < 3:
+        k = _tokens(item)
+        if len(k.replace(" ", "")) < 2:
             return False
-        return any(k == s or (len(s) >= 3 and (s in k or k in s)) for s in stock)
+        # whole-word phrase containment: "mælk" matches "Mælk 1 L" but not "kokosmælk"
+        return any(f" {s} " in f" {k} " or f" {k} " in f" {s} " for s in stock)
 
     out: list[Recipe] = []
     for r in items:
         if not isinstance(r, dict) or not str(r.get("title", "")).strip():
             continue
-        have, missing = [], _strs(r.get("missing"), 30, 80)
+        have: list[str] = []
+        missing: list[str] = []
+        moved: list[str] = []  # stocked items the model wrongly listed as missing
+
+        seen: set[str] = set()
+
+        for m in _strs(r.get("missing"), 30, 80):
+            _put(seen, moved if in_stock(m) else missing, m)
         for h in _strs(r.get("have"), 30, 80):
-            if in_stock(h):
-                have.append(h)
-            elif norm(h) not in {norm(m) for m in missing}:
-                missing.append(h)
+            _put(seen, have if in_stock(h) else missing, h)
+        have += moved
         try:
             out.append(
                 Recipe(
@@ -374,6 +396,10 @@ def prepare_image(data: bytes) -> str:
         with Image.open(io.BytesIO(data)) as probe:
             if probe.format not in ("JPEG", "PNG", "WEBP"):
                 raise AppError(400, "invalid_image", "Only JPEG, PNG or WebP images are accepted")
+            if probe.width * probe.height > MAX_IMAGE_MEGAPIXELS * 1_000_000:
+                raise AppError(400, "invalid_image", "Image dimensions too large")
+            if probe.format == "JPEG":
+                probe.draft("RGB", (1024, 1024))  # decode at reduced size
             probe.load()
             img = ImageOps.exif_transpose(probe)
             img = img.convert("RGB")
@@ -392,12 +418,22 @@ async def identify_photo(
 ) -> tuple[PhotoSuggestion, str | None]:
     data_url = await asyncio.to_thread(prepare_image, data)
     cats = ", ".join(clean(c, 40) for c in categories[:30])
-    text = (
-        "Identificér dette fødevare-/husholdningsprodukt ud fra billedet. Svar KUN med JSON: "
+    shape = (
         '{"name":str|null,"brand":str|null,"package_size":number|null,"package_unit":'
         '"g"|"kg"|"ml"|"l"|"cl"|"dl"|"pcs"|null,"category_guess":str|null,"confidence":0..1}. '
-        f"Gæt kun det du kan se; brug null hvis du er i tvivl. Mulige kategorier: {cats}."
     )
+    if locale == "en":
+        text = (
+            "Identify this food/household product from the photo. Reply with ONLY JSON: "
+            + shape
+            + f"Only guess what you can see; use null when unsure. Possible categories: {cats}."
+        )
+    else:
+        text = (
+            "Identificér dette fødevare-/husholdningsprodukt ud fra billedet. Svar KUN med JSON: "
+            + shape
+            + f"Gæt kun det du kan se; brug null hvis du er i tvivl. Mulige kategorier: {cats}."
+        )
     convo = [
         {
             "role": "system",

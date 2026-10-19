@@ -103,20 +103,28 @@ class AIClient:
         now = time.monotonic()
         if not force and self._probe and now - self._probe[0] < PROBE_TTL_S:
             return self._probe[1]
-        async with self._probe_lock:
-            now = time.monotonic()
-            if not force and self._probe and now - self._probe[0] < PROBE_TTL_S:
-                return self._probe[1]
-            ok = False
-            try:
-                async with asyncio.timeout(timeout):
-                    async with self._http(timeout) as c:
-                        r = await c.get("/models")
-                    ok = r.status_code < 500
-            except (TimeoutError, httpx.HTTPError):
-                ok = False
-            self._probe = (time.monotonic(), ok)
-            return ok
+        cached = self._probe[1] if self._probe else False
+        try:
+            # The lock wait is inside the timeout so a slow concurrent probe cannot stall callers.
+            async with asyncio.timeout(timeout):
+                async with self._probe_lock:
+                    now = time.monotonic()
+                    if not force and self._probe and now - self._probe[0] < PROBE_TTL_S:
+                        return self._probe[1]
+                    ok = False
+                    try:
+                        async with self._http(timeout) as c:
+                            r = await c.get("/models")
+                        ok = r.status_code < 500
+                    except httpx.HTTPError:
+                        ok = False
+                    self._probe = (time.monotonic(), ok)
+                    return ok
+        except TimeoutError:
+            if self._probe is None or time.monotonic() - self._probe[0] >= PROBE_TTL_S:
+                self._probe = (time.monotonic(), False)
+                return False
+            return cached
 
     # ------------------------------------------------------------------ chat
     async def chat(

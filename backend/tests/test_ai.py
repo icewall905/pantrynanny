@@ -468,3 +468,104 @@ async def test_identify_photo_rejects_gif_format_and_oversize(env, app):
         "/api/ai/identify-photo", headers=env.member, files={"file": ("a.png", big, "image/png")}
     )
     assert r.status_code == 413
+
+
+# --------------------------------------------------------------------------- review fixes
+
+
+async def test_health_not_blocked_by_concurrent_slow_status_probe(env, app):
+    import asyncio
+    import time
+
+    async def slow(request):
+        await asyncio.sleep(5)
+        return httpx.Response(200, json={"data": []})
+
+    install(app, FakeAI())
+    app.state.ai_client._transport = httpx.MockTransport(slow)
+    status_task = asyncio.create_task(env.client.get("/api/ai/status", headers=env.member))
+    await asyncio.sleep(0.05)  # status now holds the probe lock
+    t0 = time.monotonic()
+    r = await env.client.get("/api/health")
+    assert r.status_code == 200 and r.json()["ai"] == "down"
+    assert time.monotonic() - t0 < 1.3
+    assert (await status_task).status_code == 200
+
+
+async def test_photo_pixel_bomb_rejected():
+    from pantrynanny.ai.service import prepare_image
+    from pantrynanny.errors import AppError
+
+    buf = io.BytesIO()
+    Image.new("1", (6000, 6000)).save(buf, "PNG")  # 36 MP, tiny file
+    with pytest.raises(AppError) as e:
+        prepare_image(buf.getvalue())
+    assert e.value.status_code == 400 and e.value.code == "invalid_image"
+
+
+async def test_photo_jpeg_uses_draft_and_downscales():
+    from pantrynanny.ai.service import prepare_image
+
+    url = prepare_image(png_bytes((4000, 3000), "JPEG"))
+    import base64
+
+    img = Image.open(io.BytesIO(base64.b64decode(url.split(",", 1)[1])))
+    assert max(img.size) <= 1024
+
+
+async def test_long_history_and_long_assistant_reply_accepted(env, app):
+    fake = FakeAI(["ok"])
+    install(app, fake)
+    msgs = [{"role": "user", "content": "hej"}, {"role": "assistant", "content": "y" * 9000}]
+    msgs.append({"role": "user", "content": "og så?"})
+    r = await env.client.post("/api/ai/chat", headers=env.member, json={"messages": msgs})
+    assert r.status_code == 200, r.text
+    sent = fake.requests[0]["messages"]
+    assert max(len(m["content"]) for m in sent[1:]) <= 2000
+    r = await env.client.post(
+        "/api/ai/chat",
+        headers=env.member,
+        json={"messages": [{"role": "user", "content": "x" * 4001}]},
+    )
+    assert r.status_code == 422
+
+
+async def test_recipe_matching_is_word_based_and_missing_can_become_have(env, app):
+    await seed(env)  # Mælk, Ærter in stock
+    payload = {
+        "recipes": [
+            {
+                "title": "Mix",
+                "have": ["Kokosmælk", "mælk 1 l"],
+                "missing": ["ærter", "Løg"],
+                "steps": ["a"],
+            }
+        ]
+    }
+    install(app, FakeAI([json.dumps(payload)]))
+    r = await env.client.post("/api/ai/recipes", headers=env.member, json={"count": 1})
+    rec = r.json()["recipes"][0]
+    assert rec["have"] == ["mælk 1 l", "ærter"]
+    assert rec["missing"] == ["Løg", "Kokosmælk"]
+
+
+async def test_english_locale_used_for_final_prompt_and_photo(env, app):
+    fake = FakeAI([tool_call("get_shopping_list", {}, f"c{i}") for i in range(5)] + ["Done."])
+    install(app, fake)
+    await env.client.post(
+        "/api/ai/chat",
+        headers=env.member,
+        json={"messages": [{"role": "user", "content": "x"}], "locale": "en"},
+    )
+    assert "final answer" in fake.requests[-1]["messages"][-1]["content"]
+    fake2 = FakeAI(['{"name":"Milk"}'])
+    install(app, fake2)
+    r = await env.client.post(
+        "/api/ai/identify-photo",
+        headers=env.member,
+        data={"locale": "en"},
+        files={"file": ("a.png", png_bytes((10, 10)), "image/png")},
+    )
+    assert r.status_code == 200
+    text = fake2.requests[0]["messages"][1]["content"][0]["text"]
+    assert text.startswith("Identify")

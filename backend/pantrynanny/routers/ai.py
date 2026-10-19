@@ -4,7 +4,7 @@ endpoint is not configured or unreachable; nothing else in the app depends on it
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, File, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -60,8 +60,8 @@ async def status(request: Request, principal: Principal = Depends(get_principal)
     ai = _client(request)
     if not ai.enabled:
         return StatusOut(enabled=False, reachable=False, model=None)
-    reachable = await ai.reachable(timeout=3.0)
-    model = await ai.detect_model(timeout=3.0) if reachable else None
+    reachable = await ai.reachable(timeout=1.0)
+    model = await ai.detect_model(timeout=1.0) if reachable else None
     return StatusOut(enabled=True, reachable=reachable, model=model)
 
 
@@ -73,7 +73,7 @@ async def chat(
     session: AsyncSession = Depends(get_session),
 ):
     principal, ai = dep
-    log.debug("ai_chat", user=str(principal.user_id), last=body.messages[-1].content[:500])
+    log.debug("ai_chat", user=str(principal.user_id), messages=len(body.messages))
     ctx = _ctx(request, session, principal)
     locs = (
         (
@@ -97,7 +97,7 @@ async def recipes(
     session: AsyncSession = Depends(get_session),
 ):
     principal, ai = dep
-    log.debug("ai_recipes", user=str(principal.user_id), prompt=(body.prompt or "")[:500])
+    log.debug("ai_recipes", user=str(principal.user_id), count=body.count)
     items, model = await service.recipes(
         ai, _ctx(request, session, principal), body.prompt, body.count, body.locale
     )
@@ -108,6 +108,7 @@ async def recipes(
 async def identify_photo(
     request: Request,
     file: UploadFile = File(...),
+    locale: str = Form("da"),
     dep: tuple[Principal, AIClient] = Depends(member_ai),
     session: AsyncSession = Depends(get_session),
 ):
@@ -124,5 +125,7 @@ async def identify_photo(
         .scalars()
         .all()
     )
-    suggestion, _ = await service.identify_photo(ai, data, list(cats), "da")
+    suggestion, _ = await service.identify_photo(
+        ai, data, list(cats), "en" if locale == "en" else "da"
+    )
     return suggestion

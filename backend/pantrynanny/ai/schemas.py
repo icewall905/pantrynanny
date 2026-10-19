@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 MAX_MESSAGES = 30
 MAX_MESSAGE_CHARS = 4000
@@ -8,14 +8,18 @@ MAX_MESSAGE_CHARS = 4000
 
 class ChatMessage(BaseModel):
     role: Literal["user", "assistant"]
-    content: str = Field(min_length=1, max_length=MAX_MESSAGE_CHARS)
+    content: str = Field(min_length=1)
 
-    @field_validator("content")
-    @classmethod
-    def _not_blank(cls, v: str) -> str:
-        if not v.strip():
+    @model_validator(mode="after")
+    def _check(self):
+        if not self.content.strip():
             raise ValueError("content must not be blank")
-        return v
+        if len(self.content) > MAX_MESSAGE_CHARS:
+            if self.role == "user":
+                raise ValueError(f"content must be at most {MAX_MESSAGE_CHARS} characters")
+            # Over-long assistant history is truncated rather than rejected.
+            self.content = self.content[:MAX_MESSAGE_CHARS]
+        return self
 
 
 class ChatIn(BaseModel):
