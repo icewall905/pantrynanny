@@ -217,7 +217,7 @@ export default function ProductDetailPage() {
                   </span>
                   <Select
                     aria-label={t('inventory.location')}
-                    className="w-auto"
+                    className="w-auto!"
                     value={b.location_id}
                     onChange={(e) =>
                       move.mutate({ item: { ...asItem, batches: [b] }, toLocationId: e.target.value })

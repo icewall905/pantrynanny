@@ -1,84 +1,87 @@
 @import 'tailwindcss';
 
-/* PantryNanny design tokens. Warm, bright, restrained. */
+/* PantryNanny design tokens: clean neutrals, one fresh green accent, hairline borders. */
 @theme {
-  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --color-cream-50: #fffdf9;
-  --color-cream-100: #fbf8f3;
-  --color-cream-200: #f3ede3;
-  --color-ink-900: #22201c;
-  --color-ink-700: #4a463f;
-  --color-ink-500: #7a746a;
-  --color-ink-300: #b8b1a5;
-  --color-leaf-50: #ecf7ef;
-  --color-leaf-100: #d3eedb;
-  --color-leaf-500: #2f9a5c;
-  --color-leaf-600: #2f7d4f;
-  --color-leaf-700: #23603c;
-  --color-tomato-50: #fff1ec;
-  --color-tomato-100: #ffdccf;
-  --color-tomato-500: #e8613a;
-  --color-tomato-600: #cc4a24;
-  --color-honey-50: #fff8e6;
-  --color-honey-400: #f4b740;
-  --color-honey-600: #b9810f;
-  --color-sky-500: #3b82c4;
-  --color-leaf-800: #23603c; /* button hover / gradient end: stays dark in both themes */
-  --color-surface: #ffffff; /* cards, inputs, menus (bg-white stays literal white) */
-  --color-night: #22201c; /* dark pills (toasts, selection bars) in both themes */
+  --font-sans: 'Inter Variable', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --color-cream-50: #fafbfa;
+  --color-cream-100: #f4f6f5;
+  --color-cream-200: #e4e9e6;
+  --color-ink-900: #0f1613;
+  --color-ink-700: #38433e;
+  --color-ink-500: #68746e;
+  --color-ink-300: #a6b0ab;
+  --color-leaf-50: #ebfbf2;
+  --color-leaf-100: #cff5e0;
+  --color-leaf-500: #12b76a;
+  --color-leaf-600: #079455;
+  --color-leaf-700: #067647;
+  --color-tomato-50: #fef3f2;
+  --color-tomato-100: #fee4e2;
+  --color-tomato-500: #f04438;
+  --color-tomato-600: #d92d20;
+  --color-honey-50: #fffaeb;
+  --color-honey-400: #fdb022;
+  --color-honey-600: #c4560a;
+  --color-sky-500: #2e90fa;
+  --color-leaf-800: #05603a;
+  --color-surface: #ffffff;
+  --color-night: #111814;
   --radius-card: 1.25rem;
-  --shadow-card: 0 1px 2px rgb(34 32 28 / 0.04), 0 4px 16px rgb(34 32 28 / 0.06);
+  --shadow-card: 0 1px 2px rgb(15 22 19 / 0.04), 0 8px 24px -14px rgb(15 22 19 / 0.18);
 }
+/* leaf-800 stays dark (button hover / gradient end), surface = cards, inputs and menus
+   (bg-white stays literal white), night = dark pills (toasts, selection bars) in both themes. */
 
 /* Dark is the default theme (no flash: it needs no JS); <html data-theme="light"> opts out.
    Only tokens are swapped, so components need no dark: variants. */
 :root:not([data-theme='light']) {
   color-scheme: dark;
-  --color-cream-50: #1b1a17;
-  --color-cream-100: #131210;
-  --color-cream-200: #2f2c27;
-  --color-ink-900: #f3efe8;
-  --color-ink-700: #d4cec4;
-  --color-ink-500: #a49d91;
-  --color-ink-300: #6e685f;
-  --color-leaf-50: #15261b;
-  --color-leaf-100: #1c3626;
-  --color-leaf-500: #3fae6c;
-  --color-leaf-600: #2f8a55;
-  --color-leaf-700: #86d3a3;
-  --color-tomato-50: #2d1912;
-  --color-tomato-100: #4a2216;
-  --color-tomato-600: #f07a55;
-  --color-honey-50: #2a2211;
-  --color-honey-600: #e9b440;
-  --color-sky-500: #6aa7de;
-  --color-surface: #1f1d1a;
-  --color-night: #3a362f;
-  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 16px rgb(0 0 0 / 0.35);
+  --color-cream-50: #111714;
+  --color-cream-100: #0a0e0c;
+  --color-cream-200: #222b27;
+  --color-ink-900: #eef3f0;
+  --color-ink-700: #c3ccc7;
+  --color-ink-500: #86918c;
+  --color-ink-300: #525d58;
+  --color-leaf-50: #0b2016;
+  --color-leaf-100: #0f2e1f;
+  --color-leaf-500: #2fd283;
+  --color-leaf-600: #0a9a58;
+  --color-leaf-700: #6ce9a6;
+  --color-tomato-50: #2a1210;
+  --color-tomato-100: #451915;
+  --color-tomato-600: #ff7a6e;
+  --color-honey-50: #281d08;
+  --color-honey-600: #fdb022;
+  --color-sky-500: #53b1fd;
+  --color-surface: #121815;
+  --color-night: #1d2622;
+  --shadow-card: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 10px 30px -18px rgb(0 0 0 / 0.7);
 }
-/* The /scan station has its own fixed high-contrast design: always the original palette. */
+/* The /scan station has its own fixed high-contrast design: always the light token values. */
 .pn-scan-palette {
   color-scheme: dark;
-  --color-cream-50: #fffdf9;
-  --color-cream-100: #fbf8f3;
-  --color-cream-200: #f3ede3;
-  --color-ink-900: #22201c;
-  --color-ink-700: #4a463f;
-  --color-ink-500: #7a746a;
-  --color-ink-300: #b8b1a5;
-  --color-leaf-50: #ecf7ef;
-  --color-leaf-100: #d3eedb;
-  --color-leaf-500: #2f9a5c;
-  --color-leaf-600: #2f7d4f;
-  --color-leaf-700: #23603c;
-  --color-tomato-50: #fff1ec;
-  --color-tomato-100: #ffdccf;
-  --color-tomato-600: #cc4a24;
-  --color-honey-50: #fff8e6;
-  --color-honey-600: #b9810f;
-  --color-sky-500: #3b82c4;
+  --color-cream-50: #fafbfa;
+  --color-cream-100: #f4f6f5;
+  --color-cream-200: #e4e9e6;
+  --color-ink-900: #0f1613;
+  --color-ink-700: #38433e;
+  --color-ink-500: #68746e;
+  --color-ink-300: #a6b0ab;
+  --color-leaf-50: #ebfbf2;
+  --color-leaf-100: #cff5e0;
+  --color-leaf-500: #12b76a;
+  --color-leaf-600: #079455;
+  --color-leaf-700: #067647;
+  --color-tomato-50: #fef3f2;
+  --color-tomato-100: #fee4e2;
+  --color-tomato-600: #d92d20;
+  --color-honey-50: #fffaeb;
+  --color-honey-600: #c4560a;
+  --color-sky-500: #2e90fa;
+  --color-leaf-800: #05603a;
   --color-surface: #ffffff;
-  --color-night: #22201c;
+  --color-night: #111814;
 }
 
 html,
@@ -88,6 +91,8 @@ body,
 }
 body {
   @apply bg-cream-100 text-ink-900 antialiased;
+  font-feature-settings: 'cv11', 'ss01', 'ss03'; /* Inter: single-storey a, open digits, round quotes */
+  text-rendering: optimizeLegibility;
   -webkit-tap-highlight-color: transparent;
 }
 

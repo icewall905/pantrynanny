@@ -17,10 +17,11 @@ import { cn } from '../lib/format'
 /* ---------- Button ---------- */
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger'
 const variants: Record<Variant, string> = {
-  primary: 'bg-leaf-600 text-white hover:bg-leaf-800 shadow-sm',
-  secondary: 'bg-surface text-ink-900 ring-1 ring-cream-200 hover:bg-cream-200',
-  ghost: 'text-ink-700 hover:bg-cream-200',
-  danger: 'bg-tomato-500 text-white hover:bg-tomato-600 shadow-sm',
+  primary:
+    'bg-leaf-600 text-white hover:bg-leaf-800 shadow-[inset_0_1px_0_rgb(255_255_255/0.18),0_8px_20px_-10px_var(--color-leaf-600)]',
+  secondary: 'bg-surface text-ink-900 ring-1 ring-cream-200 hover:bg-cream-200/70',
+  ghost: 'text-ink-700 hover:bg-cream-200/70',
+  danger: 'bg-tomato-500 text-white hover:bg-tomato-600 shadow-[inset_0_1px_0_rgb(255_255_255/0.18)]',
 }
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant
@@ -37,7 +38,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       type={type}
       disabled={disabled || loading}
       className={cn(
-        'inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+        'inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-[background-color,transform,box-shadow] duration-150 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100',
         size === 'sm' && 'min-h-9 px-3 text-sm',
         size === 'md' && 'min-h-11 px-4 text-sm',
         size === 'lg' && 'min-h-14 px-6 text-base',
@@ -77,7 +78,7 @@ export function IconButton({
 /* ---------- Card / Badge ---------- */
 export function Card({ className, children, ...rest }: React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn('rounded-[var(--radius-card)] bg-surface p-4 shadow-card sm:p-5', className)} {...rest}>
+    <div className={cn('rounded-[var(--radius-card)] bg-surface p-4 shadow-card ring-1 ring-cream-200/70 sm:p-5', className)} {...rest}>
       {children}
     </div>
   )
@@ -101,7 +102,7 @@ export function Badge({ tone = 'neutral', children, className }: { tone?: Tone; 
 
 /* ---------- Form fields ---------- */
 const inputCls =
-  'min-h-11 w-full rounded-xl border border-ink-300/60 bg-surface px-3 text-base text-ink-900 placeholder:text-ink-300 focus:border-leaf-500 disabled:bg-cream-100 sm:text-sm'
+  'min-h-11 w-full rounded-xl border border-cream-200 bg-cream-50 px-3.5 text-base text-ink-900 transition-[border-color,box-shadow,background-color] placeholder:text-ink-300 hover:border-ink-300/60 focus:border-leaf-500 focus:bg-surface focus:shadow-[0_0_0_4px_color-mix(in_oklab,var(--color-leaf-500)_18%,transparent)] focus:outline-none disabled:opacity-60 sm:text-sm'
 
 export function Field({
   label,
@@ -331,7 +332,7 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
   return (
     <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">{title}</h1>
+        <h1 className="text-2xl font-bold tracking-[-0.025em] sm:text-[2rem] sm:leading-tight">{title}</h1>
         {subtitle && <p className="mt-0.5 text-sm text-ink-500">{subtitle}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
@@ -358,7 +359,7 @@ export function Tabs<T extends string>({
           onClick={() => onChange(tb.id)}
           className={cn(
             'min-h-11 shrink-0 rounded-xl px-4 text-sm font-semibold transition-colors',
-            tb.id === value ? 'bg-night text-white' : 'text-ink-700 hover:bg-cream-200',
+            tb.id === value ? 'bg-leaf-600 text-white shadow-sm' : 'text-ink-700 hover:bg-cream-200/70',
           )}
         >
           {tb.label}
@@ -376,7 +377,7 @@ export function Chip({ active, children, onClick }: { active?: boolean; children
       onClick={onClick}
       className={cn(
         'min-h-10 rounded-full px-4 text-sm font-medium ring-1 transition-colors',
-        active ? 'bg-leaf-600 text-white ring-leaf-600' : 'bg-surface text-ink-700 ring-cream-200 hover:bg-cream-200',
+        active ? 'bg-leaf-600 text-white ring-leaf-600 shadow-sm' : 'bg-surface text-ink-700 ring-cream-200 hover:bg-cream-200/70',
       )}
     >
       {children}

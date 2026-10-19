@@ -31,12 +31,15 @@ function Stat({
   tone: string
 }) {
   return (
-    <Link to={to} className="group rounded-[var(--radius-card)] bg-surface p-4 shadow-card transition hover:-translate-y-0.5 hover:shadow-lg">
-      <div className={cn('mb-3 grid size-10 place-items-center rounded-xl', tone)}>
+    <Link
+      to={to}
+      className="group rounded-[var(--radius-card)] bg-surface p-4 shadow-card ring-1 ring-cream-200/70 transition hover:-translate-y-0.5 hover:ring-leaf-500/40"
+    >
+      <div className={cn('mb-3 grid size-9 place-items-center rounded-xl sm:mb-4 sm:size-10', tone)}>
         <Icon className="size-5" />
       </div>
-      <div className="text-3xl font-extrabold tabular-nums">{value}</div>
-      <div className="text-sm text-ink-500">{label}</div>
+      <div className="text-[1.75rem] font-semibold leading-none tracking-[-0.03em] tabular-nums sm:text-[2rem]">{value}</div>
+      <div className="mt-1.5 text-sm text-ink-500">{label}</div>
     </Link>
   )
 }
@@ -73,16 +76,19 @@ export default function DashboardPage() {
 
   return (
     <>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-[2rem] bg-gradient-to-br from-leaf-600 to-leaf-800 p-6 text-white shadow-card">
-        <div>
-          <p className="text-sm text-white/80">{t('dashboard.hello', { name: me?.user?.display_name })}</p>
-          <h1 className="text-2xl font-extrabold sm:text-3xl">
+      <div className="relative mb-6 flex flex-wrap items-center justify-between gap-4 overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-leaf-600 to-leaf-800 p-6 text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.15),0_20px_40px_-24px_var(--color-leaf-600)] sm:p-8">
+        {/* soft light blobs for depth */}
+        <div aria-hidden className="pointer-events-none absolute -right-16 -top-24 size-72 rounded-full bg-white/15 blur-3xl" />
+        <div aria-hidden className="pointer-events-none absolute -bottom-28 left-1/3 size-64 rounded-full bg-leaf-500/40 blur-3xl" />
+        <div className="relative">
+          <p className="text-sm font-medium text-white/75">{t('dashboard.hello', { name: me?.user?.display_name })}</p>
+          <h1 className="mt-1 text-2xl font-bold tracking-[-0.03em] sm:text-[2.25rem] sm:leading-tight">
             {d ? t('dashboard.inStock', { count: d.totals.products_in_stock }) : t('dashboard.title')}
           </h1>
         </div>
         <Link
           to="/scan"
-          className="inline-flex min-h-14 items-center gap-2 rounded-2xl bg-surface px-6 text-base font-bold text-leaf-700 shadow-md transition hover:scale-[1.02]"
+          className="relative inline-flex min-h-14 items-center gap-2 rounded-2xl bg-white px-6 text-base font-semibold text-leaf-800 shadow-[0_10px_30px_-12px_rgb(0_0_0/0.45)] transition hover:scale-[1.02] active:scale-[0.98]"
         >
           <ScanBarcode className="size-6" /> {t('nav.scan')}
         </Link>
@@ -116,7 +122,7 @@ export default function DashboardPage() {
                 <Link
                   key={location.id}
                   to={`/inventory?location=${location.id}`}
-                  className="rounded-[var(--radius-card)] bg-surface p-4 shadow-card transition hover:-translate-y-0.5"
+                  className="rounded-[var(--radius-card)] bg-surface p-4 shadow-card ring-1 ring-cream-200/70 transition hover:-translate-y-0.5 hover:ring-leaf-500/40"
                 >
                   <div className="truncate font-bold">{location.name}</div>
                   <div className="text-sm text-ink-500">{t('dashboard.items', { count: item_count })}</div>

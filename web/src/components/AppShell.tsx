@@ -9,7 +9,7 @@ import {
   Download,
   HelpCircle,
   Home,
-  LayoutGrid,
+  Leaf,
   MoreHorizontal,
   ScanBarcode,
   Settings,
@@ -68,8 +68,8 @@ export default function AppShell() {
 
   const linkCls = ({ isActive }: { isActive: boolean }) =>
     cn(
-      'flex min-h-12 items-center gap-3 rounded-2xl px-4 text-[15px] font-semibold transition-colors [&_svg]:size-5',
-      isActive ? 'bg-leaf-100 text-leaf-700' : 'text-ink-700 hover:bg-cream-200',
+      'flex min-h-11 items-center gap-3 rounded-xl px-3.5 text-[15px] font-medium transition-colors [&_svg]:size-5',
+      isActive ? 'bg-leaf-100 font-semibold text-leaf-700' : 'text-ink-700 hover:bg-cream-200/70 hover:text-ink-900',
     )
 
   return (
@@ -78,17 +78,17 @@ export default function AppShell() {
         {t('nav.skip')}
       </a>
       {/* Sidebar */}
-      <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col gap-1 border-r border-cream-200 bg-cream-50 p-4 lg:flex">
+      <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col gap-1 border-r border-cream-200/70 bg-cream-50 p-4 lg:flex">
         <div className="mb-4 flex items-center gap-2 px-2 pt-2">
-          <div className="grid size-10 place-items-center rounded-2xl bg-leaf-600 text-white">
-            <LayoutGrid className="size-5" />
+          <div className="grid size-10 place-items-center rounded-xl bg-gradient-to-br from-leaf-500 to-leaf-800 text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.2),0_10px_24px_-12px_var(--color-leaf-600)]">
+            <Leaf className="size-5" />
           </div>
           <div>
-            <div className="text-lg font-extrabold leading-none">PantryNanny</div>
+            <div className="text-[17px] font-bold leading-none tracking-[-0.02em]">PantryNanny</div>
             <div className="text-xs text-ink-500">{me?.household.name}</div>
           </div>
         </div>
-        <NavLink to="/scan" className="mb-2 flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-leaf-600 font-bold text-white shadow-sm hover:bg-leaf-800">
+        <NavLink to="/scan" className="mb-3 flex min-h-12 items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-leaf-500 to-leaf-800 font-semibold text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.2),0_10px_24px_-12px_var(--color-leaf-600)] transition-transform hover:brightness-110 active:scale-[0.98]">
           <ScanBarcode className="size-5" /> {t('nav.scan')}
         </NavLink>
         <nav aria-label={t('nav.main')} className="flex flex-col gap-1">
@@ -106,8 +106,13 @@ export default function AppShell() {
       </aside>
 
       {/* Top bar (phones) */}
-      <header className="sticky top-0 z-20 flex items-center justify-between bg-cream-100/90 px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur lg:hidden">
-        <span className="text-lg font-extrabold">PantryNanny</span>
+      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-cream-200/60 bg-cream-100/75 px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur-xl lg:hidden">
+        <span className="flex items-center gap-2 text-[17px] font-bold tracking-[-0.02em]">
+          <span className="grid size-8 place-items-center rounded-lg bg-gradient-to-br from-leaf-500 to-leaf-800 text-white">
+            <Leaf className="size-4" />
+          </span>
+          PantryNanny
+        </span>
         <SyncPill />
       </header>
       <div className="hidden justify-end px-8 pt-4 lg:flex" />
@@ -123,13 +128,13 @@ export default function AppShell() {
       {/* Bottom tab bar (phones/tablets) */}
       <nav
         aria-label={t('nav.main')}
-        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-cream-200 bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-cream-200/70 bg-surface/80 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden"
       >
         {primary.slice(0, 2).map((n) => (
           <Tab key={n.to} n={n} />
         ))}
         <NavLink to="/scan" aria-label={t('nav.scan')} className="relative grid place-items-center">
-          <span className="-mt-6 grid size-16 place-items-center rounded-full bg-leaf-600 text-white shadow-lg ring-4 ring-cream-100">
+          <span className="-mt-6 grid size-16 place-items-center rounded-full bg-gradient-to-br from-leaf-500 to-leaf-800 text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.2),0_10px_24px_-12px_var(--color-leaf-600)] ring-4 ring-cream-100 transition-transform active:scale-95">
             <ScanBarcode className="size-7" />
           </span>
         </NavLink>

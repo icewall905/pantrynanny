@@ -45,6 +45,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -129,6 +130,7 @@ fun ScannerScreen(vm: ScannerViewModel, snackbar: SnackbarHostState, onRegisterP
             Modifier
                 .fillMaxWidth()
                 .weight(1f)
+                .clip(RoundedCornerShape(20.dp))
                 .background(Color.Black)
         ) {
             if (granted) {
@@ -275,7 +277,7 @@ private fun ModeButton(
     Button(
         onClick = onClick,
         modifier = modifier.height(84.dp),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = if (selected) {
             ButtonDefaults.buttonColors(containerColor = color, contentColor = Color.White)
         } else {
