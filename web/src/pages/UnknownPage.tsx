@@ -19,7 +19,7 @@ async function fetchUnknown(): Promise<Product[]> {
 }
 
 function Editor({ product, onSkip, remaining }: { product: Product; onSkip: () => void; remaining: number }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const qc = useQueryClient()
   const toast = useToast()
   const cats = useCategories()
@@ -53,6 +53,7 @@ function Editor({ product, onSkip, remaining }: { product: Product; onSkip: () =
     mutationFn: async (file: File) => {
       const fd = new FormData()
       fd.append('file', file)
+      fd.append('locale', i18n.language.startsWith('en') ? 'en' : 'da')
       return post<AiIdentifySuggestion>('/ai/identify-photo', fd)
     },
     onSuccess: (s) => {
