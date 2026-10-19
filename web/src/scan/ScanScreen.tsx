@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 import { useTranslation } from 'react-i18next'
 import { get, qs } from '../api/client'
 import type { BarcodeLookupResult, HouseholdSettings, Location, Product } from '../api/types'
-import { enqueueOp, getStore, normalizeBarcode, useSyncStatus } from '../offline'
+import { enqueueOp, getStore, isBlankBarcode, normalizeBarcode, useSyncStatus } from '../offline'
 import type { FailedRecord } from '../offline'
 import { CameraError } from './camera'
 import { DEFAULT_REARM_MS } from './dedupe'
@@ -196,6 +196,11 @@ export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: 
 
   const handleScan = useCallback(
     async (ev: ScanEvent | { value: string; format: string; frameAt?: number }) => {
+      if (isBlankBarcode(ev.value)) {
+        beep('error')
+        toast(t('toast.invalidBarcode'), 'red')
+        return
+      }
       // safety: REMOVE that sat idle too long must not apply to this scan
       if (removeTimedOut(modeRef.current, lastActivity.current, Date.now(), settings?.remove_mode_timeout_min ?? 10)) {
         setMode('add')
@@ -567,8 +572,12 @@ export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: 
           className="absolute inset-x-0 bottom-0 z-40 flex gap-3 bg-ink-900 p-4 shadow-2xl"
           onSubmit={(e) => {
             e.preventDefault()
-            const v = manual.trim()
+            const v = manual
             if (!v) return
+            if (isBlankBarcode(v)) {
+              toast(t('toast.invalidBarcode'), 'red')
+              return
+            }
             setManual('')
             setManualOpen(false)
             submit({ value: v, format: 'other' })

@@ -25,17 +25,19 @@ function fakeServer() {
   const seen = new Map<string, OpResult>()
   const requests: ClientOp[][] = []
   const totals = new Map<string, number>()
-  const state = { fail500: new Set<string>(), down: false, dropAfterApply: false, unauth: false, rejectIds: new Set<string>() }
+  const state = { all500: false, dbDown: false, fail500: new Set<string>(), down: false, dropAfterApply: false, unauth: false, rejectIds: new Set<string>() }
   const P = product('p1', '05701234567899')
   const handler = async (url: string, init?: RequestInit) => {
     if (state.down) throw new TypeError('Failed to fetch')
     if (state.unauth) return new Response('{"detail":"no"}', { status: 401, headers: { 'content-type': 'application/json' } })
     const json = (b: unknown, status = 200) =>
       new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } })
+    if (url.endsWith('/api/health'))
+      return state.dbDown ? json({ status: 'error', db: 'down' }, 503) : json({ status: 'ok', db: 'ok' })
     if (url.endsWith('/api/sync/ops')) {
       const body = JSON.parse(String(init!.body)) as { ops: ClientOp[] }
       requests.push(body.ops)
-      if (body.ops.some((o) => state.fail500.has(o.client_op_id))) return json({ detail: 'boom' }, 500)
+      if (state.all500 || body.ops.some((o) => state.fail500.has(o.client_op_id))) return json({ detail: 'boom' }, 500)
       const results: OpResult[] = body.ops.map((op) => {
         const prev = seen.get(op.client_op_id)
         if (prev) return { ...prev, status: 'duplicate' }
@@ -359,5 +361,34 @@ describe('HTTP 500 handling', () => {
     srv.state.rejectIds.add(bad.client_op_id)
     await s.syncNow()
     expect((await s.getFailedOps())[0].error_code).toBe('invalid_quantity')
+  })
+
+  it('a long server-wide 500 outage (DB down) parks nothing', async () => {
+    const s = mk()
+    const a = await add(s)
+    const b = await add(s)
+    srv.state.all500 = true
+    srv.state.dbDown = true
+    for (let i = 0; i < 60; i++) await s.syncNow() // ~ a 15 minute outage worth of retries
+    expect((await s.getFailedOps()).length).toBe(0)
+    expect((await s.getPending()).length).toBe(2)
+    srv.state.all500 = false
+    srv.state.dbDown = false
+    await s.syncNow()
+    expect(srv.seen.has(a.client_op_id) && srv.seen.has(b.client_op_id)).toBe(true)
+  })
+
+  it('500s that stop being counted when the outage turns into network errors / 503', async () => {
+    const s = mk()
+    const bad = await add(s)
+    srv.state.fail500.add(bad.client_op_id)
+    for (let i = 0; i < 3; i++) await s.syncNow() // 3 healthy-server 500s
+    srv.state.down = true
+    await s.syncNow() // network failure resets the history
+    srv.state.down = false
+    for (let i = 0; i < 4; i++) await s.syncNow() // only 4 more: still below 5
+    expect((await s.getFailedOps()).length).toBe(0)
+    await s.syncNow()
+    expect((await s.getFailedOps()).length).toBe(1)
   })
 })

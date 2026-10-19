@@ -6,7 +6,7 @@ import type { SyncStatus } from './types'
 
 export type { NewOp, SyncStatus }
 export { OfflineStore } from './store'
-export { normalizeBarcode, gtinChecksumValid } from './normalize'
+export { normalizeBarcode, gtinChecksumValid, isBlankBarcode, stripBarcode, EmptyBarcodeError } from './normalize'
 export type * from './types'
 
 let _store: OfflineStore | null = null

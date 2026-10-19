@@ -573,7 +573,12 @@ export class OfflineStore {
             continue
           }
           if (e instanceof ApiError && e.status === 500) {
-            // A poison op must never block the queue forever. 502/503/504/network stay retry-forever.
+            // A poison op must never block the queue forever, but a server-wide outage must not
+            // park healthy ops: only count a 500 while GET /health says the server (incl. DB) is up.
+            if (!(await this.serverHealthy())) {
+              await this.resetFailCounters(batch)
+              throw e
+            }
             if (batch.length > 1) {
               if (++this.batch500 >= BATCH_500_SPLIT) {
                 size = 1
@@ -588,9 +593,11 @@ export class OfflineStore {
               this.batch500 = 0
               continue
             }
-            await db.put('pendingOps', { ...rec, fails500: n })
+            await db.put('pendingOps', { ...rec, sent: true, fails500: n })
             throw e
           }
+          // network / 502-504 / 503 / anything else: the server was not healthy, forget 500 history
+          await this.resetFailCounters(batch)
           throw e
         }
         this.batch500 = 0
@@ -622,6 +629,21 @@ export class OfflineStore {
         this.emitData()
       }
     }
+  }
+
+  private async serverHealthy(): Promise<boolean> {
+    try {
+      const h = await get<{ db?: string }>('/health', { timeoutMs: 5000, silent401: true })
+      return h?.db === 'ok'
+    } catch {
+      return false
+    }
+  }
+
+  private async resetFailCounters(batch: PendingRecord[]) {
+    this.batch500 = 0
+    const db = await this.db()
+    for (const r of batch) if (r.fails500) await db.put('pendingOps', { ...r, sent: true, fails500: 0 })
   }
 
   private async fail(rec: PendingRecord, error: string, error_code: string | null = null) {

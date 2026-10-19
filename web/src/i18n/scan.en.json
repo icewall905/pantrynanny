@@ -43,7 +43,8 @@
     "undone": "Undone: {{name}}",
     "undoNothing": "Nothing to undo",
     "saveFailed": "COULD NOT SAVE scan ({{code}}) – scan again",
-    "notSaved": "Not saved – scan again"
+    "notSaved": "Not saved – scan again",
+    "invalidBarcode": "Invalid barcode"
   },
   "undo": "Undo",
   "history": {

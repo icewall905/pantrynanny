@@ -50,15 +50,43 @@ function expandUpcE(six: string, ns: string): string {
   return body + gs1CheckDigit(body)
 }
 
+/**
+ * Characters stripped from BOTH ENDS of a scanned value (must equal the backend rule exactly):
+ * ASCII whitespace (U+0009-000D, U+0020), U+001C-001F (file/group/record/unit separators, incl. the
+ * GS1 group separator U+001D), U+0085, U+00A0 and U+FEFF. Deliberately not JS trim()/\s.
+ */
+function isStripChar(c: number): boolean {
+  return (c >= 0x09 && c <= 0x0d) || c === 0x20 || (c >= 0x1c && c <= 0x1f) || c === 0x85 || c === 0xa0 || c === 0xfeff
+}
+
+export function stripBarcode(raw: string): string {
+  let a = 0
+  let b = raw.length
+  while (a < b && isStripChar(raw.charCodeAt(a))) a++
+  while (b > a && isStripChar(raw.charCodeAt(b - 1))) b--
+  return raw.slice(a, b)
+}
+
+/** True when nothing is left after stripping: such a value is invalid and must not be enqueued. */
+export const isBlankBarcode = (raw: string): boolean => stripBarcode(raw) === ''
+
+export class EmptyBarcodeError extends Error {
+  constructor() {
+    super('empty barcode')
+  }
+}
+
 /** Exact port of backend/pantrynanny/services/barcodes.py `normalize` (keep in parity). */
 export function normalizeBarcode(raw: string, symbologyHint?: string | null): NormalizedBarcode {
-  const stripped = raw.trim()
+  const stripped = stripBarcode(raw)
+  if (!stripped) throw new EmptyBarcodeError()
   const hint = symbologyHint && SYMBOLOGIES.has(symbologyHint) ? symbologyHint : null
   const local = (): NormalizedBarcode => ({ code: `local:${stripped}`, symbology: hint ?? 'other', valid: false })
   if (hint && NON_GTIN.has(hint)) return local()
 
-  const digits = stripped.replace(/\s+/g, '')
-  if (!/^\d+$/.test(digits)) return local()
+  // inner ASCII whitespace is dropped; digits must be ASCII [0-9] (no fullwidth / superscript digits)
+  const digits = stripped.replace(/[\t\n\v\f\r ]+/g, '')
+  if (!/^[0-9]+$/.test(digits)) return local()
 
   const n = digits.length
   if (n === 6 || (n === 8 && hint === 'upc_e')) {
@@ -75,6 +103,6 @@ export function normalizeBarcode(raw: string, symbologyHint?: string | null): No
   const kinds: Record<number, string> = { 8: 'ean_8', 12: 'upc_a', 13: 'ean_13', 14: 'itf' }
   if (!(n in kinds) || !gtinChecksumValid(digits)) return local()
 
-  if (n === 13 && /^2\d/.test(digits)) return { code: `instore:${digits.slice(0, 7)}`, symbology: 'ean_13', valid: true }
+  if (n === 13 && /^2[0-9]/.test(digits)) return { code: `instore:${digits.slice(0, 7)}`, symbology: 'ean_13', valid: true }
   return { code: digits.padStart(14, '0'), symbology: kinds[n], valid: true }
 }

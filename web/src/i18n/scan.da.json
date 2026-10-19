@@ -43,7 +43,8 @@
     "undone": "Fortrudt: {{name}}",
     "undoNothing": "Intet at fortryde",
     "saveFailed": "KUNNE IKKE GEMME scanning ({{code}}) – scan igen",
-    "notSaved": "Ikke gemt – scan igen"
+    "notSaved": "Ikke gemt – scan igen",
+    "invalidBarcode": "Ugyldig stregkode"
   },
   "undo": "Fortryd",
   "history": {
