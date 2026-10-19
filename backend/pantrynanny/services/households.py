@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..errors import AppError
 from ..models import Category, Household, HouseholdSettings, Location, User
-from ..security import hash_password
+from ..security import ahash_password
 
 DEFAULT_LOCATIONS = [
     ("Køleskab", "refrigerator", False),
@@ -78,7 +78,7 @@ async def create_user(
         username=username,
         display_name=display_name.strip(),
         role=role,
-        password_hash=hash_password(password),
+        password_hash=await ahash_password(password),
     )
     session.add(user)
     await session.flush()

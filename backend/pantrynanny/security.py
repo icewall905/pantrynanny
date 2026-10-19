@@ -12,6 +12,7 @@ from datetime import UTC, datetime, timedelta
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
 from fastapi import Depends, Request
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -47,6 +48,15 @@ def verify_password(password_hash: str | None, password: str) -> bool:
         return _hasher.verify(password_hash or _DUMMY_HASH, password) and password_hash is not None
     except (VerificationError, InvalidHashError):
         return False
+
+
+async def averify_password(password_hash: str | None, password: str) -> bool:
+    """Argon2 is CPU/memory heavy: keep it off the event loop."""
+    return await run_in_threadpool(verify_password, password_hash, password)
+
+
+async def ahash_password(password: str) -> str:
+    return await run_in_threadpool(hash_password, password)
 
 
 def new_token() -> str:
@@ -96,6 +106,19 @@ class RateLimiter:
             err = AppError(429, "rate_limited", "Too many attempts, try again later")
             err.headers = {"Retry-After": str(retry)}  # type: ignore[attr-defined]
             raise err
+
+    def acquire(self, key: str) -> None:
+        """Atomically check and record an attempt (no await between the two), so a burst of
+        concurrent requests cannot all slip under the limit. Call ``release`` on success."""
+        self.check(key)
+        self.fail(key)
+
+    def release(self, key: str) -> None:
+        q = self._hits.get(key)
+        if q:
+            q.pop()
+            if not q:
+                self._hits.pop(key, None)
 
     def fail(self, key: str) -> None:
         self._prune(key)

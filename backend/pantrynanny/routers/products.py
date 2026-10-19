@@ -69,6 +69,7 @@ async def by_barcode(
     sm: async_sessionmaker[AsyncSession] = Depends(get_sessionmaker),
 ):
     """Resolve a scanned code to a product. Never changes stock."""
+    svc.normalize_input(raw, symbology)  # 422 for blank / oversized codes
     status, product, source, nb = await svc.resolve_barcode(
         session,
         sm,

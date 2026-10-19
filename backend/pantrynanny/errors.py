@@ -2,10 +2,15 @@
 
 from typing import Any
 
+import asyncpg
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import DBAPIError, InterfaceError
+from sqlalchemy.exc import TimeoutError as SQLTimeoutError
 from starlette.exceptions import HTTPException as StarletteHTTPException
+
+from .logging import get_logger
 
 
 class AppError(Exception):
@@ -49,6 +54,32 @@ _STATUS_CODES = {
 }
 
 
+_DB_DOWN_SQLSTATES = (
+    "08",
+    "57P0",
+)  # connection exceptions; admin/crash shutdown, cannot connect now
+
+
+def is_db_unavailable(exc: BaseException) -> bool:
+    """True for failures that mean "the database cannot be reached right now" (restart, network,
+    pool exhaustion) as opposed to a bug or a constraint violation."""
+    seen: set[int] = set()
+    cur: BaseException | None = exc
+    while cur is not None and id(cur) not in seen:
+        seen.add(id(cur))
+        if isinstance(cur, OSError | SQLTimeoutError | asyncpg.PostgresConnectionError):
+            return True
+        if isinstance(cur, DBAPIError) and (
+            cur.connection_invalidated or isinstance(cur, InterfaceError)
+        ):
+            return True
+        state = getattr(cur, "sqlstate", None)
+        if isinstance(state, str) and state.startswith(_DB_DOWN_SQLSTATES):
+            return True
+        cur = cur.__cause__ or getattr(cur, "orig", None) or cur.__context__
+    return False
+
+
 def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def _app_error(_: Request, exc: AppError):
@@ -64,6 +95,20 @@ def install_error_handlers(app: FastAPI) -> None:
         return JSONResponse(
             _body(str(exc.detail), code), status_code=exc.status_code, headers=exc.headers
         )
+
+    @app.exception_handler(Exception)
+    async def _unhandled(request: Request, exc: Exception):
+        if is_db_unavailable(exc):
+            # Clients treat 503 as "retry later" (e.g. while PostgreSQL restarts).
+            get_logger().warning("db_unavailable", path=request.url.path, error=type(exc).__name__)
+            return JSONResponse(
+                _body("Database temporarily unavailable", "db_unavailable"),
+                status_code=503,
+                headers={"Retry-After": "5"},
+            )
+        # Never leak internals; the traceback goes to the structured log only.
+        get_logger().error("unhandled_exception", path=request.url.path, exc_info=exc)
+        return JSONResponse(_body("internal error", "internal"), status_code=500)
 
     @app.exception_handler(RequestValidationError)
     async def _validation_error(_: Request, exc: RequestValidationError):

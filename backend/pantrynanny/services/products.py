@@ -37,11 +37,12 @@ from ..models import (
     StockTransaction,
 )
 from ..schemas.catalogue import BarcodeOut, ProductCreate, ProductOut, ProductPatch
-from .barcodes import NormalizedBarcode, normalize
+from .barcodes import NormalizedBarcode, normalize, strip_barcode
 from .lookup import ProductData, enqueue_enrichment, lookup_external, new_product_from_data
 
 log = get_logger()
 
+MAX_BARCODE_LEN = 200
 UNITS = {"pcs", "pkg", "g", "kg", "ml", "cl", "dl", "l"}
 PATCH_COLUMNS = (
     "name",
@@ -59,6 +60,16 @@ PATCH_COLUMNS = (
     "countries",
 )
 NOT_NULLABLE = {"name", "stock_unit", "allergens", "countries"}
+
+
+def normalize_input(raw: str, symbology: str | None = None) -> NormalizedBarcode:
+    """normalize() for user-supplied codes: blank / oversized values are a 422, never a 500."""
+    cleaned = strip_barcode(raw or "")
+    if not cleaned:
+        raise AppError(422, "invalid_barcode", "Barcode must not be blank")
+    if len(cleaned) > MAX_BARCODE_LEN:
+        raise AppError(422, "invalid_barcode", f"Barcode longer than {MAX_BARCODE_LEN} characters")
+    return normalize(raw, symbology)
 
 
 def product_out(p: Product) -> ProductOut:
@@ -214,7 +225,7 @@ def search_score(q: str) -> tuple[ColumnElement, ColumnElement] | None:
             _text_score(_nx(func.coalesce(Category.name, "")), tq, 0.4),
             func.coalesce(alias_score, 0.0),
         ]
-        if tok.isdigit() and len(tok) >= 3:
+        if tok.isascii() and tok.isdigit() and len(tok) >= 3:
             code_hit = exists().where(
                 ProductBarcode.product_id == Product.id,
                 or_(
@@ -255,9 +266,11 @@ async def list_products(
     scored = search_score(q) if q else None
     if scored:
         score, matches = scored
-        stmt = stmt.where(matches).order_by(score.desc(), func.lower(Product.name))
+        stmt = stmt.where(matches).order_by(
+            score.desc(), func.lower(Product.name), Product.created_at, Product.id
+        )
     else:
-        stmt = stmt.order_by(func.lower(Product.name), Product.id)
+        stmt = stmt.order_by(func.lower(Product.name), Product.created_at, Product.id)
     stmt = stmt.limit(limit).offset(offset)
     return list((await session.execute(stmt)).scalars().all())
 
@@ -325,7 +338,7 @@ async def resolve_barcode(
     timeout_s: float,
 ) -> tuple[str, Product | None, str | None, NormalizedBarcode]:
     """Backs ``GET /products/by-barcode``. Never touches stock."""
-    nb = normalize(raw, symbology)
+    nb = normalize_input(raw, symbology)
     p = await find_by_code(session, household_id, nb.code)
     if p:
         return "found", p, p.source, nb
@@ -377,7 +390,7 @@ async def create_product(
     await _assert_refs(session, household_id, body.category_id, body.default_location_id)
     norm: dict[str, NormalizedBarcode] = {}
     for raw in body.barcodes:
-        nb = normalize(raw, body.symbology if len(body.barcodes) == 1 else None)
+        nb = normalize_input(raw, body.symbology if len(body.barcodes) == 1 else None)
         norm.setdefault(nb.code, nb)
     for nb in norm.values():
         existing = await find_by_code(session, household_id, nb.code)
@@ -440,23 +453,35 @@ async def patch_product(
             patch.default_location_id if "default_location_id" in sent else None,
         )
     locked = set(p.locked_fields or [])
+    changed: set[str] = set()
     for field in PATCH_COLUMNS:
-        if field in sent:
+        # The web client submits whole forms: only fields whose value really changed are
+        # written and locked against provider refreshes.
+        if field in sent and getattr(p, field) != getattr(patch, field):
             setattr(p, field, getattr(patch, field))
             locked.add(field)
+            changed.add(field)
     if "aliases" in sent and patch.aliases is not None:
         wanted = _clean_aliases(patch.aliases, p.name)
-        keep = {a.alias.lower(): a for a in p.aliases}
-        p.aliases = [a for a in p.aliases if a.alias.lower() in {w.lower() for w in wanted}]
-        for w in wanted:
-            if w.lower() not in keep:
-                p.aliases.append(ProductAlias(household_id=household_id, alias=w))
-    if "status" in sent and patch.status is not None:
+        have = {a.alias.lower() for a in p.aliases}
+        if have != {w.lower() for w in wanted}:
+            keep = {a.alias.lower(): a for a in p.aliases}
+            p.aliases = [a for a in p.aliases if a.alias.lower() in {w.lower() for w in wanted}]
+            for w in wanted:
+                if w.lower() not in keep:
+                    p.aliases.append(ProductAlias(household_id=household_id, alias=w))
+            changed.add("aliases")
+    if "status" in sent and patch.status is not None and patch.status != p.status:
         p.status = patch.status
-    elif p.status == "unknown" and "name" in sent:
+        changed.add("status")
+    elif p.status == "unknown" and "name" in changed:
         p.status = "known"
+        changed.add("status")
     if p.status == "known" and p.source == "placeholder":
         p.source = "user"
+        changed.add("source")
+    if not changed:
+        return p  # no-op edit: no version bump, nothing locked
     p.locked_fields = sorted(locked)
     p.version += 1
     await session.flush()
@@ -471,7 +496,7 @@ async def add_barcode(
     symbology: str | None,
 ) -> Product:
     p = await get_product(session, household_id, product_id, for_update=True)
-    nb = normalize(raw, symbology)
+    nb = normalize_input(raw, symbology)
     existing = await find_by_code(session, household_id, nb.code)
     if existing and existing.id == p.id:
         return p

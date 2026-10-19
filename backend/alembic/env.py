@@ -19,7 +19,7 @@ def _url() -> str:
 def include_object(obj, name, type_, reflected, compare_to):
     # Expression/trigram indexes are created with raw SQL in the migration only.
     if type_ == "index" and reflected and compare_to is None:
-        return not (name.endswith(("_trgm", "_pattern")))
+        return not (name.endswith(("_trgm", "_pattern", "_change_xid", "_change_seq")))
     return True
 
 

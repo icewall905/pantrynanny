@@ -5,6 +5,9 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, PlainSerializer
 
+# Largest magnitude accepted in a single operation / shopping quantity.
+MAX_OP_QTY = 1_000_000
+
 # Quantities are stored NUMERIC(12,3) and serialised as plain JSON numbers.
 Qty = Annotated[Decimal, PlainSerializer(float, return_type=float, when_used="json")]
 

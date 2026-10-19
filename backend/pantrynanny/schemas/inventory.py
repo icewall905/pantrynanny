@@ -2,8 +2,9 @@ from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
+from ..services.barcodes import strip_barcode
 from .catalogue import ProductOut
 from .common import ORM, Qty, Symbology, TxnType
 
@@ -57,16 +58,23 @@ class InventoryDetailOut(InventoryItemOut):
 class SyncOp(BaseModel):
     client_op_id: UUID
     type: TxnType
-    barcode: str | None = Field(default=None, min_length=1, max_length=200)
+    barcode: str | None = None
     symbology: Symbology | None = None
     product_id: UUID | None = None
-    quantity: Qty | None = Field(default=None, ge=-(10**9), le=10**9)
+    # Range/precision are checked per op in apply_op so one bad op cannot 422 the whole batch.
+    quantity: Qty | None = Field(default=None, allow_inf_nan=False)
     location_id: UUID | None = None
     to_location_id: UUID | None = None
     expires_at: date | None = None
     undoes_client_op_id: UUID | None = None
     occurred_at: datetime | None = None
     reason: str | None = Field(default=None, max_length=500)
+
+    @field_validator("barcode")
+    @classmethod
+    def _strip_barcode(cls, v: str | None) -> str | None:
+        # Whitespace-only becomes None; apply_op then rejects it as missing_target.
+        return (strip_barcode(v) or None) if v is not None else None
 
 
 class SyncOpsIn(BaseModel):

@@ -1,6 +1,6 @@
 import pytest
 
-from pantrynanny.services.barcodes import expand_upc_e, gtin_check_digit, normalize
+from pantrynanny.services.barcodes import STRIP_CHARS, expand_upc_e, gtin_check_digit, normalize
 
 
 def test_ean13_valid():
@@ -120,3 +120,65 @@ def test_wrong_length_is_local():
 def test_empty_rejected():
     with pytest.raises(ValueError):
         normalize("   ")
+
+
+# Parity vectors for the web port (same rule: strip STRIP_CHARS at both ends, ASCII digits only).
+@pytest.mark.parametrize(
+    ("raw", "code"),
+    [
+        ("5701234567899", "05701234567899"),
+        ("\t5701234567899\r\n", "05701234567899"),
+        ("\x1d5701234567899\x1d", "05701234567899"),  # GS1 group separator
+        ("\x1c\x1e\x1f5701234567899", "05701234567899"),
+        ("\x855701234567899\xa0", "05701234567899"),  # NEL, NBSP
+        ("﻿5701234567899", "05701234567899"),  # BOM
+        ("\x0b\x0c 5701234567899 ", "05701234567899"),
+        ("5 701234 567899", "05701234567899"),  # inner ASCII whitespace ignored
+    ],
+)
+def test_strip_parity_vectors(raw, code):
+    n = normalize(raw)
+    assert n.code == code and n.valid and n.raw == raw.strip(STRIP_CHARS)
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "570123456789²",  # superscript two: str.isdigit() is True, must not crash
+        "٥٧٠١234567899",  # Arabic-Indic digits
+        "5701234567899​",  # zero-width space is NOT stripped
+        "57\xa001234567899",  # inner NBSP is not ignorable
+        "57\x1d01234567899",  # inner separators are not ignorable
+        "５701234567899",  # full-width digit
+    ],
+)
+def test_non_ascii_digits_are_local_not_errors(raw):
+    n = normalize(raw)
+    assert not n.valid and n.code == f"local:{raw.strip(STRIP_CHARS)}"
+
+
+@pytest.mark.parametrize("raw", ["", "  ", "\t\n", "\x1d\x1c", "\xa0﻿\x85"])
+def test_blank_after_strip_rejected(raw):
+    with pytest.raises(ValueError):
+        normalize(raw)
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected_code"),
+    [
+        # coordinator's cross-implementation vectors, with the valid check digit (9). The
+        # "...892" spelling has a bad checksum and therefore parity-maps to local:<stripped>.
+        ("5701234567899\x1d", "05701234567899"),
+        ("\x1d5701234567899", "05701234567899"),
+        ("﻿5701234567899", "05701234567899"),
+        (" 5701234567899\u0085", "05701234567899"),
+        ("570 1234 567899", "05701234567899"),
+        ("​5701234567899", "local:​5701234567899"),
+        ("570123456789²", "local:570123456789²"),
+        ("5701234567892\x1d", "local:5701234567892"),
+        ("５７０１２３４５６７８９９", "local:５７０１２３４５６７８９９"),
+        ("٥٧٠١٢٣٤٥٦٧٨٩٩", "local:٥٧٠١٢٣٤٥٦٧٨٩٩"),
+    ],
+)
+def test_cross_implementation_vectors(raw, expected_code):
+    assert normalize(raw).code == expected_code

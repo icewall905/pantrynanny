@@ -3,6 +3,7 @@
 from functools import lru_cache
 from urllib.parse import urlparse
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -44,6 +45,13 @@ class Settings(BaseSettings):
     # Request body limits (bytes).
     max_json_body: int = 2 * 1024 * 1024
     max_upload_body: int = 10 * 1024 * 1024
+
+    @field_validator("cors_origins")
+    @classmethod
+    def _no_wildcard_cors(cls, v: str) -> str:
+        if "*" in v:
+            raise ValueError("PN_CORS_ORIGINS must list explicit origins; '*' is not allowed")
+        return v
 
     @property
     def cors_origin_list(self) -> list[str]:

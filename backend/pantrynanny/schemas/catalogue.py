@@ -1,10 +1,25 @@
+import json
 from datetime import datetime
-from typing import Any
+from typing import Annotated, Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import AfterValidator, BaseModel, Field, StringConstraints
 
 from .common import ORM, ProductStatus, Qty, Symbology, Unit
+
+
+def _check_nutrition(v: dict[str, Any] | None) -> dict[str, Any] | None:
+    if v is not None:
+        if len(v) > 100:
+            raise ValueError("nutrition has too many entries")
+        if len(json.dumps(v, default=str)) > 8000:
+            raise ValueError("nutrition is too large")
+    return v
+
+
+ShortText = Annotated[str, StringConstraints(max_length=100)]
+AliasText = Annotated[str, StringConstraints(max_length=200)]
+Nutrition = Annotated[dict[str, Any], AfterValidator(_check_nutrition)]
 
 
 class LocationOut(ORM):
@@ -100,11 +115,11 @@ class ProductFields(BaseModel):
     stock_unit: Unit = "pcs"
     min_stock: Qty | None = Field(default=None, ge=0, lt=10**9)
     ingredients: str | None = Field(default=None, max_length=8000)
-    allergens: list[str] = Field(default_factory=list, max_length=50)
-    nutrition: dict[str, Any] | None = None
+    allergens: list[ShortText] = Field(default_factory=list, max_length=50)
+    nutrition: Nutrition | None = None
     description: str | None = Field(default=None, max_length=4000)
-    countries: list[str] = Field(default_factory=list, max_length=50)
-    aliases: list[str] = Field(default_factory=list, max_length=50)
+    countries: list[ShortText] = Field(default_factory=list, max_length=50)
+    aliases: list[AliasText] = Field(default_factory=list, max_length=50)
     status: ProductStatus = "known"
 
 
@@ -125,11 +140,11 @@ class ProductPatch(BaseModel):
     stock_unit: Unit | None = None
     min_stock: Qty | None = Field(default=None, ge=0, lt=10**9)
     ingredients: str | None = Field(default=None, max_length=8000)
-    allergens: list[str] | None = Field(default=None, max_length=50)
-    nutrition: dict[str, Any] | None = None
+    allergens: list[ShortText] | None = Field(default=None, max_length=50)
+    nutrition: Nutrition | None = None
     description: str | None = Field(default=None, max_length=4000)
-    countries: list[str] | None = Field(default=None, max_length=50)
-    aliases: list[str] | None = Field(default=None, max_length=50)
+    countries: list[ShortText] | None = Field(default=None, max_length=50)
+    aliases: list[AliasText] | None = Field(default=None, max_length=50)
     status: ProductStatus | None = None
 
 

@@ -64,7 +64,7 @@ async def test_snapshot_and_changes_cursor(env):
 
     # nothing changed beyond the safety window re-read; replaying is harmless but ordered
     r = (await client.get("/api/sync/changes", params={"since": cursor}, headers=env.member)).json()
-    assert r["full_resync_required"] is False and r["cursor"] == cursor
+    assert r["full_resync_required"] is False and int(r["cursor"]) >= int(cursor)
 
     # a new change appears after the cursor and advances it
     other = await env.product("Smør")
@@ -72,7 +72,7 @@ async def test_snapshot_and_changes_cursor(env):
     ch = (
         await client.get("/api/sync/changes", params={"since": cursor}, headers=env.member)
     ).json()
-    assert int(ch["cursor"]) > int(cursor)
+    assert int(ch["cursor"]) >= int(cursor)
     pids = {x["id"] for x in ch["products"]}
     assert other["id"] in pids
     inv = {x["product_id"]: x["total_quantity"] for x in ch["inventory"]}

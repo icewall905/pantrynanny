@@ -10,9 +10,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..errors import AppError, conflict, not_found
 from ..models import Product, ShoppingItem
+from ..schemas.common import MAX_OP_QTY
 from ..schemas.shopping import ShoppingCreate, ShoppingPatch
 from .inventory import StockView, list_inventory
-from .products import get_product
+from .products import _assert_refs, get_product
+
+MAX_ITEM_QTY = Decimal(MAX_OP_QTY)
 
 
 def _open_item_stmt(household_id: uuid.UUID, product_id: uuid.UUID):
@@ -58,6 +61,7 @@ async def add_item(
 ) -> tuple[ShoppingItem, bool]:
     """Create an item, or merge quantity into the existing open item for the same product."""
     product: Product | None = None
+    await _assert_refs(session, household_id, body.category_id, None)
     if body.product_id:
         product = await get_product(session, household_id, body.product_id)
     elif not body.name:
@@ -74,7 +78,7 @@ async def add_item(
         ).scalar_one_or_none()
         if existing is None:
             return None
-        existing.quantity = existing.quantity + body.quantity
+        existing.quantity = min(existing.quantity + body.quantity, MAX_ITEM_QTY)
         existing.version += 1
         existing.updated_at = datetime.now(UTC)
         if body.note:
@@ -130,6 +134,8 @@ async def patch_item(
         )
     if "name" in sent and body.name is None:
         raise AppError(422, "validation_error", "name cannot be null")
+    if "category_id" in sent:
+        await _assert_refs(session, household_id, body.category_id, None)
     product_id, my_quantity = item.product_id, item.quantity
     try:
         # Mutate inside the savepoint: begin_nested() flushes pending state first, so a
@@ -155,7 +161,7 @@ async def patch_item(
                 .execution_options(populate_existing=True)
             )
         ).scalar_one()
-        other.quantity = other.quantity + (my_quantity or Decimal(0))
+        other.quantity = min(other.quantity + (my_quantity or Decimal(0)), MAX_ITEM_QTY)
         other.version += 1
         other.updated_at = datetime.now(UTC)
         mine = await get_item(session, household_id, item_id, lock=True)

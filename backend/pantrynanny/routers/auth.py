@@ -17,6 +17,7 @@ from ..security import (
     TTL_KIOSK,
     Principal,
     RateLimiter,
+    averify_password,
     client_ip,
     create_session,
     get_principal,
@@ -24,7 +25,6 @@ from ..security import (
     kiosk_limiter,
     login_limiter,
     now,
-    verify_password,
 )
 from ..services.households import get_household_settings
 
@@ -48,18 +48,22 @@ async def _authenticate(
     session: AsyncSession, request: Request, username: str, password: str
 ) -> User:
     key = f"{client_ip(request)}|{username.strip().lower()}"
-    ip_limiter.check(client_ip(request))
-    login_limiter.check(key)
+    ip = client_ip(request)
+    ip_limiter.acquire(ip)
+    try:
+        login_limiter.acquire(key)
+    except AppError:
+        ip_limiter.release(ip)
+        raise
     user = (
         await session.execute(select(User).where(User.username == username.strip().lower()))
     ).scalar_one_or_none()
-    ok = verify_password(user.password_hash if user else None, password)
+    ok = await averify_password(user.password_hash if user else None, password)
     if not ok or user is None or not user.is_active or user.deleted_at is not None:
-        login_limiter.fail(key)
-        ip_limiter.fail(client_ip(request))
         log.info("login_failed", ip=client_ip(request))
         raise AppError(401, "invalid_credentials", "Wrong username or password")
     login_limiter.reset(key)
+    ip_limiter.release(ip)
     return user
 
 
@@ -125,7 +129,7 @@ async def kiosk_login(
     session: AsyncSession = Depends(get_session),
 ):
     ip = client_ip(request)
-    kiosk_limiter.check(ip)
+    kiosk_limiter.acquire(ip)
     code = (
         await session.execute(
             select(KioskCode)
@@ -138,8 +142,8 @@ async def kiosk_login(
         )
     ).scalar_one_or_none()
     if code is None:
-        kiosk_limiter.fail(ip)
         raise AppError(401, "invalid_code", "Invalid or expired pairing code")
+    kiosk_limiter.release(ip)
     code.used_at = now()
     token = await create_session(
         session,

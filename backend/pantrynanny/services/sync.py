@@ -9,11 +9,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..models import Category, Location, Product, StockBatch
 from .inventory import StockView, batches_for, build_view
 
-# change_seq values are drawn when a row is written, but rows become visible at commit. A
-# transaction that drew a lower number may commit after a reader already advanced past it, so
-# `changes` re-reads a small window below the client's cursor. Clients upsert, so replays are
-# harmless.
-SAFETY_WINDOW = 200
+# Cursor design. change_seq values are drawn when a row is written but become visible only at
+# commit, so "everything above the highest seq I saw" can skip a slow writer. Instead each row is
+# stamped (trigger) with the id of the writing transaction, and the cursor is the oldest
+# transaction id that was still in progress when the previous pull took its snapshot
+# (pg_snapshot_xmin). Every transaction below that id had finished, so all of its rows were
+# visible to that pull; the next pull returns all rows with change_xid >= cursor. Rows may be
+# delivered more than once (clients upsert) but never skipped.
 
 
 @dataclass(slots=True)
@@ -26,13 +28,21 @@ class Changes:
     full_resync_required: bool = False
 
 
-async def current_cursor(session: AsyncSession) -> int:
-    row = (await session.execute(text("SELECT last_value, is_called FROM change_seq_seq"))).one()
-    return int(row.last_value) if row.is_called else 0
+async def current_cursor(session: AsyncSession) -> tuple[int, int]:
+    """(xmin, xmax) of a fresh snapshot: the cursor to hand out and the next unused xid."""
+    row = (
+        await session.execute(
+            text(
+                "SELECT pg_snapshot_xmin(pg_current_snapshot())::text::bigint AS lo, "
+                "pg_snapshot_xmax(pg_current_snapshot())::text::bigint AS hi"
+            )
+        )
+    ).one()
+    return int(row.lo), int(row.hi)
 
 
 async def snapshot(session: AsyncSession, household_id: uuid.UUID) -> Changes:
-    cursor = await current_cursor(session)
+    cursor, _ = await current_cursor(session)
     products = list(
         (
             await session.execute(
@@ -72,21 +82,21 @@ async def snapshot(session: AsyncSession, household_id: uuid.UUID) -> Changes:
 
 
 async def changes_since(session: AsyncSession, household_id: uuid.UUID, since: str) -> Changes:
-    cursor = await current_cursor(session)
+    cursor, xmax = await current_cursor(session)
     try:
         since_n = int(since)
     except ValueError:
         return Changes(str(cursor), full_resync_required=True)
-    if since_n < 0 or since_n > cursor:
+    if since_n < 0 or since_n > xmax:
         # Cursor from the future: the database was restored/reset. Client must start over.
         return Changes(str(cursor), full_resync_required=True)
-    floor = max(0, since_n - SAFETY_WINDOW)
+    floor = since_n
 
     products = list(
         (
             await session.execute(
                 select(Product)
-                .where(Product.household_id == household_id, Product.change_seq > floor)
+                .where(Product.household_id == household_id, Product.change_xid >= floor)
                 .order_by(Product.change_seq)
             )
         )
@@ -97,7 +107,7 @@ async def changes_since(session: AsyncSession, household_id: uuid.UUID, since: s
         (
             await session.execute(
                 select(StockBatch.product_id).where(
-                    StockBatch.household_id == household_id, StockBatch.change_seq > floor
+                    StockBatch.household_id == household_id, StockBatch.change_xid >= floor
                 )
             )
         )
@@ -115,7 +125,7 @@ async def changes_since(session: AsyncSession, household_id: uuid.UUID, since: s
         (
             await session.execute(
                 select(Location).where(
-                    Location.household_id == household_id, Location.change_seq > floor
+                    Location.household_id == household_id, Location.change_xid >= floor
                 )
             )
         )
@@ -126,7 +136,7 @@ async def changes_since(session: AsyncSession, household_id: uuid.UUID, since: s
         (
             await session.execute(
                 select(Category).where(
-                    Category.household_id == household_id, Category.change_seq > floor
+                    Category.household_id == household_id, Category.change_xid >= floor
                 )
             )
         )

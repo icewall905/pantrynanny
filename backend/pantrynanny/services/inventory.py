@@ -13,7 +13,7 @@ from decimal import Decimal
 
 from sqlalchemy import case, func, select
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from ..errors import not_found
@@ -28,15 +28,20 @@ from ..models import (
     StockTransaction,
     StockTransactionLine,
 )
+from ..schemas.common import MAX_OP_QTY as MAX_OP_QTY_INT
 from ..schemas.inventory import SyncOp
 from ..security import Principal
 from .barcodes import normalize
 from .households import get_household_settings
-from .products import get_or_create_placeholder, get_product, search_score
+from .products import MAX_BARCODE_LEN, get_or_create_placeholder, get_product, search_score
 
 log = get_logger()
 ZERO = Decimal(0)
 MAX_ATTEMPTS = 4
+MAX_MERGE_HOPS = 5
+MAX_OP_QTY = Decimal(MAX_OP_QTY_INT)
+# Per-batch ceiling, comfortably below NUMERIC(12,3) so sums can never overflow the column.
+MAX_BATCH_QTY = Decimal(100_000_000)
 
 
 class OpRejected(Exception):
@@ -105,23 +110,31 @@ async def _resolve_location(
     household_id: uuid.UUID,
     requested: uuid.UUID | None,
     product: Product,
+    *,
+    fallback_if_deleted: bool = True,
 ) -> Location:
-    async def fetch(loc_id: uuid.UUID) -> Location | None:
-        return (
-            await session.execute(
-                select(Location).where(
-                    Location.id == loc_id,
-                    Location.household_id == household_id,
-                    Location.deleted_at.is_(None),
-                )
-            )
-        ).scalar_one_or_none()
+    """Pick the location for an op: requested -> product default -> household default.
+
+    The chosen row is locked FOR SHARE so a concurrent location delete waits for this op.
+    A requested location that was soft-deleted after the op was queued (offline device) falls
+    back to the defaults instead of dropping the scan; unknown/foreign ids are rejected.
+    """
+
+    async def fetch(loc_id: uuid.UUID, *, deleted_ok: bool = False) -> Location | None:
+        stmt = select(Location).where(Location.id == loc_id, Location.household_id == household_id)
+        if not deleted_ok:
+            stmt = stmt.where(Location.deleted_at.is_(None))
+        stmt = stmt.with_for_update(read=True, of=Location)
+        return (await session.execute(stmt)).scalar_one_or_none()
 
     if requested is not None:
-        loc = await fetch(requested)
+        loc = await fetch(requested, deleted_ok=True)
         if loc is None:
             raise OpRejected("location_not_found", "Unknown location")
-        return loc
+        if loc.deleted_at is None:
+            return loc
+        if not fallback_if_deleted:
+            raise OpRejected("location_not_found", "Location has been deleted")
     if product.default_location_id:
         loc = await fetch(product.default_location_id)
         if loc:
@@ -131,6 +144,7 @@ async def _resolve_location(
         .where(Location.household_id == household_id, Location.deleted_at.is_(None))
         .order_by(Location.is_default.desc(), Location.sort_order, Location.created_at)
         .limit(1)
+        .with_for_update(read=True, of=Location)
     )
     loc = (await session.execute(stmt)).scalar_one_or_none()
     if loc is None:
@@ -205,6 +219,8 @@ async def _add_stock(
     expires_at: date | None,
 ) -> _Effect:
     batch = await _find_or_create_batch(session, product, location_id, expires_at)
+    if batch.quantity + qty > MAX_BATCH_QTY:
+        raise OpRejected("invalid_quantity", "Resulting stock quantity is too large")
     batch.quantity = batch.quantity + qty
     return _Effect([(batch, qty)])
 
@@ -229,6 +245,8 @@ async def _remove_stock(
     if remaining > 0:
         if allow_negative:
             batch = await _find_or_create_batch(session, product, location_id, None)
+            if batch.quantity - remaining < -MAX_BATCH_QTY:
+                raise OpRejected("invalid_quantity", "Resulting stock quantity is too small")
             batch.quantity = batch.quantity - remaining
             lines.append((batch, -remaining))
         else:
@@ -257,6 +275,8 @@ async def _move_stock(
         target = await _find_or_create_batch(
             session, product, dest, batch.expires_at, batch.opened_at
         )
+        if target.quantity + take > MAX_BATCH_QTY:
+            raise OpRejected("invalid_quantity", "Resulting stock quantity is too large")
         target.quantity = target.quantity + take
         lines.append((target, take))
         remaining -= take
@@ -353,28 +373,48 @@ async def _resolve_product(
         if original is None:
             raise OpRejected("not_found", "Original operation not found")
         pid = original.product_id
+    nb = None
+    if op.barcode and len(op.barcode) > MAX_BARCODE_LEN:
+        raise OpRejected("invalid_barcode", "Barcode too long")
+    if op.barcode:
+        try:
+            nb = normalize(op.barcode, op.symbology)
+        except ValueError:
+            nb = None
+    if op.type == "undo":
+        pass
     elif op.product_id is not None:
         pid = op.product_id
-    elif op.barcode:
-        nb = normalize(op.barcode, op.symbology)
+    elif nb is not None:
         found, _ = await get_or_create_placeholder(session, hh, nb)
         pid = found.id
     else:
-        raise OpRejected("missing_target", "Operation needs product_id or barcode")
+        raise OpRejected("missing_target", "Operation needs product_id or a non-blank barcode")
 
-    stmt = (
-        select(Product)
-        .where(Product.id == pid, Product.household_id == hh)
-        .with_for_update(of=Product)
-        .execution_options(populate_existing=True)
-    )
-    product = (await session.execute(stmt)).scalar_one_or_none()
-    if product is None:
-        raise OpRejected("product_not_found", "Unknown product")
-    if product.deleted_at is not None and op.type != "undo":
-        if op.barcode and op.product_id is None:
-            raise RetryOp  # merged/deleted between lookup and lock; re-resolve
-        raise OpRejected("product_not_found", "Product has been deleted")
+    hops = 0
+    tried_barcode = op.product_id is None
+    while True:
+        stmt = (
+            select(Product)
+            .where(Product.id == pid, Product.household_id == hh)
+            .with_for_update(of=Product)
+            .execution_options(populate_existing=True)
+        )
+        product = (await session.execute(stmt)).scalar_one_or_none()
+        if product is None:
+            raise OpRejected("product_not_found", "Unknown product")
+        if product.deleted_at is None or op.type == "undo":
+            break
+        # Deleted product: an offline device may still reference a placeholder that was merged.
+        if product.merged_into_id is not None and hops < MAX_MERGE_HOPS:
+            pid = product.merged_into_id
+            hops += 1
+        elif nb is not None and not tried_barcode:
+            tried_barcode = True
+            found, _ = await get_or_create_placeholder(session, hh, nb)
+            pid = found.id
+        else:
+            raise OpRejected("product_not_found", "Product has been deleted")
     return product, original
 
 
@@ -391,6 +431,12 @@ async def apply_op(
         return await _duplicate_result(session, existing)
 
     qty = op.quantity
+    if qty is not None and (
+        not qty.is_finite() or abs(qty) > MAX_OP_QTY or qty.as_tuple().exponent < -3
+    ):
+        raise OpRejected(
+            "invalid_quantity", f"quantity must be within +/-{MAX_OP_QTY} with at most 3 decimals"
+        )
     if op.type in ("add", "remove", "move"):
         if qty is None or qty <= 0:
             raise OpRejected("invalid_quantity", "quantity must be greater than zero")
@@ -421,14 +467,19 @@ async def apply_op(
         if original.undone:
             raise OpRejected("already_undone", "Operation was already undone")
         effect = await _reverse(session, original, allow_neg)
-        delta = original.quantity_delta if original.type == "move" else -original.quantity_delta
+        if original.type == "move":
+            delta = sum((d for _, d in effect.lines if d > 0), ZERO)  # amount actually moved back
+        else:
+            delta = sum((d for _, d in effect.lines), ZERO)  # actual (possibly clamped) effect
         location_id = original.to_location_id if original.type == "move" else original.location_id
         to_location_id = original.location_id if original.type == "move" else None
         undoes_id = original.id
         original.undone = True
     elif op.type == "move":
         assert qty is not None and op.to_location_id is not None
-        dest = await _resolve_location(session, hh, op.to_location_id, product)
+        dest = await _resolve_location(
+            session, hh, op.to_location_id, product, fallback_if_deleted=False
+        )
         src_id: uuid.UUID | None = None
         if op.location_id is not None:
             src_id = (await _resolve_location(session, hh, op.location_id, product)).id
@@ -507,6 +558,9 @@ async def process_op(
                 return await apply_op(session, principal, op, device_id)
         except OpRejected as exc:
             return OpResult(op.client_op_id, "rejected", exc.message, exc.code)
+        except (DataError, ArithmeticError, ValueError):
+            # e.g. NUMERIC overflow: reject this one op, never fail the whole sync batch.
+            return OpResult(op.client_op_id, "rejected", "Invalid quantity", "invalid_quantity")
         except (IntegrityError, RetryOp):
             # Either a concurrent identical op won the unique(client_op_id) race, or a barcode
             # placeholder was created concurrently. Re-run: the dedupe check will catch the former.

@@ -16,7 +16,19 @@ SYMBOLOGIES = {
     "data_matrix",
     "other",
 }
-_WS = re.compile(r"\s+")
+# Input cleaning rule (mirrored by the web client; see parity vectors in tests/test_barcodes.py):
+#  * strip, at BOTH ENDS ONLY, any of: ASCII whitespace (space \t \n \r \v \f), the ASCII
+#    separators \x1c-\x1f (includes GS1 group separator \x1d), U+0085, U+00A0 and U+FEFF;
+#  * an empty result is invalid input (callers answer 422 / "missing_target");
+#  * for the GTIN family, ASCII whitespace INSIDE the value is ignored ("5 701234 567899");
+#  * "digits" means ASCII 0-9 only (no Unicode digits such as superscripts or Arabic-Indic).
+STRIP_CHARS = " \t\n\r\x0b\x0c\x1c\x1d\x1e\x1f\x85\xa0\ufeff"
+_INNER_WS = re.compile(r"[ \t\n\r\x0b\x0c]+")
+_DIGITS = re.compile(r"[0-9]+")
+
+
+def strip_barcode(raw: str) -> str:
+    return raw.strip(STRIP_CHARS)
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,7 +49,9 @@ def gtin_check_digit(body: str) -> int:
 
 def has_valid_check_digit(digits: str) -> bool:
     return (
-        len(digits) >= 2 and digits.isdigit() and gtin_check_digit(digits[:-1]) == int(digits[-1])
+        len(digits) >= 2
+        and _DIGITS.fullmatch(digits) is not None
+        and gtin_check_digit(digits[:-1]) == int(digits[-1])
     )
 
 
@@ -67,15 +81,15 @@ def normalize(raw: str, symbology_hint: str | None = None) -> NormalizedBarcode:
     GTIN family with a valid check digit -> left-padded 14 digits. EAN-13 prefix 20-29
     (in-store/variable weight) -> ``instore:<first 7 digits>``. Anything else -> ``local:<raw>``.
     """
-    stripped = raw.strip()
+    stripped = strip_barcode(raw)
     if not stripped:
         raise ValueError("empty barcode")
     hint = symbology_hint if symbology_hint in SYMBOLOGIES else None
     if hint in NON_GTIN_SYMBOLOGIES:
         return _local(stripped, hint)
 
-    digits = _WS.sub("", stripped)
-    if not digits.isdigit():
+    digits = _INNER_WS.sub("", stripped)
+    if not _DIGITS.fullmatch(digits):
         return _local(stripped, hint)
 
     n = len(digits)

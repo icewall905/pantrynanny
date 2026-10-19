@@ -81,7 +81,7 @@ async def failed_lookups(session: AsyncSession, household_id: uuid.UUID, limit: 
             await session.execute(
                 select(LookupAttempt)
                 .join(latest, LookupAttempt.id == latest.c.id)
-                .order_by(LookupAttempt.created_at.desc())
+                .order_by(LookupAttempt.created_at.desc(), LookupAttempt.id)
                 .limit(limit)
             )
         )
@@ -182,7 +182,9 @@ async def list_lookups(
     stmt = select(LookupAttempt).where(LookupAttempt.household_id == household_id)
     if status:
         stmt = stmt.where(LookupAttempt.status == status)
-    stmt = stmt.order_by(LookupAttempt.created_at.desc()).limit(limit).offset(offset)
+    stmt = (
+        stmt.order_by(LookupAttempt.created_at.desc(), LookupAttempt.id).limit(limit).offset(offset)
+    )
     return [_attempt_out(a) for a in (await session.execute(stmt)).scalars()]
 
 

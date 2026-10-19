@@ -73,6 +73,16 @@ def _change_seq() -> Mapped[int]:
     )
 
 
+def _change_xid() -> Mapped[int]:
+    # Transaction id of the writer, stamped by the trigger; drives the sync cursor.
+    return mapped_column(
+        BigInteger,
+        nullable=False,
+        server_default=text("0"),
+        server_onupdate=FetchedValue(),
+    )
+
+
 class Household(Base):
     __tablename__ = "households"
     id: Mapped[uuid.UUID] = _pk()
@@ -153,6 +163,7 @@ class Location(Base):
     created_at: Mapped[datetime] = _ts()
     updated_at: Mapped[datetime] = _updated()
     change_seq: Mapped[int] = _change_seq()
+    change_xid: Mapped[int] = _change_xid()
 
     __table_args__ = (
         Index(
@@ -177,6 +188,7 @@ class Category(Base):
     created_at: Mapped[datetime] = _ts()
     updated_at: Mapped[datetime] = _updated()
     change_seq: Mapped[int] = _change_seq()
+    change_xid: Mapped[int] = _change_xid()
 
     __table_args__ = (Index("ix_categories_household", "household_id"),)
 
@@ -218,6 +230,7 @@ class Product(Base):
     updated_at: Mapped[datetime] = _updated()
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     change_seq: Mapped[int] = _change_seq()
+    change_xid: Mapped[int] = _change_xid()
 
     barcodes: Mapped[list["ProductBarcode"]] = relationship(
         lazy="selectin", order_by="ProductBarcode.created_at", cascade="all, delete-orphan"
@@ -273,6 +286,7 @@ class StockBatch(Base):
     created_at: Mapped[datetime] = _ts()
     updated_at: Mapped[datetime] = _updated()
     change_seq: Mapped[int] = _change_seq()
+    change_xid: Mapped[int] = _change_xid()
 
     __table_args__ = (
         Index("ix_stock_batches_product", "household_id", "product_id"),

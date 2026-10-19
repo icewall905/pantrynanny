@@ -8,7 +8,7 @@ from ..db import get_session
 from ..errors import AppError, forbidden, not_found
 from ..models import Session, User
 from ..schemas.admin import UserAdminOut, UserCreate, UserPatch
-from ..security import Principal, hash_password, now, require_admin
+from ..security import Principal, ahash_password, now, require_admin
 from ..services.households import create_user
 
 router = APIRouter(tags=["users"])
@@ -114,7 +114,7 @@ async def patch_user(
         if not body.is_active:
             await _revoke_sessions(session, user.id)
     if body.password is not None:
-        user.password_hash = hash_password(body.password)
+        user.password_hash = await ahash_password(body.password)
         await _revoke_sessions(session, user.id)
     await session.commit()
     return user
