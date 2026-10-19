@@ -78,3 +78,4 @@ class StatusOut(BaseModel):
     enabled: bool
     reachable: bool
     model: str | None
+    features: dict[str, bool] = Field(default_factory=dict)

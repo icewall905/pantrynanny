@@ -36,14 +36,26 @@ def _client(request: Request) -> AIClient:
     return get_ai_client(request.app)
 
 
-async def member_ai(
-    request: Request, principal: Principal = Depends(get_principal)
+def member_ai(feature: str):
+    async def dep(
+        request: Request, principal: Principal = Depends(get_principal)
+    ) -> tuple[Principal, AIClient]:
+        return await _member_ai(request, principal, feature)
+
+    return dep
+
+
+async def _member_ai(
+    request: Request, principal: Principal, feature: str
 ) -> tuple[Principal, AIClient]:
     if principal.is_kiosk:
         raise forbidden("Not allowed for kiosk devices", "kiosk_forbidden")
     ai = _client(request)
+    await ai.refresh(request.app.state.sessionmaker)
     if not ai.enabled:
         raise ai_unavailable("AI assistant is disabled")
+    if not ai.feature(feature):
+        raise ai_unavailable(f"AI feature '{feature}' is turned off in Admin → AI")
     key = str(principal.user_id or principal.session_id)
     ai_limiter.check(key)
     ai_limiter.fail(key)
@@ -58,18 +70,20 @@ def _ctx(request: Request, session: AsyncSession, principal: Principal) -> ToolC
 @router.get("/status", response_model=StatusOut)
 async def status(request: Request, principal: Principal = Depends(get_principal)):
     ai = _client(request)
+    await ai.refresh(request.app.state.sessionmaker)
+    features = {f: ai.feature(f) for f in ("chat", "recipes", "photo")}
     if not ai.enabled:
-        return StatusOut(enabled=False, reachable=False, model=None)
+        return StatusOut(enabled=False, reachable=False, model=None, features=features)
     reachable = await ai.reachable(timeout=1.0)
     model = await ai.detect_model(timeout=1.0) if reachable else None
-    return StatusOut(enabled=True, reachable=reachable, model=model)
+    return StatusOut(enabled=True, reachable=reachable, model=model, features=features)
 
 
 @router.post("/chat", response_model=ChatOut)
 async def chat(
     body: ChatIn,
     request: Request,
-    dep: tuple[Principal, AIClient] = Depends(member_ai),
+    dep: tuple[Principal, AIClient] = Depends(member_ai("chat")),
     session: AsyncSession = Depends(get_session),
 ):
     principal, ai = dep
@@ -93,7 +107,7 @@ async def chat(
 async def recipes(
     body: RecipesIn,
     request: Request,
-    dep: tuple[Principal, AIClient] = Depends(member_ai),
+    dep: tuple[Principal, AIClient] = Depends(member_ai("recipes")),
     session: AsyncSession = Depends(get_session),
 ):
     principal, ai = dep
@@ -109,7 +123,7 @@ async def identify_photo(
     request: Request,
     file: UploadFile = File(...),
     locale: str = Form("da"),
-    dep: tuple[Principal, AIClient] = Depends(member_ai),
+    dep: tuple[Principal, AIClient] = Depends(member_ai("photo")),
     session: AsyncSession = Depends(get_session),
 ):
     principal, ai = dep

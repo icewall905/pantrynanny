@@ -12,6 +12,7 @@ router = APIRouter(tags=["health"])
 async def health(request: Request):
     """Unauthenticated liveness/readiness probe."""
     client = get_ai_client(request.app)
+    await client.refresh(request.app.state.sessionmaker)
     if not client.enabled:
         ai = "disabled"
     else:

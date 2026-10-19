@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { Download, LogOut } from 'lucide-react'
+import { Download, LogOut, Sparkles } from 'lucide-react'
 import { useAuth } from '../auth/AuthProvider'
 import { setLocale } from '../i18n'
 import { Button, Card, Chip, PageHeader } from '../components/ui'
@@ -64,6 +64,20 @@ export default function SettingsPage() {
             !apk.isLoading && <p className="text-sm text-ink-500">{t('settings.androidNone')}</p>
           )}
         </Card>
+        {isAdmin && (
+          <Card>
+            <h2 className="mb-1 flex items-center gap-2 text-lg font-bold">
+              <Sparkles className="size-5 text-leaf-600" /> {t('adminAi.settingsCard')}
+            </h2>
+            <p className="mb-3 text-sm text-ink-500">{t('adminAi.settingsCardHint')}</p>
+            <Link
+              to="/admin?tab=ai"
+              className="inline-flex min-h-11 items-center rounded-xl bg-surface px-4 text-sm font-semibold ring-1 ring-cream-200 hover:bg-cream-200/70"
+            >
+              {t('adminAi.open')}
+            </Link>
+          </Card>
+        )}
         <Card>
           <h2 className="mb-1 text-lg font-bold">{t('settings.account')}</h2>
           <p className="mb-3 text-sm text-ink-500">

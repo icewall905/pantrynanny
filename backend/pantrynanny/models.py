@@ -462,3 +462,12 @@ class CatalogueSeed(Base):
     license: Mapped[str] = mapped_column(Text)
     dataset_version: Mapped[str] = mapped_column(String(64))
     updated_at: Mapped[datetime] = _ts()
+
+
+class AppSetting(Base):
+    """Server-wide settings edited in the admin UI. Absent keys fall back to the environment."""
+
+    __tablename__ = "app_settings"
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[Any] = mapped_column(JSONB)
+    updated_at: Mapped[datetime] = _ts()

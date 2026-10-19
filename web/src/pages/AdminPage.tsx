@@ -10,8 +10,9 @@ const AdminUsers = lazy(() => import('./admin/AdminUsers'))
 const AdminDevices = lazy(() => import('./admin/AdminDevices'))
 const AdminProviders = lazy(() => import('./admin/AdminProviders'))
 const AdminSettings = lazy(() => import('./admin/AdminSettings'))
+const AdminAI = lazy(() => import('./admin/AdminAI'))
 
-const TABS = ['products', 'catalogue', 'taxonomy', 'users', 'devices', 'providers', 'settings'] as const
+const TABS = ['products', 'catalogue', 'taxonomy', 'users', 'devices', 'providers', 'ai', 'settings'] as const
 type Tab = (typeof TABS)[number]
 
 export default function AdminPage() {
@@ -29,6 +30,7 @@ export default function AdminPage() {
         {tab === 'users' && <AdminUsers />}
         {tab === 'devices' && <AdminDevices />}
         {tab === 'providers' && <AdminProviders />}
+        {tab === 'ai' && <AdminAI />}
         {tab === 'settings' && <AdminSettings />}
       </Suspense>
     </>

@@ -99,6 +99,7 @@ async def test_disabled_returns_503_and_health_disabled(env):
         "enabled": False,
         "reachable": False,
         "model": None,
+        "features": {"chat": False, "recipes": False, "photo": False},
     }
     for url, kw in [
         ("/api/ai/chat", {"json": {"messages": [{"role": "user", "content": "hej"}]}}),
@@ -127,6 +128,7 @@ async def test_unreachable_503_rest_of_app_ok(env, app):
         "enabled": True,
         "reachable": False,
         "model": None,
+        "features": {"chat": True, "recipes": True, "photo": True},
     }
     health = await c.get("/api/health")
     assert health.status_code == 200 and health.json()["ai"] == "down"
@@ -137,7 +139,12 @@ async def test_status_and_health_ok_with_model_autodetect(env, app):
     fake = FakeAI(models=["real-model"])
     install(app, fake)
     r = await env.client.get("/api/ai/status", headers=env.member)
-    assert r.json() == {"enabled": True, "reachable": True, "model": "real-model"}
+    assert r.json() == {
+        "enabled": True,
+        "reachable": True,
+        "model": "real-model",
+        "features": {"chat": True, "recipes": True, "photo": True},
+    }
     assert (await env.client.get("/api/health")).json()["ai"] == "ok"
 
 

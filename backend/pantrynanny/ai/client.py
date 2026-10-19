@@ -15,6 +15,7 @@ from fastapi import FastAPI
 from ..config import Settings
 from ..errors import AppError
 from ..logging import get_logger
+from .config import AIConfig, ConfigSource
 
 log = get_logger("pantrynanny.ai")
 
@@ -22,6 +23,15 @@ PROBE_TTL_S = 60.0
 MODEL_TTL_S = 300.0
 FEATURE_TTL_S = 600.0
 _THINK = re.compile(r"<think>.*?</think>", re.DOTALL)
+_OPEN_THINK = re.compile(r"<think>.*\Z", re.DOTALL)  # reasoning cut off before </think>
+NO_THINKING = {"enable_thinking": False}
+
+
+def clean_content(content: object) -> str:
+    """Visible answer text: drop <think> blocks, including one left open by a token limit."""
+    if not isinstance(content, str):
+        return ""
+    return _OPEN_THINK.sub("", _THINK.sub("", content)).strip()
 
 
 def ai_unavailable(detail: str = "AI assistant is not available") -> AppError:
@@ -35,6 +45,7 @@ class ToolsUnsupported(Exception):
 class AIClient:
     def __init__(self, settings: Settings, transport: httpx.AsyncBaseTransport | None = None):
         self.settings = settings
+        self.source = ConfigSource(settings)
         self._transport = transport
         self._model: str | None = None
         self._model_at = 0.0
@@ -45,12 +56,29 @@ class AIClient:
 
     # ------------------------------------------------------------------ config
     @property
+    def cfg(self) -> AIConfig:
+        return self.source.current
+
+    async def refresh(self, sm=None, *, force: bool = False) -> AIConfig:
+        """Pick up admin-UI overrides (cached for a few seconds). Resets caches on change."""
+        before = self.cfg
+        cfg = await self.source.refresh(sm, force=force)
+        key = (cfg.base_url, cfg.model, cfg.api_key)
+        if key != (before.base_url, before.model, before.api_key):
+            self._model, self._probe = None, None
+            self._no_tools_until = self._no_json_mode_until = 0.0
+        return cfg
+
+    @property
     def enabled(self) -> bool:
-        return bool(self.settings.ai_base_url.strip())
+        return self.cfg.active
+
+    def feature(self, name: str) -> bool:
+        return self.cfg.feature(name)
 
     @property
     def base_url(self) -> str:
-        return self.settings.ai_base_url.strip().rstrip("/")
+        return self.cfg.base_url.strip().rstrip("/")
 
     @property
     def tools_supported(self) -> bool:
@@ -62,8 +90,8 @@ class AIClient:
 
     def _headers(self) -> dict[str, str]:
         h = {"Content-Type": "application/json"}
-        if self.settings.ai_api_key:
-            h["Authorization"] = f"Bearer {self.settings.ai_api_key}"
+        if self.cfg.api_key:
+            h["Authorization"] = f"Bearer {self.cfg.api_key}"
         return h
 
     def _http(self, timeout: float) -> httpx.AsyncClient:
@@ -76,8 +104,8 @@ class AIClient:
 
     # ------------------------------------------------------------------ model/probe
     async def detect_model(self, timeout: float | None = None) -> str | None:  # noqa: ASYNC109
-        if self.settings.ai_model.strip():
-            return self.settings.ai_model.strip()
+        if self.cfg.model.strip():
+            return self.cfg.model.strip()
         if self._model and time.monotonic() - self._model_at < MODEL_TTL_S:
             return self._model
         try:
@@ -135,30 +163,38 @@ class AIClient:
         json_mode: bool = False,
         max_tokens: int = 2048,
         temperature: float = 0.3,
+        _retry_empty: bool = True,
     ) -> dict[str, Any]:
         """Return the assistant message dict (``content`` normalised to a string)."""
         if not self.enabled:
             raise ai_unavailable("AI assistant is disabled")
+        cfg = self.cfg
         model = await self.detect_model()
         if not model:
             raise ai_unavailable("AI endpoint unreachable")
         body: dict[str, Any] = {
             "model": model,
             "messages": messages,
-            "max_tokens": max_tokens,
-            "temperature": temperature,
+            "max_tokens": cfg.max_tokens or max_tokens,
+            "temperature": cfg.temperature if cfg.temperature is not None else temperature,
             "stream": False,
         }
+        if cfg.disable_thinking or not _retry_empty:
+            body["chat_template_kwargs"] = NO_THINKING
         if tools:
             body["tools"] = tools
             body["tool_choice"] = "auto"
         if json_mode and self.json_mode_supported:
             body["response_format"] = {"type": "json_object"}
+        started = time.monotonic()
         try:
-            async with self._http(self.settings.ai_timeout_s) as c:
+            async with self._http(cfg.timeout_s) as c:
                 r = await c.post("/chat/completions", json=body)
         except httpx.TimeoutException as e:
-            raise ai_unavailable("AI endpoint timed out") from e
+            raise ai_unavailable(
+                f"AI endpoint did not answer within {cfg.timeout_s:.0f} s (raise the timeout in "
+                "Admin → AI, or use a faster model)"
+            ) from e
         except httpx.HTTPError as e:
             self._probe = (time.monotonic(), False)
             raise ai_unavailable("AI endpoint unreachable") from e
@@ -176,12 +212,13 @@ class AIClient:
                     json_mode=False,
                     max_tokens=max_tokens,
                     temperature=temperature,
+                    _retry_empty=_retry_empty,
                 )
             if tools and r.status_code in (400, 422, 501):
                 self._no_tools_until = time.monotonic() + FEATURE_TTL_S
                 raise ToolsUnsupported
-            log.warning("ai_http_error", status=r.status_code)
-            raise ai_unavailable(f"AI endpoint returned HTTP {r.status_code}")
+            log.warning("ai_http_error", status=r.status_code, body=r.text[:200])
+            raise ai_unavailable(f"AI endpoint returned HTTP {r.status_code}: {r.text[:120]}")
         try:
             choice = r.json()["choices"][0]
             msg = dict(choice["message"])
@@ -189,9 +226,42 @@ class AIClient:
             raise AppError(
                 502, "ai_bad_response", "AI endpoint returned an invalid response"
             ) from e
-        content = msg.get("content")
-        msg["content"] = _THINK.sub("", content).strip() if isinstance(content, str) else ""
+        msg["content"] = clean_content(msg.get("content"))
         msg["finish_reason"] = choice.get("finish_reason")
+        reasoning = msg.get("reasoning_content") or msg.get("reasoning") or ""
+        log.info(
+            "ai_chat_done",
+            model=model,
+            ms=int((time.monotonic() - started) * 1000),
+            finish=msg["finish_reason"],
+            content_chars=len(msg["content"]),
+            reasoning_chars=len(reasoning) if isinstance(reasoning, str) else 0,
+        )
+        if not msg["content"] and not msg.get("tool_calls"):
+            # Typical for reasoning models: the whole token budget went into thinking
+            # (reasoning_content / an unclosed <think>), so no answer was written.
+            if _retry_empty:
+                retried = await self.chat(
+                    messages,
+                    tools=tools,
+                    json_mode=json_mode,
+                    max_tokens=max(max_tokens * 2, 4096),
+                    temperature=temperature,
+                    _retry_empty=False,
+                )
+                retried["retried_without_thinking"] = True
+                return retried
+            raise AppError(
+                502,
+                "ai_empty_response",
+                "The model returned no answer"
+                + (
+                    " (it used its token budget for reasoning)"
+                    if reasoning or msg["finish_reason"] == "length"
+                    else ""
+                )
+                + ". Try 'Disable thinking' or a higher token limit in Admin → AI.",
+            )
         return msg
 
 

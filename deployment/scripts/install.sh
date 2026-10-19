@@ -87,6 +87,18 @@ if [[ ! -x $RELEASE_DIR/venv/bin/uvicorn ]]; then
 fi
 
 # --- 6. migrate, activate, (re)start ---------------------------------------------
+# Safety net: every deploy dumps the database before migrating (kept: last 10). A deploy whose
+# dump fails stops here, before any schema change. Restore: deployment/scripts/restore.sh <dir>.
+PRE_DIR=$BACKUPS/pre-deploy
+pre="$PRE_DIR/$(date +%Y%m%d-%H%M%S)-$(basename "$RELEASE_DIR")"
+install -d -m 0700 "$PRE_DIR" "$pre"
+log "backing up database before migrations -> $pre"
+runuser -u postgres -- pg_dump -Fc --no-owner --no-acl -d "$DB_NAME" >"$pre/pantrynanny.dump" \
+  || die "pre-deploy database backup failed; nothing was changed"
+runuser -u postgres -- pg_restore --list <"$pre/pantrynanny.dump" >/dev/null || die "pre-deploy backup is unreadable"
+(cd "$pre" && sha256sum pantrynanny.dump >SHA256SUMS)
+find "$PRE_DIR" -mindepth 1 -maxdepth 1 -type d -print0 | sort -z | head -z -n -10 | xargs -0 -r rm -rf
+
 log "running database migrations"
 runuser -u pantrynanny -- bash -c "cd '$RELEASE_DIR/backend' && set -a && . '$ENV_FILE' && set +a && exec '$RELEASE_DIR/venv/bin/alembic' -c alembic.ini upgrade head"
 log "importing the open-data seed catalogue (skipped when unchanged)"

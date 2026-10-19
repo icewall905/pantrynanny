@@ -22,6 +22,7 @@ from .db import make_engine, make_sessionmaker
 from .errors import install_error_handlers
 from .logging import configure_logging, get_logger
 from .routers import (
+    admin_ai,
     admin_catalogue,
     ai,
     auth,
@@ -190,6 +191,7 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
         export,
         stats,
         admin_catalogue,
+        admin_ai,
         ha,
     ):
         app.include_router(module.router, prefix="/api")
