@@ -9,7 +9,7 @@ test.beforeEach(async ({ page }) => {
 test('create a product manually and adjust its stock', async ({ page }) => {
   const name = `E2E Mælk ${Date.now()}`
   await page.goto('/products/new')
-  await page.getByLabel('Navn').fill(name)
+  await page.getByLabel('Navn', { exact: true }).fill(name)
   await page.getByRole('button', { name: 'Gem' }).click()
   await expect(page.getByRole('heading', { name })).toBeVisible()
   await page.getByRole('button', { name: new RegExp(`Tilføj én ${name}`) }).click()

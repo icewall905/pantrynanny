@@ -31,6 +31,7 @@ pantrynanny-admin create-user --username anna --display-name Anna [--role owner|
 pantrynanny-admin reset-password --username anna [--password P | --generate]   # also revokes sessions
 pantrynanny-admin list-users
 pantrynanny-admin create-kiosk-code --name "Kitchen iPad"                      # 15 min, single use
+pantrynanny-admin import-seed [--file F.jsonl.gz] [--if-changed]                # offline barcode seed (ODbL)
 ```
 
 Creating the first user creates the household (default locations and categories are seeded;
@@ -89,9 +90,11 @@ tests/
 * **Stock is transaction based.** Every change is an append-only `stock_transactions` row (unique per
   `(household_id, client_op_id)`) plus `stock_transaction_lines` (per-batch effect, which makes undo exact).
   Each op runs in its own DB transaction with `SELECT ... FOR UPDATE` on the product row.
-* **change_seq** is stamped by a `BEFORE INSERT OR UPDATE` trigger from the global sequence
-  `change_seq_seq` on products, stock_batches, locations and categories; it also maintains `updated_at`.
-  `GET /sync/changes` re-reads a 200-value window below the client cursor to tolerate sequence values
-  that commit out of order; clients must upsert.
+* **change_seq / change_xid** are stamped by a `BEFORE INSERT OR UPDATE` trigger on products,
+  stock_batches, locations and categories (`change_xid` = `pg_current_xact_id()` of the writer); it also
+  maintains `updated_at`. The sync cursor is `x1.<database oid>.<snapshot xmin>` and `GET /sync/changes`
+  returns rows with `change_xid >= xmin`, so a transaction still running at the previous pull is never
+  skipped. Rows may repeat; clients must upsert. A cursor from another database (restore) or an older
+  format forces a full resync.
 * Lookups (`GET /products/by-barcode`) never touch stock. External providers plug in via
   `services/lookup/__init__.py` (`lookup_external`, `enqueue_enrichment`).
