@@ -167,7 +167,7 @@ export class ScannerEngine {
     const v = this.o.video as VFCVideo
     if (v.requestVideoFrameCallback) {
       this.vfc = v.requestVideoFrameCallback(() => this.tick())
-      // rVFC does not fire for a stalled video; a timer keeps the watchdog honest.
+      // rVFC stops firing for a stalled video; the watchdog interval in run() detects that and restarts.
     } else {
       this.timer = setTimeout(() => this.tick(), this.interval / 2)
     }
@@ -189,6 +189,7 @@ export class ScannerEngine {
     const v = this.o.video
     if (v.readyState < 2 || !v.videoWidth) return
     this.busy = true
+    const gen = this.runGen
     try {
       const box = v.getBoundingClientRect()
       const r = cropRect(v.videoWidth, v.videoHeight, box.width, box.height)
@@ -205,6 +206,7 @@ export class ScannerEngine {
       const t0 = performance.now()
       const found = await this.decoder!.decode({ canvas: this.canvas, ctx, width: w, height: h, index: this.frameIndex++ })
       perf.frame(performance.now() - t0)
+      if (gen !== this.runGen || !this.wanted || this.state !== 'running') return // stopped/restarted while decoding
       const t = performance.now()
       for (const f of found) {
         if (this.dedupe.onDetection(f.rawValue, t, readIsTrusted(f.rawValue, f.format))) {

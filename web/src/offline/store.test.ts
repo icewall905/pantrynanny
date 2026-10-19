@@ -391,4 +391,56 @@ describe('HTTP 500 handling', () => {
     await s.syncNow()
     expect((await s.getFailedOps()).length).toBe(1)
   })
+
+  it('dead connection: the next lookup AND enqueue both succeed (reopen + retry once)', async () => {
+    const s = mk()
+    const p = product('p1', '05701234567899')
+    await s.cacheProduct(p)
+    const h = await (s as unknown as { db(): Promise<{ close(): void }> }).db()
+    h.close()
+    const look = await s.lookupBarcode('5701234567899', 'ean_13')
+    expect(look.product?.id).toBe('p1')
+    h.close() // dies again
+    await add(s)
+    expect(await s.displayedQuantity(p)).toBe(1)
+  })
+
+  it('undo interleaved with the upload batch read never resurrects the op', async () => {
+    const s = mk()
+    const p = product('p1', '05701234567899')
+    await s.cacheProduct(p)
+    const op = await add(s)
+    const sync = s.syncNow()
+    const undo = s.undoScan(op.client_op_id) // races the batch read + sent marker
+    const [, r] = await Promise.all([sync, undo])
+    await s.syncNow()
+    // whichever won: the server total must match what the UI says (undone → 0)
+    expect(srv.totals.get('p1') ?? 0).toBe(0)
+    expect(await s.displayedQuantity(p)).toBe(0)
+    expect(['removed', 'enqueued']).toContain(r)
+    expect((await s.getPending()).length).toBe(0)
+  })
+
+  it('removed op is never marked sent / uploaded afterwards', async () => {
+    const s = mk()
+    const op = await add(s)
+    expect(await s.undoScan(op.client_op_id)).toBe('removed')
+    await s.syncNow()
+    expect(srv.requests.flat().some((o) => o.client_op_id === op.client_op_id)).toBe(false)
+    expect((await s.getPending()).length).toBe(0)
+  })
+
+  it('retryFailedOp skips an op whose scan was undone meanwhile', async () => {
+    const s = mk()
+    const bad = await add(s)
+    srv.state.rejectIds.add(bad.client_op_id)
+    await s.syncNow()
+    const db = (await (s as unknown as { db(): Promise<{ get(a: string, k: string): Promise<object>; put(a: string, v: object): Promise<void> }> }).db())
+    const h = await db.get('scanHistory', bad.client_op_id)
+    await db.put('scanHistory', { ...h, undone: true })
+    srv.state.rejectIds.clear()
+    await s.retryFailedOp(bad.client_op_id)
+    expect((await s.getFailedOps()).length).toBe(0)
+    expect((await s.getPending()).length).toBe(0)
+  })
 })

@@ -31,6 +31,17 @@ const BACKOFF_MAX = 30_000
 
 type DB = IDBPDatabase<unknown>
 
+const RETRY_METHODS = [
+  'lookupBarcode', 'displayedQuantity', 'pendingDelta', 'getProduct', 'cacheProduct', 'getHistory',
+  'getPending', 'getFailedOps', 'dismissFailedOp', 'retryFailedOp', 'undoScan', 'getMeta', 'setMeta',
+  'getDeviceId', 'adoptSession', 'clearForLogout',
+] as const
+
+function isDeadConnection(e: unknown): boolean {
+  const n = (e as DOMException)?.name
+  return n === 'InvalidStateError' || n === 'UnknownError' || n === 'TransactionInactiveError'
+}
+
 export interface StoreOptions {
   dbName?: string
   /** Disable timers/listeners/auto sync (tests). */
@@ -53,6 +64,7 @@ export class OfflineStore {
   private forcePull = false
   /** Set after a 401: no polling/backoff until resume() (successful login or pairing). */
   private paused = false
+  private lockTimer: ReturnType<typeof setTimeout> | null = null
   private retryDelay = BACKOFF_MIN
   private batch500 = 0
   private retryTimer: ReturnType<typeof setTimeout> | null = null
@@ -83,7 +95,22 @@ export class OfflineStore {
     } catch {
       this.channel = null
     }
+    for (const name of RETRY_METHODS) {
+      const orig = (this as unknown as Record<string, (...a: unknown[]) => Promise<unknown>>)[name].bind(this)
+      ;(this as unknown as Record<string, unknown>)[name] = (...a: unknown[]) => this.retryOnce(() => orig(...a))
+    }
     void this.refreshStatus()
+  }
+
+  /** Dead IndexedDB connection (iOS kills them) → reopen and retry the whole operation once. */
+  private async retryOnce<T>(fn: () => Promise<T>): Promise<T> {
+    try {
+      return await fn()
+    } catch (e) {
+      if (!isDeadConnection(e)) throw e
+      await this.reopen()
+      return fn()
+    }
   }
 
   // ---------- db ----------
@@ -141,7 +168,8 @@ export class OfflineStore {
     this.cleanup = []
     this.started = false
     if (this.retryTimer) clearTimeout(this.retryTimer)
-    this.retryTimer = null
+    if (this.lockTimer) clearTimeout(this.lockTimer)
+    this.retryTimer = this.lockTimer = null
     this.channel?.close()
     this.channel = null
   }
@@ -233,7 +261,7 @@ export class OfflineStore {
     const db = await this.db()
     const norm = normalizeBarcode(raw, symbology)
     let id = (await db.get('barcodeIndex', norm.code)) as UUID | undefined
-    id ??= (await db.get('barcodeIndex', `local:${raw}`)) as UUID | undefined
+    id ??= (await db.get('barcodeIndex', `local:${raw.replace(/\s+/g, '')}`)) as UUID | undefined
     const product = id ? ((await db.get('products', id)) as Product | undefined) ?? null : null
     return { norm, product }
   }
@@ -270,8 +298,7 @@ export class OfflineStore {
     try {
       await this.writeOp(full)
     } catch (e) {
-      const name = (e as DOMException)?.name
-      if (name !== 'InvalidStateError' && name !== 'UnknownError' && name !== 'TransactionInactiveError') throw e
+      if (!isDeadConnection(e)) throw e
       await this.reopen()
       await this.writeOp(full) // same client_op_id: the put is idempotent
     }
@@ -399,10 +426,19 @@ export class OfflineStore {
   /** Put a rejected op back into the queue (e.g. after the user fixed the cause). */
   async retryFailedOp(id: string) {
     const db = await this.db()
-    const tx = db.transaction(['failedOps', 'pendingOps', 'meta'], 'readwrite')
+    const tx = db.transaction(['failedOps', 'pendingOps', 'meta', 'scanHistory'], 'readwrite')
     const f = (await tx.objectStore('failedOps').get(id)) as FailedRecord | undefined
     if (!f) {
       await tx.done
+      return
+    }
+    // The user undid this scan while it sat in the failed list: do not resurrect it.
+    const h = (await tx.objectStore('scanHistory').get(id)) as HistoryRecord | undefined
+    if (h?.undone) {
+      await tx.objectStore('failedOps').delete(id)
+      await tx.done
+      await this.refreshStatus()
+      this.announce()
       return
     }
     const meta = tx.objectStore('meta')
@@ -491,6 +527,14 @@ export class OfflineStore {
     if (!locks) return fn()
     return locks.request(`pn-sync-${this.dbName}`, { ifAvailable: true }, async (lock) => {
       if (lock) await fn()
+      else if (this.autoSync) {
+        // another tab is syncing: look again shortly instead of waiting for the 30 s timer
+        if (this.lockTimer) clearTimeout(this.lockTimer)
+        this.lockTimer = setTimeout(() => {
+          this.lockTimer = null
+          void this.syncNow()
+        }, 2000)
+      }
     }) as Promise<void>
   }
 
@@ -551,14 +595,10 @@ export class OfflineStore {
     const device_id = await this.getDeviceId()
     let size = BATCH
     for (;;) {
-      const batch = ((await db.getAllFromIndex('pendingOps', 'seq', undefined, size)) as PendingRecord[]) ?? []
+      // Read the batch AND mark it "sent" in ONE readwrite transaction: an undo that deletes an op
+      // either commits before (op not in the batch) or after (it sees sent=true and compensates).
+      const batch = await this.takeBatch(size)
       if (!batch.length) return
-      // Durably mark as "sent" BEFORE the POST: from now on the server may have applied them.
-      {
-        const tx = db.transaction('pendingOps', 'readwrite')
-        for (const r of batch) if (!r.sent) await tx.store.put({ ...r, sent: true })
-        await tx.done
-      }
       try {
         let res: SyncOpsResponse
         try {
@@ -593,7 +633,7 @@ export class OfflineStore {
               this.batch500 = 0
               continue
             }
-            await db.put('pendingOps', { ...rec, sent: true, fails500: n })
+            await this.patchPending(rec.client_op_id, (r) => ({ ...r, sent: true, fails500: n }))
             throw e
           }
           // network / 502-504 / 503 / anything else: the server was not healthy, forget 500 history
@@ -610,8 +650,9 @@ export class OfflineStore {
             continue
           }
           const tx = db.transaction(['pendingOps', 'products', 'barcodeIndex', 'inventory'], 'readwrite')
+          const still = await tx.objectStore('pendingOps').get(rec.client_op_id)
           await tx.objectStore('pendingOps').delete(rec.client_op_id)
-          if (r.product) {
+          if (still && r.product) {
             await this.putProduct(tx, r.product)
             if (r.status === 'applied' && r.total_quantity != null) {
               const old = (await tx.objectStore('inventory').get(r.product.id)) as InventoryRecord | undefined
@@ -642,13 +683,40 @@ export class OfflineStore {
 
   private async resetFailCounters(batch: PendingRecord[]) {
     this.batch500 = 0
+    for (const r of batch) if (r.fails500) await this.patchPending(r.client_op_id, (x) => ({ ...x, sent: true, fails500: 0 }))
+  }
+
+  private async takeBatch(size: number): Promise<PendingRecord[]> {
     const db = await this.db()
-    for (const r of batch) if (r.fails500) await db.put('pendingOps', { ...r, sent: true, fails500: 0 })
+    const tx = db.transaction('pendingOps', 'readwrite')
+    const batch = (await tx.store.index('seq').getAll(undefined, size)) as PendingRecord[]
+    const out: PendingRecord[] = []
+    for (const r of batch) {
+      const m = r.sent ? r : { ...r, sent: true }
+      if (!r.sent) await tx.store.put(m)
+      out.push(m)
+    }
+    await tx.done
+    return out
+  }
+
+  /** Re-read the record inside the transaction; skip silently if it vanished (household wipe etc.). */
+  private async patchPending(id: string, f: (r: PendingRecord) => PendingRecord): Promise<boolean> {
+    const db = await this.db()
+    const tx = db.transaction('pendingOps', 'readwrite')
+    const cur = (await tx.store.get(id)) as PendingRecord | undefined
+    if (cur) await tx.store.put(f(cur))
+    await tx.done
+    return !!cur
   }
 
   private async fail(rec: PendingRecord, error: string, error_code: string | null = null) {
     const db = await this.db()
     const tx = db.transaction(['pendingOps', 'failedOps'], 'readwrite')
+    if (!(await tx.objectStore('pendingOps').get(rec.client_op_id))) {
+      await tx.done // wiped meanwhile (household switch): nothing to park
+      return
+    }
     await tx.objectStore('failedOps').put({
       client_op_id: rec.client_op_id,
       seq: rec.seq,

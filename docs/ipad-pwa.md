@@ -76,8 +76,16 @@ your mount.
 * REMOVE mode reverts to ADD after `remove_mode_timeout_min` (default 10) idle minutes and on every page reload.
 * Mode switch clears the duplicate-suppression state (an item still in view is not counted twice in the new mode).
 * Whole-screen tint (green = ADD, tomato = REMOVE), giant label and segmented control.
-* Nothing is dropped: rejected ops are listed in the red "afvist" banner, undo of a not-yet-synced scan removes it
-  from the queue, undo of a synced scan sends an `undo` op.
+* A scan is only confirmed (beep, card) after it was written to IndexedDB; if that write fails the user gets an error
+  tone and a red toast that stays until tapped. A dead IndexedDB connection is reopened and the operation retried once.
+* Undo: a scan that was **never uploaded** is removed from the queue. As soon as an upload was attempted (even if the
+  response was lost) the server may have applied it, so undo sends a compensating `undo` op instead. Both choices are
+  made atomically with the "sent" marker.
+* Rejected ops are never dropped: they are listed in the red "afvist" banner (retry or dismiss; an op whose scan was
+  undone meanwhile is not resurrected).
+* Logging out keeps unsent ops for the same household. Signing in to a **different household** deletes all local data
+  including unsent scans of the previous household (they would be applied to the wrong stock); the Start screen shows
+  a warning with the number of discarded scans.
 
 ## 4. Hidden debug overlay
 

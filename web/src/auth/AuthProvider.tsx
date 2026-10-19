@@ -65,7 +65,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (username, password, remember) => {
       const me = await post<Me>('/auth/login', { username, password, remember })
       qc.setQueryData(keys.me, me)
-      void adoptSession(me).then(() => resumeSync()) // household switch wipes local data; lift sync pause
+      void adoptSession(me)
+        .catch(() => undefined)
+        .finally(() => void resumeSync()) // household switch wipes local data; lift sync pause
       return me
     },
     [qc],

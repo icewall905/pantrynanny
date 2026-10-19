@@ -48,6 +48,7 @@ interface Card {
   opId: string
   type: ScanMode
   barcode: string
+  format?: string
   product: Product | null
   qty: number | null
   lookingUp: boolean
@@ -159,8 +160,8 @@ export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: 
     setLocations(await store.getLocations())
     const c = cardRef.current
     if (c) {
-      const norm = normalizeBarcode(c.barcode)
-      const p = c.product ?? (await store.lookupBarcode(c.barcode)).product
+      const norm = normalizeBarcode(c.barcode, c.format)
+      const p = c.product ?? (await store.lookupBarcode(c.barcode, c.format)).product
       const q = await store.displayedQuantity(p, norm)
       setCard((cur) => (cur && cur.n === c.n ? { ...cur, product: cur.product ?? p, qty: Math.max(0, q) } : cur))
     }
@@ -213,9 +214,14 @@ export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: 
       let norm = normalizeBarcode(ev.value, ev.format)
       let op: Awaited<ReturnType<typeof enqueueOp>>
       try {
-        const look = await store.lookupBarcode(ev.value, ev.format)
-        product = look.product
-        norm = look.norm
+        try {
+          const look = await store.lookupBarcode(ev.value, ev.format)
+          product = look.product
+          norm = look.norm
+        } catch (e) {
+          // cache unavailable: still record the scan (server resolves the barcode)
+          console.warn('local lookup failed', e)
+        }
         op = await enqueueOp({
           type,
           barcode: ev.value,
@@ -229,7 +235,7 @@ export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: 
         console.error('enqueue failed', e)
         beep('error')
         vibrate([200, 80, 200])
-        setCard({ n, opId: '', type, barcode: ev.value, product, qty: null, lookingUp: false, failed: true })
+        setCard({ n, opId: '', type, barcode: ev.value, format: ev.format, product, qty: null, lookingUp: false, failed: true })
         toast(t('toast.saveFailed', { code: ev.value }), 'red')
         return
       }
@@ -237,7 +243,7 @@ export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: 
       const known = !!product && product.status !== 'unknown'
       beep(known ? type : 'unknown')
       vibrate(known ? 40 : [40, 60, 40])
-      setCard({ n, opId: op.client_op_id, type, barcode: ev.value, product, qty: null, lookingUp: !known })
+      setCard({ n, opId: op.client_op_id, type, barcode: ev.value, format: ev.format, product, qty: null, lookingUp: !known })
       let unknownToast = 0
       if (!known) unknownToast = toast(t('toast.unknown'), 'amber')
       const q = await store.displayedQuantity(product, norm).catch(() => 0)
