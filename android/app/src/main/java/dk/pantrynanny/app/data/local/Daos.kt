@@ -173,6 +173,9 @@ interface HistoryDao {
     @Query("SELECT * FROM scan_history WHERE undone = 0 ORDER BY occurredAtMs DESC LIMIT 1")
     suspend fun lastUndoable(): ScanHistoryEntity?
 
+    @Query("SELECT * FROM scan_history WHERE clientOpId = :clientOpId")
+    suspend fun get(clientOpId: String): ScanHistoryEntity?
+
     @Query("UPDATE scan_history SET undone = 1 WHERE clientOpId = :clientOpId")
     suspend fun markUndone(clientOpId: String)
 

@@ -5,6 +5,7 @@ import dk.pantrynanny.app.data.TokenStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import okhttp3.Cache
 import okhttp3.HttpUrl
@@ -50,6 +51,9 @@ class ApiClient(
 
     /** Snapshot downloads can be large: allow a longer read timeout. */
     private val longClient: OkHttpClient = client.newBuilder().readTimeout(60, TimeUnit.SECONDS).build()
+
+    /** The assistant waits for a local AI model, which can take minutes. */
+    private val slowClient: OkHttpClient = client.newBuilder().readTimeout(200, TimeUnit.SECONDS).build()
 
     // Separate client WITHOUT the auth interceptor: media is public, and the token must never reach other hosts.
     private val imageClient: OkHttpClient = OkHttpClient.Builder()
@@ -103,6 +107,27 @@ class ApiClient(
             serializer = ProductDto.serializer(),
         )
 
+    // ---- Generic JSON calls (feature screens: shopping, recipes, meal plan, ...) ----------------
+
+    suspend fun <T> get(path: String, serializer: KSerializer<T>, query: Map<String, String> = emptyMap()): ApiResult<T> =
+        send("GET", path, query = query, serializer = serializer)
+
+    suspend fun <T> post(path: String, body: JsonElement?, serializer: KSerializer<T>, slow: Boolean = false): ApiResult<T> =
+        send("POST", path, body = body?.toString() ?: "{}", serializer = serializer, slow = slow)
+
+    suspend fun <T> put(path: String, body: JsonElement, serializer: KSerializer<T>): ApiResult<T> =
+        send("PUT", path, body = body.toString(), serializer = serializer)
+
+    suspend fun <T> patch(path: String, body: JsonElement, serializer: KSerializer<T>, ifMatch: Int? = null): ApiResult<T> =
+        send(
+            "PATCH", path, body = body.toString(), serializer = serializer,
+            headers = if (ifMatch != null) mapOf("If-Match" to ifMatch.toString()) else emptyMap(),
+        )
+
+    /** For endpoints whose response body the caller does not need (204, or JSON it ignores). */
+    suspend fun call(method: String, path: String, body: JsonElement? = null): ApiResult<Unit> =
+        sendNoContent(method, path, body?.toString() ?: if (method == "DELETE") null else "{}")
+
     // ---- Plumbing ---------------------------------------------------------------------------
 
     /** Multipart photo upload; the server re-encodes to WebP, strips EXIF and locks the image field. */
@@ -146,8 +171,9 @@ class ApiClient(
         baseOverride: String? = null,
         authenticated: Boolean = true,
         requestBody: RequestBody? = null,
+        slow: Boolean = false,
     ): ApiResult<T> {
-        return when (val raw = execute(method, path, body, query, headers, long, baseOverride, authenticated, requestBody)) {
+        return when (val raw = execute(method, path, body, query, headers, long, baseOverride, authenticated, requestBody, slow)) {
             is ApiResult.Ok -> try {
                 ApiResult.Ok(AppJson.decodeFromString(serializer, raw.value.body))
             } catch (e: Exception) {
@@ -175,6 +201,7 @@ class ApiClient(
         baseOverride: String?,
         authenticated: Boolean,
         requestBody: RequestBody? = null,
+        slow: Boolean = false,
     ): ApiResult<RawResponse> = withContext(Dispatchers.IO) {
         try {
             val base = baseOverride ?: settings.current().serverUrl
@@ -182,11 +209,16 @@ class ApiClient(
                 ?: return@withContext ApiResult.NetworkError(IOException("Invalid server URL"))
             val builder = Request.Builder().url(url).header("Accept", "application/json")
             headers.forEach { (k, v) -> builder.header(k, v) }
-            when (method) {
-                "GET" -> builder.get()
+            when {
+                method == "GET" -> builder.get()
+                method == "DELETE" && body == null && requestBody == null -> builder.delete()
                 else -> builder.method(method, requestBody ?: (body ?: "").toRequestBody(jsonType))
             }
-            val http = if (long) longClient else client
+            val http = when {
+                slow -> slowClient
+                long -> longClient
+                else -> client
+            }
             http.newCall(builder.build()).execute().use { response ->
                 val text = response.body.string()
                 if (response.isSuccessful) {

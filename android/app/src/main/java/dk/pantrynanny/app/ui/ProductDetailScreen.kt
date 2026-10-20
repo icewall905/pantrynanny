@@ -80,6 +80,16 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import dk.pantrynanny.app.data.remote.ApiResult
+import dk.pantrynanny.app.data.remote.BatchDto
+import dk.pantrynanny.app.data.remote.InventoryItemDto
+import dk.pantrynanny.app.data.remote.ProductDto
+import dk.pantrynanny.app.data.remote.RunOutDto
+import dk.pantrynanny.app.data.remote.ShoppingItemDto
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 
 data class DetailUiState(
     val product: ProductWithQty? = null,
@@ -132,6 +142,90 @@ class ProductDetailViewModel(private val c: AppContainer, private val productId:
                 PhotoFiles.cleanUp(c.app)
                 _uploading.value = false
             }
+        }
+    }
+
+    // ---- online details (nutrition, ingredients, history, favourite) ----
+    private val _details = MutableStateFlow<Load<InventoryItemDto>>(Load.Loading)
+    val details: StateFlow<Load<InventoryItemDto>> = _details.asStateFlow()
+    private val _runOut = MutableStateFlow<RunOutDto?>(null)
+    val runOut: StateFlow<RunOutDto?> = _runOut.asStateFlow()
+
+    fun loadDetails() {
+        viewModelScope.launch {
+            _details.value = c.api.get("api/inventory/$productId", InventoryItemDto.serializer()).toLoad()
+            (c.api.get("api/stats/runout", ListSerializer(RunOutDto.serializer()), mapOf("product_id" to productId)) as? ApiResult.Ok)
+                ?.let { _runOut.value = it.value.firstOrNull() }
+        }
+    }
+
+    init {
+        loadDetails()
+    }
+
+    private fun online(okRes: Int, block: suspend () -> ApiResult<*>) {
+        viewModelScope.launch {
+            when (val r = block()) {
+                is ApiResult.Ok -> {
+                    _events.tryEmit(UiMessage(okRes))
+                    loadDetails()
+                    c.syncNowManually() // pull the change into the local cache (batches, expiry)
+                }
+                is ApiResult.NetworkError -> _events.tryEmit(UiMessage(R.string.edit_offline))
+                is ApiResult.HttpError -> _events.tryEmit(UiMessage(R.string.edit_failed, r.detail ?: "HTTP ${r.code}"))
+            }
+        }
+    }
+
+    fun toggleFavorite() {
+        val fav = (details.value as? Load.Ok)?.value?.product?.favorite ?: return
+        online(if (fav) R.string.unfavorited else R.string.favorited) {
+            c.api.put(
+                "api/products/$productId/favorite",
+                buildJsonObject { put("favorite", JsonPrimitive(!fav)) },
+                ProductDto.serializer(),
+            )
+        }
+    }
+
+    fun addToShopping() = online(R.string.added_to_shopping) {
+        c.api.post(
+            "api/shopping",
+            buildJsonObject {
+                put("product_id", JsonPrimitive(productId))
+                put("quantity", JsonPrimitive(1))
+            },
+            ShoppingItemDto.serializer(),
+        )
+    }
+
+    fun setExpiry(batchId: String, date: String?) = online(R.string.edit_saved) {
+        c.api.patch(
+            "api/batches/$batchId",
+            buildJsonObject { put("expires_at", date?.let { JsonPrimitive(it) } ?: JsonNull) },
+            BatchDto.serializer(),
+        )
+    }
+
+    /** Take out [qty], set the count to [target], or move everything: queued like scans (works offline). */
+    fun takeOut(qty: Double) = queue("remove", qty)
+
+    fun setCount(target: Double) {
+        val current = state.value.product?.displayQuantity ?: return
+        val delta = Math.round((target - current) * 1000) / 1000.0
+        if (kotlin.math.abs(delta) > QuantityMath.EPSILON) queue("adjust", delta)
+    }
+
+    fun moveAll(toLocationId: String) {
+        val current = state.value.product?.displayQuantity ?: return
+        if (current > QuantityMath.EPSILON) queue("move", current, toLocationId)
+    }
+
+    private fun queue(type: String, qty: Double, toLocationId: String? = null) {
+        viewModelScope.launch(Dispatchers.IO) {
+            c.scanRepository.enqueueOp(type, productId, qty, toLocationId = toLocationId)
+            _events.tryEmit(UiMessage(R.string.change_queued))
+            c.requestSync()
         }
     }
 
@@ -201,6 +295,10 @@ fun ProductDetailScreen(
 
     val item = ui.product
     var editing by remember { mutableStateOf(register) }
+    val details by vm.details.collectAsStateWithLifecycle()
+    val runOut by vm.runOut.collectAsStateWithLifecycle()
+    var dialog by remember { mutableStateOf<String?>(null) }
+    var expiryBatch by remember { mutableStateOf<BatchEntity?>(null) }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
         IconButton(onClick = onBack) {
@@ -240,25 +338,67 @@ fun ProductDetailScreen(
             p.minStock?.let { Text(stringResource(R.string.min_stock_value, QuantityMath.format(it))) }
 
             Spacer(Modifier.height(12.dp))
+            val detailLoad = details
+            ProductActions(
+                favorite = (detailLoad as? Load.Ok)?.value?.product?.favorite,
+                onTakeOut = { dialog = "take" },
+                onCount = { dialog = "count" },
+                onMove = { dialog = "move" },
+                onShopping = vm::addToShopping,
+                onFavorite = vm::toggleFavorite,
+            )
+            Spacer(Modifier.height(12.dp))
+            BatchList(ui.batches, ui.locations, onEditExpiry = { expiryBatch = it })
+            Spacer(Modifier.height(12.dp))
+            when (detailLoad) {
+                is Load.Ok -> ProductDetailsCard(detailLoad.value, runOut)
+                is Load.Failed -> SectionCard(stringResource(R.string.details)) {
+                    Text(stringResource(R.string.details_offline), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    TextButton(onClick = vm::loadDetails) { Text(stringResource(R.string.retry)) }
+                }
+                Load.Loading -> Unit
+            }
+            Spacer(Modifier.height(12.dp))
             if (ui.barcodes.isNotEmpty()) {
                 Text(stringResource(R.string.barcodes), fontWeight = FontWeight.Bold)
                 ui.barcodes.forEach { Text(it.raw.ifEmpty { it.code }) }
                 Spacer(Modifier.height(12.dp))
             }
-
-            Text(stringResource(R.string.batches), fontWeight = FontWeight.Bold)
-            if (ui.batches.isEmpty()) Text(stringResource(R.string.no_batches))
-            ui.batches.forEach { b ->
-                val loc = ui.locations.firstOrNull { it.id == b.locationId }?.name ?: "-"
-                Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-                    Text(loc, modifier = Modifier.weight(1f))
-                    Text(b.expiresAt?.let { stringResource(R.string.expires, it) } ?: "", modifier = Modifier.padding(end = 12.dp))
-                    Text(QuantityMath.format(b.quantity), fontWeight = FontWeight.Bold)
-                }
-                HorizontalDivider()
-            }
-            Spacer(Modifier.height(16.dp))
             Button(onClick = { editing = true }) { Text(stringResource(R.string.edit)) }
+            Spacer(Modifier.height(24.dp))
+
+            when (dialog) {
+                "take" -> QuantityDialog(
+                    title = stringResource(R.string.action_take_out),
+                    initial = "1",
+                    confirm = stringResource(R.string.action_take_out),
+                    onDismiss = { dialog = null },
+                    onConfirm = { q ->
+                        dialog = null
+                        if (q > 0) vm.takeOut(q)
+                    },
+                )
+                "count" -> QuantityDialog(
+                    title = stringResource(R.string.action_count),
+                    initial = QuantityMath.format(maxOf(item.displayQuantity, 0.0)),
+                    confirm = stringResource(R.string.save),
+                    onDismiss = { dialog = null },
+                    onConfirm = { q ->
+                        dialog = null
+                        vm.setCount(q)
+                    },
+                )
+                "move" -> LocationDialog(ui.locations, onDismiss = { dialog = null }, onPick = { l ->
+                    dialog = null
+                    vm.moveAll(l.id)
+                })
+            }
+            expiryBatch?.let { b ->
+                ExpiryDialog(b.expiresAt, onDismiss = { expiryBatch = null }, onSave = { d ->
+                    expiryBatch = null
+                    vm.setExpiry(b.id, d)
+                })
+            }
         } else {
             if (p.status == "unknown") {
                 Text(stringResource(R.string.register_title), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)

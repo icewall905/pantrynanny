@@ -40,6 +40,22 @@ class ScanRepository(private val db: AppDatabase) {
             enqueue(mode.apiType, null, null, product, 1.0, locationId)
         }
 
+    /**
+     * Any stock change made from the app's screens (take out N, move, count, cook a recipe):
+     * the same offline queue as scans, so it works without a connection and syncs exactly once.
+     * [quantity] is positive, except for "adjust" where it is the signed correction.
+     */
+    suspend fun enqueueOp(
+        type: String,
+        productId: String,
+        quantity: Double,
+        locationId: String? = null,
+        toLocationId: String? = null,
+    ): ScanOutcome? = db.withTransaction {
+        val product = db.productDao().getWithQty(productId) ?: return@withTransaction null
+        enqueue(type, null, null, product, quantity, locationId, toLocationId)
+    }
+
     private suspend fun enqueue(
         type: String,
         barcode: String?,
@@ -47,6 +63,7 @@ class ScanRepository(private val db: AppDatabase) {
         product: ProductWithQty?,
         quantity: Double,
         locationId: String?,
+        toLocationId: String? = null,
     ): ScanOutcome {
         val delta = when {
             product == null -> 0.0
@@ -64,7 +81,7 @@ class ScanRepository(private val db: AppDatabase) {
                 productId = product?.product?.id,
                 quantity = quantity,
                 locationId = locationId,
-                toLocationId = null,
+                toLocationId = toLocationId,
                 expiresAt = null,
                 undoesClientOpId = null,
                 occurredAt = now.toString(),
@@ -92,8 +109,12 @@ class ScanRepository(private val db: AppDatabase) {
      * Undo the most recent non-undone scan: a still-pending op is simply deleted; an op that is
      * in flight or already synced gets a compensating `undo` op referencing its client_op_id.
      */
-    suspend fun undoLast(): UndoResult = db.withTransaction {
-        val h = db.historyDao().lastUndoable() ?: return@withTransaction UndoResult.NOTHING
+    suspend fun undoLast(): UndoResult = undo(null)
+
+    /** Undo one specific op (e.g. "Undo" after cooking a recipe), or the last one when [clientOpId] is null. */
+    suspend fun undo(clientOpId: String?): UndoResult = db.withTransaction {
+        val h = (if (clientOpId == null) db.historyDao().lastUndoable() else db.historyDao().get(clientOpId))
+            ?.takeIf { !it.undone } ?: return@withTransaction UndoResult.NOTHING
         db.historyDao().markUndone(h.clientOpId)
         val original = db.pendingOpDao().getByClientOpId(h.clientOpId)
         if (original != null &&

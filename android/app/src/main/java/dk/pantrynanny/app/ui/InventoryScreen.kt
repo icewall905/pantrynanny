@@ -19,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -86,9 +87,10 @@ class InventoryViewModel(private val c: AppContainer) : ViewModel() {
 }
 
 @Composable
-fun InventoryScreen(container: AppContainer, onOpenProduct: (String) -> Unit) {
+fun InventoryScreen(container: AppContainer, onOpenProduct: (String) -> Unit, startUnknown: Boolean = false) {
     val vm: InventoryViewModel = viewModel(factory = viewModelFactory { initializer { InventoryViewModel(container) } })
     val ui by vm.state.collectAsStateWithLifecycle()
+    LaunchedEffect(startUnknown) { if (startUnknown) vm.setUnknownOnly(true) }
 
     Column(Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
         Text(

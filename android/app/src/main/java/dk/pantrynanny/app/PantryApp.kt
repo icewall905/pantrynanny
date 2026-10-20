@@ -52,6 +52,9 @@ class AppContainer(val app: Application) {
     /** Scanner mode asked for by a launcher shortcut; the scanner consumes it (sets back to null). */
     val requestedMode = MutableStateFlow<ScanMode?>(null)
 
+    /** A tab a launcher shortcut asked for ("Indkøbsliste"); consumed by the navigation. */
+    val requestedRoute = MutableStateFlow<String?>(null)
+
     private val syncTrigger = Channel<Unit>(Channel.CONFLATED)
 
     fun start() {

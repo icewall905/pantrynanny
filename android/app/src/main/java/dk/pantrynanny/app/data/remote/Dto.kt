@@ -4,6 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
 /** Shared JSON configuration: tolerant on input, compact on output. */
@@ -39,6 +40,15 @@ data class ProductDto(
     val barcodes: List<BarcodeDto> = emptyList(),
     val status: String = "known",
     @SerialName("deleted_at") val deletedAt: String? = null,
+    // Details shown on the product screen (not cached in Room).
+    val ingredients: String? = null,
+    val allergens: List<String> = emptyList(),
+    val nutrition: JsonObject? = null,
+    val description: String? = null,
+    val countries: List<String> = emptyList(),
+    val source: String? = null,
+    @SerialName("source_attribution") val sourceAttribution: String? = null,
+    val favorite: Boolean = false,
 )
 
 @Serializable

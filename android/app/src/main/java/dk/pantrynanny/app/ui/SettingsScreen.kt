@@ -10,7 +10,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -91,7 +95,7 @@ class SettingsViewModel(private val c: AppContainer) : ViewModel() {
 }
 
 @Composable
-fun SettingsScreen(container: AppContainer) {
+fun SettingsScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
     val vm: SettingsViewModel = viewModel(factory = viewModelFactory { initializer { SettingsViewModel(container) } })
     val ui by vm.state.collectAsStateWithLifecycle()
     val s = ui.settings
@@ -104,7 +108,14 @@ fun SettingsScreen(container: AppContainer) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text(stringResource(R.string.nav_settings), style = MaterialTheme.typography.headlineSmall)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (onBack != null) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+                }
+            }
+            Text(stringResource(R.string.nav_settings), style = MaterialTheme.typography.headlineSmall)
+        }
 
         SectionTitle(R.string.section_account)
         Text(stringResource(R.string.server_label, s.serverUrl))
