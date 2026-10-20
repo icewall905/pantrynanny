@@ -126,6 +126,20 @@ class ScanConfirmerTest {
         assertFalse(c.onRead(read("A")))
     }
     @Test
+    fun misreadAfterWeakUnconfirmedRealCodeIsRejected() {
+        val c = confirmer()
+        assertFalse(c.onRead(read("A", weak = true)))
+        now += 33
+        assertFalse(c.onRead(read("A", weak = true)))
+        now += 33
+        assertFalse(c.onRead(read("X")))
+        now += 33
+        assertFalse("X ties A 2-2 and must not confirm", c.onRead(read("X")))
+        now += 33
+        assertTrue("A confirms on its third read", c.onRead(read("A")))
+    }
+
+    @Test
     fun differentProductQuicklySwappedIntoHeldSpotConfirmsSoon() {
         val c = confirmer()
         c.onRead(read("A"))

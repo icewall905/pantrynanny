@@ -106,11 +106,11 @@ class ScanConfirmer(
             if (overlaps && mine.size <= minOf(lastReads, minReads + 1)) return false
         }
         // Competitors: other codes read from a region overlapping this code's (unknown box = assume overlap),
-        // counted only since this code's first sighting — a product that was swapped out before this one appeared
-        // is not competing with it (the region hold above covers late misreads after a confirmation).
+        // The last CONFIRMED code's reads from before this code's first sighting don't count (that product was
+        // swapped out); every other code — e.g. a real product not yet confirmed — keeps its full window.
         val regions = mine.mapNotNull { it.box }
         val since = mine.first().t
-        val rivalBest = reads.filter { it.code != d.raw && it.t >= since }
+        val rivalBest = reads.filter { it.code != d.raw && !(it.code == lastCode && it.t < since) }
             .filter { r -> r.box == null || regions.isEmpty() || regions.any { it.overlaps(r.box) } }
             .groupBy { it.code }
             .maxOfOrNull { it.value.size } ?: 0
