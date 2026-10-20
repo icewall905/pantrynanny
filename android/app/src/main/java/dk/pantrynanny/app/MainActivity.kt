@@ -10,8 +10,8 @@ import dk.pantrynanny.app.domain.ScanMode
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -94,8 +94,8 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// Five tabs: the scanner first (the app opens there for quick scans), then the daily lists,
-// food (recipes + meal plan) and "Mere" for everything else. Detail screens keep their tab lit.
+// Five tabs: the scanner first (the app opens there for quick scans), inventory, food (recipes +
+// meal plan), the assistant and "Mere" for everything else (incl. the shopping list). Detail screens keep their tab lit.
 private const val ROUTE_SCAN = "scan"
 private const val ROUTE_INVENTORY = "inventory?unknown={unknown}"
 const val ROUTE_SHOPPING = "shopping"
@@ -121,8 +121,8 @@ fun PantryRoot(container: AppContainer) {
 private enum class Tab(val route: String, val labelRes: Int) {
     SCAN(ROUTE_SCAN, R.string.nav_scan),
     INVENTORY("inventory", R.string.nav_inventory),
-    SHOPPING(ROUTE_SHOPPING, R.string.nav_shopping),
     FOOD(ROUTE_RECIPES, R.string.tab_food),
+    ASSISTANT(ROUTE_ASSISTANT, R.string.nav_assistant),
     MORE(ROUTE_MORE, R.string.nav_more),
 }
 
@@ -130,7 +130,7 @@ private enum class Tab(val route: String, val labelRes: Int) {
 private fun tabOf(route: String?): Tab = when (route?.substringBefore('/')?.substringBefore('?')) {
     null, ROUTE_SCAN -> Tab.SCAN
     "inventory", "product" -> Tab.INVENTORY
-    ROUTE_SHOPPING -> Tab.SHOPPING
+    ROUTE_ASSISTANT -> Tab.ASSISTANT
     ROUTE_RECIPES, ROUTE_PLAN, "recipe", "recipe_edit" -> Tab.FOOD
     else -> Tab.MORE
 }
@@ -140,7 +140,7 @@ private fun TabIcon(tab: Tab) {
     when (tab) {
         Tab.SCAN -> Icon(painterResource(R.drawable.ic_nav_scan), contentDescription = null)
         Tab.INVENTORY -> Icon(Icons.AutoMirrored.Filled.List, contentDescription = null)
-        Tab.SHOPPING -> Icon(Icons.Filled.ShoppingCart, contentDescription = null)
+        Tab.ASSISTANT -> Icon(Icons.Filled.Face, contentDescription = null)
         Tab.FOOD -> Icon(painterResource(R.drawable.ic_nav_food), contentDescription = null)
         Tab.MORE -> Icon(Icons.Filled.Menu, contentDescription = null)
     }
@@ -222,7 +222,7 @@ private fun MainScaffold(container: AppContainer) {
                 val register = backStack.arguments?.getBoolean("register") ?: false
                 ProductDetailScreen(container, id, snackbar, register = register, onBack = back)
             }
-            composable(ROUTE_SHOPPING) { ShoppingScreen(container, snackbar) }
+            composable(ROUTE_SHOPPING) { ShoppingScreen(container, snackbar, onBack = back) }
             composable(ROUTE_RECIPES) {
                 RecipesScreen(
                     container, snackbar,
@@ -274,7 +274,7 @@ private fun MainScaffold(container: AppContainer) {
                     onOverview = { nav.navigate(ROUTE_OVERVIEW) },
                     onUnknown = { openUnknown() },
                     onActivity = { nav.navigate(ROUTE_ACTIVITY) },
-                    onAssistant = { nav.navigate(ROUTE_ASSISTANT) },
+                    onShopping = { nav.navigate(ROUTE_SHOPPING) },
                     onSettings = { nav.navigate(ROUTE_SETTINGS) },
                 )
             }
@@ -286,7 +286,7 @@ private fun MainScaffold(container: AppContainer) {
                 )
             }
             composable(ROUTE_ACTIVITY) { ActivityScreen(container, snackbar, onBack = back, onOpenProduct = openProduct) }
-            composable(ROUTE_ASSISTANT) { AssistantScreen(container, snackbar, onBack = back) }
+            composable(ROUTE_ASSISTANT) { AssistantScreen(container, snackbar) }
             composable(ROUTE_SETTINGS) { SettingsScreen(container, onBack = back) }
         }
     }

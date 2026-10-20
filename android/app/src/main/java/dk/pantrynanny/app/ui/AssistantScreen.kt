@@ -139,7 +139,7 @@ class AssistantViewModel(private val c: AppContainer) : ViewModel() {
 }
 
 @Composable
-fun AssistantScreen(container: AppContainer, snackbar: SnackbarHostState, onBack: () -> Unit) {
+fun AssistantScreen(container: AppContainer, snackbar: SnackbarHostState, onBack: (() -> Unit)? = null) {
     val vm: AssistantViewModel = viewModel(factory = viewModelFactory { initializer { AssistantViewModel(container) } })
     val ui by vm.ui.collectAsStateWithLifecycle()
     CollectMessages(vm.messages, snackbar)

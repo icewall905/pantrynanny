@@ -128,7 +128,7 @@ class ShoppingViewModel(c: AppContainer) : RemoteVm<ShoppingData>(c) {
 }
 
 @Composable
-fun ShoppingScreen(container: AppContainer, snackbar: SnackbarHostState) {
+fun ShoppingScreen(container: AppContainer, snackbar: SnackbarHostState, onBack: (() -> Unit)? = null) {
     val vm: ShoppingViewModel = viewModel(factory = viewModelFactory { initializer { ShoppingViewModel(container) } })
     val load by vm.state.collectAsStateWithLifecycle()
     CollectMessages(vm.messages, snackbar)
@@ -137,7 +137,7 @@ fun ShoppingScreen(container: AppContainer, snackbar: SnackbarHostState) {
     var confirmPutAway by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize()) {
-        ScreenHeader(stringResource(R.string.nav_shopping)) {
+        ScreenHeader(stringResource(R.string.nav_shopping), onBack = onBack) {
             IconButton(onClick = { vm.refresh(spinner = true) }) {
                 Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.refresh))
             }

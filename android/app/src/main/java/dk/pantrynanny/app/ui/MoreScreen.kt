@@ -11,7 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Face
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
@@ -39,7 +39,7 @@ fun MoreScreen(
     onOverview: () -> Unit,
     onUnknown: () -> Unit,
     onActivity: () -> Unit,
-    onAssistant: () -> Unit,
+    onShopping: () -> Unit,
     onSettings: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -50,7 +50,7 @@ fun MoreScreen(
             MoreItem(Icons.Filled.Home, R.string.nav_overview, R.string.more_overview, onOverview)
             MoreItem(Icons.Filled.Info, R.string.tab_unknown, R.string.more_unknown, onUnknown)
             MoreItem(Icons.Filled.DateRange, R.string.nav_activity, R.string.more_activity, onActivity)
-            MoreItem(Icons.Filled.Face, R.string.nav_assistant, R.string.more_assistant, onAssistant)
+            MoreItem(Icons.Filled.ShoppingCart, R.string.nav_shopping, R.string.more_shopping, onShopping)
             MoreItem(Icons.Filled.Settings, R.string.nav_settings, R.string.more_settings, onSettings)
             MoreItem(Icons.AutoMirrored.Filled.ExitToApp, R.string.open_web, R.string.more_web) {
                 scope.launch {
