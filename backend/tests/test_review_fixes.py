@@ -235,7 +235,7 @@ async def test_deleted_location_in_queued_op_falls_back(env):
     (res,) = await env.ops(env.op("add", product_id=p["id"], location_id=loc["id"]))
     assert res["status"] == "applied"
     item = (await env.client.get("/api/inventory", headers=env.member)).json()[0]
-    assert item["batches"][0]["location_id"] == env.locations["Spisekammer"]
+    assert item["batches"][0]["location_id"] == env.locations["Køleskab"]
     # a move to a deleted destination is still rejected
     (res,) = await env.ops(
         env.op(

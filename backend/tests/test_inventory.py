@@ -19,8 +19,8 @@ async def test_add_one(env):
     assert res["total_quantity"] == 1 and res["product"]["id"] == p["id"]
     items = await inv(env)
     assert len(items) == 1 and items[0]["total_quantity"] == 1
-    # default location = household default (Spisekammer)
-    assert items[0]["batches"][0]["location_id"] == env.locations["Spisekammer"]
+    # default location = household default (the fridge)
+    assert items[0]["batches"][0]["location_id"] == env.locations["Køleskab"]
 
 
 async def test_location_resolution_prefers_op_then_product_default(env):
@@ -443,3 +443,36 @@ async def test_ops_validation_and_limits(env):
         env.op("add", quantity=-1, product_id=p["id"]), env.op("add", product_id=p["id"])
     )
     assert [x["status"] for x in r] == ["rejected", "applied"]
+
+
+async def test_unknown_place_is_the_fridge_and_moves_are_remembered(env):
+    fridge, pantry, freezer = (env.locations[n] for n in ("Køleskab", "Spisekammer", "Fryser"))
+    rice = await env.product("Ris")
+
+    async def default():
+        return (await env.client.get(f"/api/products/{rice['id']}", headers=env.member)).json()[
+            "default_location_id"
+        ]
+
+    (a,) = await env.ops(env.op("add", product_id=rice["id"]))
+    item = (await inv(env))[0]
+    assert item["batches"][0]["location_id"] == fridge
+    assert await default() is None  # a fallback is not a decision
+
+    # the user moves it to the pantry: from now on new rice goes there
+    (mv,) = await env.ops(env.op("move", product_id=rice["id"], quantity=1, to_location_id=pantry))
+    assert mv["status"] == "applied" and await default() == pantry
+    await env.ops(env.op("add", product_id=rice["id"]))
+    item = (await inv(env))[0]
+    assert {b["location_id"]: b["quantity"] for b in item["batches"]} == {pantry: 2}
+
+    # undoing the move forgets it again
+    await env.ops(env.op("undo", quantity=None, undoes_client_op_id=mv["client_op_id"]))
+    assert await default() == fridge
+
+    # an explicit place on the first add of a new product is learned; later ones are not
+    peas = await env.product("Ærter")
+    await env.ops(env.op("add", product_id=peas["id"], location_id=freezer))
+    await env.ops(env.op("add", product_id=peas["id"], location_id=pantry))
+    p = (await env.client.get(f"/api/products/{peas['id']}", headers=env.member)).json()
+    assert p["default_location_id"] == freezer

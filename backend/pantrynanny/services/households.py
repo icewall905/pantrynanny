@@ -10,9 +10,10 @@ from ..models import Category, Household, HouseholdSettings, Location, User
 from ..security import ahash_password
 
 DEFAULT_LOCATIONS = [
-    ("Køleskab", "refrigerator", False),
+    # Unknown items go to the fridge unless the product has learned another place.
+    ("Køleskab", "refrigerator", True),
     ("Fryser", "snowflake", False),
-    ("Spisekammer", "warehouse", True),
+    ("Spisekammer", "warehouse", False),
     ("Køkkenskab", "cooking-pot", False),
     ("Andet", "package", False),
 ]

@@ -152,6 +152,13 @@ async def _resolve_location(
     return loc
 
 
+def _learn_location(product: Product, location_id: uuid.UUID | None) -> None:
+    """Remember where this product lives, so the next scan without a location goes there."""
+    if location_id is not None and product.default_location_id != location_id:
+        product.default_location_id = location_id
+        product.version += 1
+
+
 async def _find_or_create_batch(
     session: AsyncSession,
     product: Product,
@@ -477,6 +484,8 @@ async def apply_op(
         to_location_id = original.location_id if original.type == "move" else None
         undoes_id = original.id
         original.undone = True
+        if original.type == "move" and product.default_location_id == original.to_location_id:
+            _learn_location(product, original.location_id)  # the move is taken back
     elif op.type == "move":
         assert qty is not None and op.to_location_id is not None
         dest = await _resolve_location(
@@ -490,9 +499,13 @@ async def apply_op(
         effect, delta = await _move_stock(session, product, src_id, dest.id, qty)
         first_src = next((b.location_id for b, d in effect.lines if d < 0), src_id)
         location_id, to_location_id = first_src, dest.id
+        if delta > 0:
+            _learn_location(product, dest.id)  # moved it: that is where it belongs now
     else:
         loc = await _resolve_location(session, hh, op.location_id, product)
         location_id = loc.id
+        if op.type == "add" and op.location_id == loc.id and product.default_location_id is None:
+            _learn_location(product, loc.id)  # first time it was put somewhere on purpose
         assert qty is not None
         signed = qty if op.type == "add" else (-qty if op.type == "remove" else qty)
         if signed > 0:
