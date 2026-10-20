@@ -316,6 +316,11 @@ export default function ScanScreen({ settings, kiosk, wake, initialMode, onExit,
           vibrate(15)
           setCard((c) => (c && c.n === cur.n ? { ...c, dupAt: at } : c))
           setTimeout(() => setCard((c) => (c && c.n === cur.n && c.dupAt === at ? { ...c, dupAt: null } : c)), 4000)
+        } else {
+          // the repeated item's card isn't shown (e.g. a failed scan replaced it): still never ignore silently
+          beep('dup')
+          vibrate(15)
+          toast(t('last.alreadyCounted'))
         }
         return
       }

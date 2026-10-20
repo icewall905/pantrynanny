@@ -16,7 +16,12 @@ export function reloadForStaleChunk(): boolean {
     if (Date.now() - last < 60_000) return false
     sessionStorage.setItem(KEY, String(Date.now()))
   } catch {
-    /* storage unavailable: still try once */
+    // storage unavailable: guard with a URL marker instead, so a broken deploy can't loop
+    const url = new URL(window.location.href)
+    if (url.searchParams.has('_r')) return false
+    url.searchParams.set('_r', '1')
+    window.location.replace(url.toString())
+    return true
   }
   window.location.reload()
   return true

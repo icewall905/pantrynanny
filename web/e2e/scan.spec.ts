@@ -130,7 +130,9 @@ test.describe('hand scanner, quantity and sessions', () => {
     await page.keyboard.type(BARCODE_A, { delay: 5 })
     await page.keyboard.press('Enter')
     await expect(page.getByTestId('last-name')).toHaveText('Letmælk')
-    // the same item again right away is not counted (hand scanner follows the same rule): hint, still +1
+    // the same item again is not counted (hand scanner follows the same rule): hint, still +1.
+    // Wait past the HID trigger-bounce window (350 ms) so this exercises the owner rule, not the bounce filter.
+    await page.waitForTimeout(600)
     await page.keyboard.type(BARCODE_A, { delay: 5 })
     await page.keyboard.press('Enter')
     await expect(page.getByTestId('dup-hint')).toBeVisible()
