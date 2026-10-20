@@ -9,10 +9,12 @@ import dk.pantrynanny.app.data.AppSettings
 import dk.pantrynanny.app.data.UndoResult
 import dk.pantrynanny.app.data.local.HistoryRow
 import dk.pantrynanny.app.domain.BarcodeNormalizer
+import dk.pantrynanny.app.domain.LastCountedGuard
 import dk.pantrynanny.app.domain.ModePolicy
 import dk.pantrynanny.app.domain.ScanDeduplicator
 import dk.pantrynanny.app.domain.ScanMode
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,6 +34,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 /** How long "Registrer" waits for an unsynced unknown scan to come back with its placeholder product. */
 private const val REGISTER_WAIT_MS = 10_000L
+private const val ALREADY_COUNTED_MS = 2_500L
 
 data class SyncStatusUi(
     val pending: Int = 0,
@@ -48,6 +51,7 @@ data class ScannerUiState(
     val last: HistoryRow? = null,
     val history: List<HistoryRow> = emptyList(),
     val status: SyncStatusUi = SyncStatusUi(),
+    val alreadyCounted: Boolean = false,
 )
 
 class ScannerViewModel(private val c: AppContainer) : ViewModel() {
@@ -59,6 +63,9 @@ class ScannerViewModel(private val c: AppContainer) : ViewModel() {
     private val _torch = MutableStateFlow(false)
 
     private val dedup = ScanDeduplicator(ScanDeduplicator.DEFAULT_REARM_MS) { SystemClock.elapsedRealtime() }
+    private val guard = LastCountedGuard { SystemClock.elapsedRealtime() }
+    private val _already = MutableStateFlow(false)
+    private var alreadyJob: Job? = null
     private val feedback = Feedback(c.app)
 
     @Volatile
@@ -93,7 +100,7 @@ class ScannerViewModel(private val c: AppContainer) : ViewModel() {
         settings.map { it.frontCamera },
     ) { mode, torch, history, st, front ->
         ScannerUiState(mode, torch, front, history.firstOrNull(), history, st)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ScannerUiState())
+    }.combine(_already) { s, already -> s.copy(alreadyCounted = already) }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ScannerUiState())
 
     init {
         // Cold start: the app always starts in Add mode (a persisted Remove mode is reset).
@@ -148,6 +155,16 @@ class ScannerViewModel(private val c: AppContainer) : ViewModel() {
         val mode = _mode.value
         touch()
         val s = settings.value
+        if (!guard.shouldCount(BarcodeNormalizer.normalize(raw, symbology).code, mode)) {
+            feedback.alreadyCounted(s.sound, s.vibrate)
+            _already.value = true
+            alreadyJob?.cancel()
+            alreadyJob = viewModelScope.launch {
+                delay(ALREADY_COUNTED_MS)
+                _already.value = false
+            }
+            return
+        }
         feedback.signal(mode, s.sound, s.vibrate)
 
         viewModelScope.launch(Dispatchers.IO) {
@@ -175,9 +192,26 @@ class ScannerViewModel(private val c: AppContainer) : ViewModel() {
         }
     }
 
+    /** +1/+2/+5 on the last-scanned card (extra op for the same product/barcode in the current mode). */
+    fun addExtra(row: HistoryRow, quantity: Int) {
+        val mode = _mode.value
+        touch()
+        val loc = settings.value.defaultLocationId
+        viewModelScope.launch(Dispatchers.IO) {
+            c.scanRepository.addExtra(row.entry.productId, row.entry.barcode, mode, quantity.toDouble(), loc)
+            c.requestSync()
+        }
+    }
+
+    fun onAppStopped() = guard.onBackgrounded()
+
+    fun onAppStarted() = guard.onForegrounded()
+
     fun undo() {
         viewModelScope.launch(Dispatchers.IO) {
-            when (c.scanRepository.undoLast()) {
+            val result = c.scanRepository.undoLast()
+            if (result != UndoResult.NOTHING) guard.reset()
+            when (result) {
                 UndoResult.NOTHING -> _events.tryEmit(UiMessage(R.string.snack_nothing_to_undo))
                 UndoResult.REMOVED_PENDING -> _events.tryEmit(UiMessage(R.string.snack_undone))
                 UndoResult.QUEUED -> {
@@ -206,6 +240,7 @@ class ScannerViewModel(private val c: AppContainer) : ViewModel() {
     private fun applyMode(mode: ScanMode, clearDedup: Boolean) {
         _mode.value = mode
         if (clearDedup) dedup.clear()
+        guard.reset()
         viewModelScope.launch { c.settings.setMode(mode) }
     }
 

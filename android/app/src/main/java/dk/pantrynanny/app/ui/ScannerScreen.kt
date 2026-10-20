@@ -108,6 +108,8 @@ fun ScannerScreen(vm: ScannerViewModel, snackbar: SnackbarHostState, onRegisterP
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) granted = hasCameraPermission(context)
+            if (event == Lifecycle.Event.ON_STOP) vm.onAppStopped()
+            if (event == Lifecycle.Event.ON_START) vm.onAppStarted()
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
@@ -187,7 +189,7 @@ fun ScannerScreen(vm: ScannerViewModel, snackbar: SnackbarHostState, onRegisterP
         Spacer(Modifier.height(6.dp))
         ModeToggle(state.mode, onSelect = vm::setMode)
         Spacer(Modifier.height(6.dp))
-        LastScanCard(state.last, accent, onRegister = vm::register)
+        LastScanCard(state.last, accent, state.alreadyCounted, onRegister = vm::register, onExtra = vm::addExtra)
         Spacer(Modifier.height(4.dp))
 
         LazyColumn(
@@ -302,8 +304,21 @@ private fun needsRegister(row: HistoryRow): Boolean =
     row.entry.barcode.isNotEmpty() && !row.entry.undone && (row.prodStatus == null || row.prodStatus == "unknown")
 
 @Composable
-private fun LastScanCard(last: HistoryRow?, accent: Color, onRegister: (String) -> Unit) {
-    Card(Modifier.fillMaxWidth()) {
+private fun LastScanCard(
+    last: HistoryRow?,
+    accent: Color,
+    alreadyCounted: Boolean,
+    onRegister: (String) -> Unit,
+    onExtra: (HistoryRow, Int) -> Unit,
+) {
+    Card(
+        Modifier
+            .fillMaxWidth()
+            .then(
+                if (alreadyCounted) Modifier.border(3.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
+                else Modifier
+            ),
+    ) {
         Column(Modifier.padding(10.dp)) {
             if (last == null) {
                 Text(stringResource(R.string.scan_prompt), fontSize = 18.sp)
@@ -337,6 +352,22 @@ private fun LastScanCard(last: HistoryRow?, accent: Color, onRegister: (String) 
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
                         )
+                    }
+                }
+                if (alreadyCounted) {
+                    Text(
+                        stringResource(R.string.already_counted),
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
+                if (!last.entry.undone) {
+                    Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        for (n in intArrayOf(1, 2, 5)) {
+                            OutlinedButton(onClick = { onExtra(last, n) }, modifier = Modifier.weight(1f)) {
+                                Text("+$n", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
                     }
                 }
                 if (needsRegister(last)) {

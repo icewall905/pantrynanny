@@ -114,4 +114,5 @@
     <string name="about_version">Version %1$s</string>
     <string name="error_http_release">Kun https:// er tilladt i release-versionen</string>
     <string name="warn_other_server_pending">Kontoen/serveren er en anden end den lokale database. Ikke-synkroniserede handlinger (antal nedenfor) slettes – tryk Log ind igen for at bekræfte.</string>
+    <string name="already_counted">Allerede talt – tryk + for flere</string>
 </resources>

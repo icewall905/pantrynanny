@@ -40,6 +40,15 @@ class ScanRepository(private val db: AppDatabase) {
             enqueue(mode.apiType, null, null, product, 1.0, locationId)
         }
 
+    /** +1/+2/+5 on the last-scanned card: one extra op (own client_op_id) for that product/barcode. */
+    suspend fun addExtra(
+        productId: String?, barcode: String, mode: ScanMode, quantity: Double, locationId: String?,
+    ): ScanOutcome? = db.withTransaction {
+        val product = productId?.let { db.productDao().getWithQty(it) }?.takeIf { it.product.deletedAt == null }
+        if (product == null && barcode.isEmpty()) return@withTransaction null
+        enqueue(mode.apiType, if (product == null) barcode else null, null, product, quantity, locationId)
+    }
+
     private suspend fun enqueue(
         type: String,
         barcode: String?,

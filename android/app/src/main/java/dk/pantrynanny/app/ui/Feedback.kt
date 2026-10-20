@@ -29,6 +29,12 @@ class Feedback(context: Context) {
         }
     }
 
+    /** Soft neutral cue for "already counted": a short different tone and a light tick. */
+    fun alreadyCounted(sound: Boolean, vibrate: Boolean) {
+        if (sound) tone?.startTone(ToneGenerator.TONE_PROP_PROMPT, 60)
+        if (vibrate) vibrator?.vibrate(VibrationEffect.createOneShot(15L, 60))
+    }
+
     fun release() {
         tone?.release()
     }
