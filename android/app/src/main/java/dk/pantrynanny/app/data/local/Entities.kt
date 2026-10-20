@@ -107,6 +107,8 @@ data class ScanHistoryEntity(
     val occurredAtMs: Long,
     val undone: Boolean = false,
     val titleSnapshot: String?,
+    /** Symbology of the original scan (null for manual +/- ops); carried to +N extra ops. */
+    val symbology: String? = null,
 )
 
 data class ProductWithQty(

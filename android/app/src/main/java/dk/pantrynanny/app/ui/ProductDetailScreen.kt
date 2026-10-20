@@ -141,6 +141,7 @@ class ProductDetailViewModel(private val c: AppContainer, private val productId:
             val product = state.value.product?.product
             val loc = product?.defaultLocationId ?: c.settings.current().defaultLocationId
             c.scanRepository.adjustProduct(productId, mode, loc)
+            c.scanGuard.reset() // the last-scanned card is no longer the last op
             c.requestSync()
         }
     }

@@ -108,8 +108,6 @@ fun ScannerScreen(vm: ScannerViewModel, snackbar: SnackbarHostState, onRegisterP
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) granted = hasCameraPermission(context)
-            if (event == Lifecycle.Event.ON_STOP) vm.onAppStopped()
-            if (event == Lifecycle.Event.ON_START) vm.onAppStarted()
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }

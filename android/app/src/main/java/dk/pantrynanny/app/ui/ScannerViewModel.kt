@@ -9,7 +9,6 @@ import dk.pantrynanny.app.data.AppSettings
 import dk.pantrynanny.app.data.UndoResult
 import dk.pantrynanny.app.data.local.HistoryRow
 import dk.pantrynanny.app.domain.BarcodeNormalizer
-import dk.pantrynanny.app.domain.LastCountedGuard
 import dk.pantrynanny.app.domain.ModePolicy
 import dk.pantrynanny.app.domain.ScanDeduplicator
 import dk.pantrynanny.app.domain.ScanMode
@@ -63,7 +62,7 @@ class ScannerViewModel(private val c: AppContainer) : ViewModel() {
     private val _torch = MutableStateFlow(false)
 
     private val dedup = ScanDeduplicator(ScanDeduplicator.DEFAULT_REARM_MS) { SystemClock.elapsedRealtime() }
-    private val guard = LastCountedGuard { SystemClock.elapsedRealtime() }
+    private val guard = c.scanGuard
     private val _already = MutableStateFlow(false)
     private var alreadyJob: Job? = null
     private val feedback = Feedback(c.app)
@@ -155,7 +154,8 @@ class ScannerViewModel(private val c: AppContainer) : ViewModel() {
         val mode = _mode.value
         touch()
         val s = settings.value
-        if (!guard.shouldCount(BarcodeNormalizer.normalize(raw, symbology).code, mode)) {
+        val code = BarcodeNormalizer.normalize(raw, symbology).code
+        if (!guard.shouldCount(code, mode)) {
             feedback.alreadyCounted(s.sound, s.vibrate)
             _already.value = true
             alreadyJob?.cancel()
@@ -168,7 +168,13 @@ class ScannerViewModel(private val c: AppContainer) : ViewModel() {
         feedback.signal(mode, s.sound, s.vibrate)
 
         viewModelScope.launch(Dispatchers.IO) {
-            val outcome = c.scanRepository.recordScan(raw, symbology, mode, s.defaultLocationId)
+            val outcome = try {
+                c.scanRepository.recordScan(raw, symbology, mode, s.defaultLocationId)
+            } catch (e: Exception) {
+                guard.release(code, mode)
+                throw e
+            }
+            guard.confirm(code, mode, outcome.clientOpId)
             if (!outcome.known) _unknownScans.tryEmit(outcome.clientOpId)
             c.requestSync()
         }
@@ -192,26 +198,23 @@ class ScannerViewModel(private val c: AppContainer) : ViewModel() {
         }
     }
 
-    /** +1/+2/+5 on the last-scanned card (extra op for the same product/barcode in the current mode). */
+    /** +1/+2/+5 on the last-scanned card: extra op for the same product/barcode with the card's own op type. */
     fun addExtra(row: HistoryRow, quantity: Int) {
-        val mode = _mode.value
         touch()
         val loc = settings.value.defaultLocationId
         viewModelScope.launch(Dispatchers.IO) {
-            c.scanRepository.addExtra(row.entry.productId, row.entry.barcode, mode, quantity.toDouble(), loc)
+            c.scanRepository.addExtra(
+                row.entry.productId, row.entry.barcode, row.entry.symbology, row.entry.type, quantity.toDouble(), loc,
+            )
             c.requestSync()
         }
     }
 
-    fun onAppStopped() = guard.onBackgrounded()
-
-    fun onAppStarted() = guard.onForegrounded()
-
     fun undo() {
         viewModelScope.launch(Dispatchers.IO) {
-            val result = c.scanRepository.undoLast()
-            if (result != UndoResult.NOTHING) guard.reset()
-            when (result) {
+            val outcome = c.scanRepository.undoLast()
+            outcome.undoneClientOpId?.let(guard::onUndone)
+            when (outcome.result) {
                 UndoResult.NOTHING -> _events.tryEmit(UiMessage(R.string.snack_nothing_to_undo))
                 UndoResult.REMOVED_PENDING -> _events.tryEmit(UiMessage(R.string.snack_undone))
                 UndoResult.QUEUED -> {

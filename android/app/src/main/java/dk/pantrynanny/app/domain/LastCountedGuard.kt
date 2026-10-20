@@ -11,21 +11,50 @@ package dk.pantrynanny.app.domain
 class LastCountedGuard(private val clock: () -> Long) {
     private var lastCode: String? = null
     private var lastMode: ScanMode? = null
+    private var lastOpId: String? = null
     private var backgroundedAt: Long? = null
 
-    /** True when the scan should be counted (and is recorded as the last counted one). */
+    /**
+     * True when the scan should be counted. The scan is claimed immediately (so a quick second fire
+     * cannot slip through before the write finishes); call [confirm] once the op is durably stored,
+     * or [release] if the write failed.
+     */
     @Synchronized
     fun shouldCount(code: String, mode: ScanMode): Boolean {
         if (code == lastCode && mode == lastMode) return false
         lastCode = code
         lastMode = mode
+        lastOpId = null
         return true
     }
+
+    /** The claimed scan was stored as op [clientOpId]. */
+    @Synchronized
+    fun confirm(code: String, mode: ScanMode, clientOpId: String) {
+        if (code == lastCode && mode == lastMode) lastOpId = clientOpId
+    }
+
+    /** The claimed scan was not stored (write failed): forget the claim. */
+    @Synchronized
+    fun release(code: String, mode: ScanMode) {
+        if (code == lastCode && mode == lastMode && lastOpId == null) reset()
+    }
+
+    /** An op was undone; only undoing the last counted scan op re-arms its code. */
+    @Synchronized
+    fun onUndone(clientOpId: String) {
+        if (clientOpId == lastOpId) reset()
+    }
+
+    /** The normalised code and mode of the last counted scan (null when none / reset). */
+    @Synchronized
+    fun lastCode(): String? = lastCode
 
     @Synchronized
     fun reset() {
         lastCode = null
         lastMode = null
+        lastOpId = null
     }
 
     @Synchronized

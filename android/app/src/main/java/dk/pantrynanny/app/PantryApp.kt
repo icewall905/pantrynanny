@@ -1,5 +1,11 @@
 package dk.pantrynanny.app
 
+import android.os.SystemClock
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ProcessLifecycleOwner
+import dk.pantrynanny.app.data.local.Migrations
+import dk.pantrynanny.app.domain.LastCountedGuard
 import android.app.Application
 import androidx.room.Room
 import dk.pantrynanny.app.data.CacheWriter
@@ -37,7 +43,9 @@ class PantryApp : Application() {
 class AppContainer(val app: Application) {
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
-    val db: AppDatabase = Room.databaseBuilder(app, AppDatabase::class.java, "pantrynanny.db").build()
+    val db: AppDatabase = Room.databaseBuilder(app, AppDatabase::class.java, "pantrynanny.db")
+        .addMigrations(Migrations.MIGRATION_1_2)
+        .build()
     val settings = SettingsStore(app)
     val tokens = TokenStore(app)
     val api = ApiClient(settings, tokens, imageCacheDir = java.io.File(app.cacheDir, "images"))
@@ -45,6 +53,9 @@ class AppContainer(val app: Application) {
     val cache = CacheWriter(db)
     val syncRepository = SyncRepository(db, api, settings, tokens, cache)
     val scanRepository = ScanRepository(db)
+
+    /** "Never count the same item twice in succession" state, shared by scanner and detail screen. */
+    val scanGuard = LastCountedGuard { SystemClock.elapsedRealtime() }
     val inventoryRepository = InventoryRepository(api, cache)
     val network = NetworkMonitor(app)
     val scheduler = SyncScheduler(app)
@@ -63,6 +74,11 @@ class AppContainer(val app: Application) {
                 syncRepository.syncNow()
             }
         }
+        // App-wide foreground/background (not tied to the scanner screen being composed).
+        ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onStop(owner: LifecycleOwner) = scanGuard.onBackgrounded()
+            override fun onStart(owner: LifecycleOwner) = scanGuard.onForegrounded()
+        })
         scheduler.schedulePeriodic()
         network.start { if (tokens.token() != null) requestSync() }
         if (tokens.token() != null) requestSync()

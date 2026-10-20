@@ -15,6 +15,9 @@ import java.util.UUID
 
 enum class UndoResult { NOTHING, REMOVED_PENDING, QUEUED }
 
+/** [undoneClientOpId] is the history op that was undone (null for NOTHING). */
+data class UndoOutcome(val result: UndoResult, val undoneClientOpId: String? = null)
+
 data class ScanOutcome(val clientOpId: String, val productId: String?, val known: Boolean)
 
 /**
@@ -40,13 +43,17 @@ class ScanRepository(private val db: AppDatabase) {
             enqueue(mode.apiType, null, null, product, 1.0, locationId)
         }
 
-    /** +1/+2/+5 on the last-scanned card: one extra op (own client_op_id) for that product/barcode. */
+    /**
+     * +1/+2/+5 on the last-scanned card: one extra op (own client_op_id) for that product/barcode.
+     * [type] is the card's own op type ("add"/"remove"), not the scanner's current mode; [symbology]
+     * is the original scan's so an unknown barcode normalises to the same code on the server.
+     */
     suspend fun addExtra(
-        productId: String?, barcode: String, mode: ScanMode, quantity: Double, locationId: String?,
+        productId: String?, barcode: String, symbology: String?, type: String, quantity: Double, locationId: String?,
     ): ScanOutcome? = db.withTransaction {
         val product = productId?.let { db.productDao().getWithQty(it) }?.takeIf { it.product.deletedAt == null }
         if (product == null && barcode.isEmpty()) return@withTransaction null
-        enqueue(mode.apiType, if (product == null) barcode else null, null, product, quantity, locationId)
+        enqueue(type, if (product == null) barcode else null, symbology, product, quantity, locationId)
     }
 
     private suspend fun enqueue(
@@ -85,6 +92,7 @@ class ScanRepository(private val db: AppDatabase) {
                 clientOpId = opId,
                 productId = product?.product?.id,
                 barcode = barcode ?: "",
+                symbology = symbology,
                 type = type,
                 quantity = quantity,
                 localDelta = delta,
@@ -101,15 +109,15 @@ class ScanRepository(private val db: AppDatabase) {
      * Undo the most recent non-undone scan: a still-pending op is simply deleted; an op that is
      * in flight or already synced gets a compensating `undo` op referencing its client_op_id.
      */
-    suspend fun undoLast(): UndoResult = db.withTransaction {
-        val h = db.historyDao().lastUndoable() ?: return@withTransaction UndoResult.NOTHING
+    suspend fun undoLast(): UndoOutcome = db.withTransaction {
+        val h = db.historyDao().lastUndoable() ?: return@withTransaction UndoOutcome(UndoResult.NOTHING)
         db.historyDao().markUndone(h.clientOpId)
         val original = db.pendingOpDao().getByClientOpId(h.clientOpId)
         if (original != null &&
             UndoPlanner.decide(original.status, original.attempts) == UndoAction.DELETE_LOCAL_OP
         ) {
             db.pendingOpDao().deleteByClientOpId(h.clientOpId)
-            return@withTransaction UndoResult.REMOVED_PENDING
+            return@withTransaction UndoOutcome(UndoResult.REMOVED_PENDING, h.clientOpId)
         }
         db.pendingOpDao().insert(
             PendingOpEntity(
@@ -127,6 +135,6 @@ class ScanRepository(private val db: AppDatabase) {
                 localDelta = -h.localDelta,
             )
         )
-        UndoResult.QUEUED
+        UndoOutcome(UndoResult.QUEUED, h.clientOpId)
     }
 }
