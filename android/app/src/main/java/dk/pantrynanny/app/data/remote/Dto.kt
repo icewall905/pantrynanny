@@ -201,3 +201,11 @@ fun errorMessage(body: String?): String? {
         null
     }
 }
+
+/** GET /api/products/by-barcode/{raw}: status is "found" | "created_placeholder" | "not_found". */
+@Serializable
+data class BarcodeLookupDto(
+    val status: String = "not_found",
+    val product: ProductDto? = null,
+    val source: String? = null,
+)

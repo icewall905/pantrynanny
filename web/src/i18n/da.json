@@ -482,7 +482,17 @@
     "noSessions": "Ingen scanninger endnu på denne enhed.",
     "sessionMeta": "{{scans}} scanninger · {{products}} varer",
     "sessionUnknown_one": "{{count}} ukendt",
-    "sessionUnknown_other": "{{count}} ukendte"
+    "sessionUnknown_other": "{{count}} ukendte",
+    "link": {
+      "title": "Direkte scannerlink",
+      "hint": "Åbner scanneren med det samme (uden at gå via menuen). Brug det som bogmærke eller på hjemmeskærmen.",
+      "add": "Indscanning (standard)",
+      "remove": "Udscanning (skifter tilbage til indscanning efter inaktivitet)",
+      "handOnly": "Kun håndscanner (kamera slået fra)",
+      "copy": "Kopiér",
+      "copied": "Kopieret",
+      "ipad": "iPad: åbn linket i Safari › Del › Føj til hjemmeskærm. Ikonet hedder “Scan” og åbner direkte scanneren. Første gang skal du trykke Start og tillade kameraet. Ikonet på iPadens hjemmeskærm åbner altid indscanning (ADD). Udscanning og håndscanner-varianterne er til bogmærker og links."
+    }
   },
   "kitchen": {
     "greet_morning": "Godmorgen",

@@ -1,7 +1,7 @@
 // Frame decoder: native BarcodeDetector when it really supports EAN-13, else ZXing
 // (in a Web Worker when possible, on the main thread otherwise).
 import { perf } from './perf'
-import { rgbaToLuma, ZxingDecoderCore, type DecodedBarcode } from './zxingCore'
+import { OrientationDecoder, rgbaToLuma, type DecodedBarcode, type FrameTiming } from './zxingCore'
 
 export type { DecodedBarcode }
 
@@ -53,17 +53,16 @@ function getImageData(f: Frame) {
   return f.ctx.getImageData(0, 0, f.width, f.height)
 }
 
-/** TRY_HARDER (slower, finds rotated codes) only every Nth frame. */
-const HARD_EVERY = 4
-
 function createZxingMain(): FrameDecoder {
-  const core = new ZxingDecoderCore()
+  const core = new OrientationDecoder()
   let luma: Uint8ClampedArray | undefined
   return {
     name: 'zxing-main',
     async decode(f) {
       luma = rgbaToLuma(getImageData(f).data, luma)
-      return core.decode(luma, f.width, f.height, f.index % HARD_EVERY === HARD_EVERY - 1)
+      const res = core.decode(luma, f.width, f.height, { maxPasses: 1, budgetMs: 25 }) // main thread: keep the UI responsive
+      perf.timing(core.last)
+      return res
     },
     dispose() {},
   }
@@ -85,7 +84,8 @@ function createZxingWorker(): FrameDecoder | null {
     waiting.forEach((w) => w.reject(e))
     waiting.clear()
   }
-  worker.onmessage = (ev: MessageEvent<{ id: number; results: DecodedBarcode[] }>) => {
+  worker.onmessage = (ev: MessageEvent<{ id: number; results: DecodedBarcode[]; timing?: FrameTiming }>) => {
+    if (ev.data.timing) perf.timing(ev.data.timing)
     waiting.get(ev.data.id)?.resolve(ev.data.results)
     waiting.delete(ev.data.id)
   }
@@ -108,7 +108,7 @@ function createZxingWorker(): FrameDecoder | null {
           reject: (e) => (clearTimeout(timer), reject(e)),
         })
         worker.postMessage(
-          { id: myId, width: f.width, height: f.height, luma: luma.buffer, hard: f.index % HARD_EVERY === HARD_EVERY - 1 },
+          { id: myId, width: f.width, height: f.height, luma: luma.buffer },
           [luma.buffer],
         )
       })

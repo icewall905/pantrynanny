@@ -81,12 +81,14 @@ test.describe('continuous scanner (fake camera)', () => {
 
     // The clip loops: A (held 2 s), A again after a gap, B (unknown, held 2 s). Wait for two B's.
     const bIdx = () => state.ops.map((o, i) => (o.barcode === BARCODE_B ? i : -1)).filter((i) => i >= 0)
+    // the second (rotated) presentation of A right after the first is NOT counted: it shows the hint instead
+    await expect(page.getByTestId('dup-hint')).toBeVisible({ timeout: 30_000 })
     await expect.poll(() => bIdx().length, { timeout: 45_000 }).toBeGreaterThanOrEqual(2)
     await expect(page.getByTestId('last-card')).toBeVisible()
     const [b1, b2] = bIdx()
-    // Exactly one loop between the two B's = exactly [A, A, B]: the held item counted once per
-    // presentation (not once per frame) and the re-presented identical item counted again.
-    expect(state.ops.slice(b1 + 1, b2 + 1).map((o) => o.barcode)).toEqual([BARCODE_A, BARCODE_A, BARCODE_B])
+    // Exactly one loop between the two B's = [A, B]: the held item counts once; the identical item presented again
+    // straight after (rotated 45 degrees, same code at any angle) is not counted twice in succession; A after B is.
+    expect(state.ops.slice(b1 + 1, b2 + 1).map((o) => o.barcode)).toEqual([BARCODE_A, BARCODE_B])
     expect(state.ops.every((o) => o.type === 'add')).toBe(true)
     expect(new Set(state.ops.map((o) => o.client_op_id)).size).toBe(state.ops.length)
     // the unknown item got the camera frame as its photo (snapshot, so a real image can replace it)
@@ -138,6 +140,13 @@ test.describe('hand scanner, quantity and sessions', () => {
     await page.keyboard.type(BARCODE_A, { delay: 5 })
     await page.keyboard.press('Enter')
     await expect(page.getByTestId('last-name')).toHaveText('Letmælk')
+    // the same item again is not counted (hand scanner follows the same rule): hint, still +1.
+    // Wait past the HID trigger-bounce window (350 ms) so this exercises the owner rule, not the bounce filter.
+    await page.waitForTimeout(600)
+    await page.keyboard.type(BARCODE_A, { delay: 5 })
+    await page.keyboard.press('Enter')
+    await expect(page.getByTestId('dup-hint')).toBeVisible()
+    await expect(page.getByTestId('last-delta')).toHaveText('+1')
     await page.getByTestId('more-5').click()
     await expect(page.getByTestId('last-delta')).toHaveText('+6')
     await expect.poll(() => state.ops.map((o) => [o.barcode, o.quantity]), { timeout: 20_000 }).toEqual([
@@ -150,6 +159,32 @@ test.describe('hand scanner, quantity and sessions', () => {
     await expect(sum).toContainText('+6')
     await expect(sum).toContainText('Letmælk')
     await page.getByTestId('session-done').click()
+    await expect(page.getByTestId('start-scanning')).toBeVisible()
+  })
+})
+
+test.describe('direct scanner link', () => {
+  test.skip(!E2E, 'PN_E2E_BASE_URL not set')
+
+  test('autostart=1&mode=remove starts scanning without a tap and uses the scanner manifest', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'desktop only')
+    const state = { online: true, ops: [] as { client_op_id: string; type: string; barcode?: string }[] }
+    await mockBackend(page, state)
+    await page.goto('/scan?autostart=1&mode=remove')
+    await expect(page.getByTestId('scan-screen')).toHaveAttribute('data-mode', 'remove') // no Start tap
+    await expect(page.locator('link[rel="manifest"]')).toHaveAttribute('href', '/manifest-scan.webmanifest')
+    await expect(page.locator('meta[name="apple-mobile-web-app-title"]')).toHaveAttribute('content', 'Scan')
+    const m = await (await page.request.get('/manifest-scan.webmanifest')).json()
+    expect(m).toMatchObject({ short_name: 'Scan', start_url: '/scan?autostart=1', scope: '/', display: 'standalone' })
+  })
+
+  test('autostart=1&camera=off starts the hand-scanner station; without autostart the Start button shows', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'desktop only')
+    const state = { online: true, ops: [] as { client_op_id: string; type: string; barcode?: string }[] }
+    await mockBackend(page, state, false)
+    await page.goto('/scan?autostart=1&camera=off')
+    await expect(page.getByTestId('camera-off')).toBeVisible()
+    await page.goto('/scan?camera=on')
     await expect(page.getByTestId('start-scanning')).toBeVisible()
   })
 })

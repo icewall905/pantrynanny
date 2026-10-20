@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -61,6 +62,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dk.pantrynanny.app.R
 import dk.pantrynanny.app.data.local.HistoryRow
+import dk.pantrynanny.app.domain.CardPhase
 import dk.pantrynanny.app.domain.QuantityMath
 import dk.pantrynanny.app.domain.ScanMode
 import kotlinx.coroutines.launch
@@ -88,9 +90,11 @@ fun ScannerScreen(vm: ScannerViewModel, snackbar: SnackbarHostState, onRegisterP
         }
     }
     LaunchedEffect(vm) {
+        // What the camera sees right now may be an unknown item: keep it as its photo.
+        vm.snapshotRequests.collect { clientOpId -> frameGrabber?.invoke()?.let { vm.keepSnapshot(clientOpId, it) } }
+    }
+    LaunchedEffect(vm) {
         vm.unknownScans.collect { clientOpId ->
-            // What the camera sees right now is the unknown item: keep it as its photo.
-            frameGrabber?.invoke()?.let { vm.keepSnapshot(clientOpId, it) }
             snackbar.currentSnackbarData?.dismiss()
             scope.launch {
                 val result = snackbar.showSnackbar(
@@ -144,6 +148,7 @@ fun ScannerScreen(vm: ScannerViewModel, snackbar: SnackbarHostState, onRegisterP
                     onBarcode = vm::onDecoded,
                     modifier = Modifier.fillMaxSize(),
                     frontCamera = state.frontCamera,
+                    otherFormats = state.otherFormats,
                     onCanSwitch = { canSwitch = it },
                     onFrameGrabber = { frameGrabber = it },
                 )
@@ -192,7 +197,7 @@ fun ScannerScreen(vm: ScannerViewModel, snackbar: SnackbarHostState, onRegisterP
         Spacer(Modifier.height(6.dp))
         ModeToggle(state.mode, onSelect = vm::setMode)
         Spacer(Modifier.height(6.dp))
-        LastScanCard(state.last, accent, onRegister = vm::register)
+        LastScanCard(state.last, state.lastPhase, accent, state.alreadyCounted, onRegister = vm::register, onExtra = vm::addExtra)
         Spacer(Modifier.height(4.dp))
 
         LazyColumn(
@@ -307,8 +312,22 @@ private fun needsRegister(row: HistoryRow): Boolean =
     row.entry.barcode.isNotEmpty() && !row.entry.undone && (row.prodStatus == null || row.prodStatus == "unknown")
 
 @Composable
-private fun LastScanCard(last: HistoryRow?, accent: Color, onRegister: (String) -> Unit) {
-    Card(Modifier.fillMaxWidth()) {
+private fun LastScanCard(
+    last: HistoryRow?,
+    phase: CardPhase,
+    accent: Color,
+    alreadyCounted: Boolean,
+    onRegister: (String) -> Unit,
+    onExtra: (HistoryRow, Int) -> Unit,
+) {
+    Card(
+        Modifier
+            .fillMaxWidth()
+            .then(
+                if (alreadyCounted) Modifier.border(3.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
+                else Modifier
+            ),
+    ) {
         Column(Modifier.padding(10.dp)) {
             if (last == null) {
                 Text(stringResource(R.string.scan_prompt), fontSize = 18.sp)
@@ -327,7 +346,20 @@ private fun LastScanCard(last: HistoryRow?, accent: Color, onRegister: (String) 
                     )
                     Spacer(Modifier.padding(horizontal = 6.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(
+                        if (phase == CardPhase.LOOKING || phase == CardPhase.SLOW) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (phase == CardPhase.LOOKING) {
+                                    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                                    Spacer(Modifier.padding(horizontal = 4.dp))
+                                }
+                                Text(
+                                    stringResource(if (phase == CardPhase.LOOKING) R.string.lookup_looking else R.string.lookup_slow),
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                )
+                            }
+                        } else Text(
                             rowTitle(last),
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
@@ -344,7 +376,23 @@ private fun LastScanCard(last: HistoryRow?, accent: Color, onRegister: (String) 
                         )
                     }
                 }
-                if (needsRegister(last)) {
+                if (alreadyCounted) {
+                    Text(
+                        stringResource(R.string.already_counted),
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
+                if (!last.entry.undone) {
+                    Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        for (n in intArrayOf(1, 2, 5)) {
+                            OutlinedButton(onClick = { onExtra(last, n) }, modifier = Modifier.weight(1f)) {
+                                Text("+$n", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+                if (needsRegister(last) && phase != CardPhase.LOOKING) {
                     Button(
                         onClick = { onRegister(last.entry.clientOpId) },
                         modifier = Modifier.fillMaxWidth().padding(top = 6.dp),

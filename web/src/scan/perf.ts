@@ -7,9 +7,13 @@ export interface ScanPerf {
   latencyMs: number | null
   lastLatencies: number[]
   frames: number
+  /** ms for the 0° pass (EMA) and for the whole frame incl. rotated passes (EMA) */
+  zeroMs: number
+  totalMs: number
+  passes: number
 }
 
-let state: ScanPerf = { decoder: '-', fps: 0, decodeMs: 0, latencyMs: null, lastLatencies: [], frames: 0 }
+let state: ScanPerf = { decoder: '-', fps: 0, decodeMs: 0, latencyMs: null, lastLatencies: [], frames: 0, zeroMs: 0, totalMs: 0, passes: 0 }
 const listeners = new Set<() => void>()
 let windowStart = 0
 let windowFrames = 0
@@ -36,6 +40,10 @@ export const perf = {
       windowFrames = 0
       emit()
     }
+  },
+  timing(t: { zeroMs: number; totalMs: number; passes: number }) {
+    const ema = (old: number, v: number) => (old ? old * 0.8 + v * 0.2 : v)
+    state = { ...state, zeroMs: ema(state.zeroMs, t.zeroMs), totalMs: ema(state.totalMs, t.totalMs), passes: t.passes }
   },
   latency(ms: number) {
     state = { ...state, latencyMs: ms, lastLatencies: [...state.lastLatencies.slice(-9), ms] }

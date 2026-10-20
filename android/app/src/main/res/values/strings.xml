@@ -258,4 +258,8 @@
     <string name="uses_up">Bruger: %1$s</string>
     <string name="week_shopped">Ugens indkøb er sat på listen</string>
     <string name="you">Dig</string>
+    <string name="already_counted">Allerede talt – tryk + for flere</string>
+    <string name="setting_other_barcode_types">Andre stregkodetyper</string>
+    <string name="lookup_looking">Slår op…</string>
+    <string name="lookup_slow">Ukendt – slås op i baggrunden</string>
 </resources>

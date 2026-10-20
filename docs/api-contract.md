@@ -211,12 +211,25 @@ tracked[code].lastSeenAt = t
 * Frames without detections simply don't update `lastSeenAt`, so a barcode held in view
   (continuously decoded) never re-fires; removing it for ≥ REARM_MS and showing it again fires.
 * Different codes are independent → no global cooldown.
-* Optional confirmation filter: a code must be decoded in ≥ 2 frames within 250 ms OR have a
-  valid checksum to fire (rejects misreads). EAN/UPC checksum-valid single reads fire
-  immediately.
+* Misread confirmation (Android; runs before the dedupe above): partial left-half decodes can be
+  checksum-valid yet wrong, so a code fires only after the identical raw value was decoded in
+  ≥ 2 frames within 600 ms (3 if the first sighting was small / near the frame edge) and no
+  competing code from an overlapping region has as many reads. Codes touching the frame edge
+  are ignored; per frame only the most central code is considered. Checksum validity is
+  irrelevant. Default formats: EAN-13/8, UPC-A/E (CODE_128/ITF behind a setting).
 * Switching Add/Remove mode clears `tracked` (so the item in view can be counted in the new
   mode only after it is re-presented — avoids an accidental double operation).
 * Entries older than 10 s are garbage-collected.
+
+**Never the same item twice in succession (owner rule, applies on top of the frame-level
+dedupe above; PWA and Android).** Remember the *last counted scan* `(normalised code, mode,
+scan session, op id)`. A fired scan whose normalised code, mode and session equal the last
+counted one is **not counted**: no op is created. The UI shows a neutral cue (soft tone, no
+success beep) and the hint "Already counted – tap + for more" on that item's card, with the
++1/+2/+5 buttons highlighted; the buttons create their own ops as before. Hand-scanner
+(keyboard wedge) input follows the same rule. The memory is cleared when a *different* code is
+counted, the mode is switched, the scan session ends or a new one starts, or the last counted
+scan is undone (re-scanning then counts again). So A, A = 1; A, B, A = 3; A, undo, A = 2.
 
 ## 5. AI assistant
 

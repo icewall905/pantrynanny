@@ -29,6 +29,18 @@ class Feedback(context: Context) {
         }
     }
 
+    /** Soft neutral cue for "already counted": a short different tone and a light tick. */
+    fun alreadyCounted(sound: Boolean, vibrate: Boolean) {
+        if (sound) tone?.startTone(ToneGenerator.TONE_PROP_PROMPT, 60)
+        if (vibrate) vibrator?.vibrate(VibrationEffect.createOneShot(15L, 60))
+    }
+
+    /** Low double beep for "settled as unknown". */
+    fun unknown(sound: Boolean, vibrate: Boolean) {
+        if (sound) tone?.startTone(ToneGenerator.TONE_SUP_ERROR, 120)
+        if (vibrate) vibrator?.vibrate(VibrationEffect.createOneShot(40L, 120))
+    }
+
     fun release() {
         tone?.release()
     }

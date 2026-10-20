@@ -8,8 +8,10 @@ import './i18n'
 import App from './App'
 import { registerServiceWorker, startSync } from './offline'
 import { applyTheme } from './lib/theme'
+import { installStaleChunkHandler } from './lib/staleChunk'
 
 applyTheme()
+installStaleChunkHandler()
 
 void registerServiceWorker()
 startSync()

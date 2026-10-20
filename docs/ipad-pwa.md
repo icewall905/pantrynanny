@@ -10,7 +10,7 @@ Findings for the wall-mounted iPad (`/scan`), plus the setup guide. Research dat
 |---|---|---|
 | `getUserMedia` in a standalone Home-Screen PWA | Works on iOS/iPadOS 13.4+ in standalone mode (earlier versions only worked in the Safari tab). Needs HTTPS (secure context) and a user-visible permission grant; Safari re-asks per origin/session unless "Allow" is chosen under Website Settings. Standalone apps keep their own permission state, so the first launch from the Home Screen prompts again. Camera is killed when the app is backgrounded/locked. | `Camera.open()` uses `facingMode: {ideal:'environment'}` 1280x720; re-opens the stream on `visibilitychange`/`pageshow`, when the track ends, and when no video frames arrive for 4 s (watchdog). `muted` + `playsinline` + `autoplay` on the `<video>`. |
 | `BarcodeDetector` | **Not available** in Safari or any iOS browser (all use WebKit). Shape Detection exists only behind a Technical-Preview flag and is reported broken in iOS 18. ([Apple dev forum](https://developer.apple.com/forums/thread/767761), [overview](https://eringen.substack.com/p/barcode-scanning-on-ios-the-missing)) | Feature-detected: native detector only if `getSupportedFormats()` contains `ean_13`; otherwise ZXing. On the iPad this means **ZXing always**. |
-| Decoder choice | `@zxing/library` `MultiFormatReader`, formats restricted to EAN-13/EAN-8/UPC-A/UPC-E/Code 128/ITF, TRY_HARDER off (on for every 4th frame to catch rotated codes). Runs in a module Web Worker (Safari 15+) fed with a downscaled (≤800 px) centre-crop luminance buffer at ~12 fps; falls back to the main thread if the worker fails. | Measured in headless Chromium: ~3 ms decode per frame in the worker; UI latency 25-90 ms. **Verify on device** (iPad CPU/thermal behaviour over hours). |
+| Decoder choice | `@zxing/library` `MultiFormatReader`, formats restricted to EAN-13/EAN-8/UPC-A/UPC-E/Code 128/ITF, fast reader (TRY_HARDER is ~10x slower and no longer used). Orientation is handled by explicit rotation passes, see section 6. Runs in a module Web Worker (Safari 15+) fed with a downscaled (<=640 px) square centre-crop luminance buffer at ~12 fps; falls back to the main thread if the worker fails. | Measured in headless Chromium on a desktop CPU: ~12 ms for the 0 degree pass, ~36 ms per frame with two rotated passes; UI latency 25-90 ms. **Verify on device** (iPad CPU/thermal behaviour over hours). |
 | Screen Wake Lock | Safari 16.4+ in the browser. In installed Home-Screen web apps it did **not** work until iOS 18.4 ([WebKit bug 254545](https://bugs.webkit.org/show_bug.cgi?id=254545), [summary](https://progressier.com/pwa-capabilities/screen-wake-lock)). The lock is released when the page is hidden and may be refused on low battery. | Acquired on the "Start scanning" tap, re-acquired on `visibilitychange`. If unsupported/failed an on-screen hint recommends Auto-Lock "Never". **The documented fallback (Auto-Lock Never + Guided Access) is the primary mechanism, the wake lock is a bonus.** |
 | Torch / `ImageCapture` / `focusMode` | iOS Safari exposes neither `torch` nor `focusMode` capabilities (`getCapabilities()` is sparse or empty); autofocus is continuous by default in the system camera pipeline. Torch is Chromium-on-Android only. | Feature-detected through `getCapabilities()`: continuous focus is applied and the torch button is shown only when supported (so it is hidden on iPad). |
 | `AudioContext` | Starts `suspended`; may only be resumed from a user gesture. WebKit also uses a non-standard `interrupted` state (phone call, Siren, app switch, lock) that does **not** recover on its own. The hardware silent switch does not mute Web Audio on iPad but media volume does. | One `AudioContext` is created and resumed inside the "Start scanning" tap (plus a silent blip). Because `state !== 'running'` is treated as "needs resume" (covers `suspended` and `interrupted`), `beep()` retries on every beep, `visibilitychange` re-resumes, and passive document `pointerdown`/`touchend` listeners call `unlockAudio()` again. After an automatic resume (see below) sound starts at the next touch. Distinct tones: rising = add, falling = remove, low double square = unknown, long low = error. |
@@ -27,7 +27,7 @@ come from prior knowledge of WebKit release notes (13.4) - **verify on device**.
 ### One-time iPad setup
 
 1. **Update** iPadOS (18.4 or later strongly preferred for the Wake Lock fix).
-2. Open `https://<your-pantrynanny-host>/scan` in **Safari** (HTTPS is mandatory for the camera).
+2. Open `https://<your-pantrynanny-host>/scan?autostart=1` in **Safari** (see section 7, "Direct scanner link") (HTTPS is mandatory for the camera).
 3. **Install**: Share button › *Add to Home Screen* › *Open as Web App* on › *Add*. Launch PantryNanny from the Home
    Screen icon (standalone, no browser chrome).
 4. **Camera permission**: tap *Start scanning* and choose *Allow*. If you previously denied it: Settings › Apps › Safari
@@ -62,7 +62,7 @@ come from prior knowledge of WebKit release notes (13.4) - **verify on device**.
   (arm, stand or bracket with a gap) so the lens at the back is free and looks at the area where items are held.
   A tablet mounted flat against the wall blocks the rear camera.
 * Even, diffuse light (no strong light straight behind the item). Avoid a window directly behind the scanning area.
-* Present the barcode flat, bars vertical or horizontal, inside the framed rectangle, about 15-25 cm from the lens; hold for ~0.3 s.
+* Present the barcode flat, in **any orientation** (horizontal, vertical or diagonal), inside the square aiming frame, about 15-25 cm from the lens; hold for ~0.3 s.
 * Matte/dark background behind the scan area improves contrast.
 
 #### Front or rear camera
@@ -75,6 +75,9 @@ further away (about 25-40 cm). **Verify on device** which camera and distance su
 
 ## 3. Safety behaviours implemented
 
+* **The same item is never counted twice in succession** (also not after a gap, from the camera or a hand scanner):
+  scanning it again shows "Already counted – tap + for more", a soft tick and highlights +1/+2/+5. A different item,
+  switching mode, a new scan session or undoing that scan re-arms it (contract section 4).
 * REMOVE mode reverts to ADD after `remove_mode_timeout_min` (default 10) idle minutes and on every page reload.
 * Mode switch clears the duplicate-suppression state (an item still in view is not counted twice in the new mode).
 * Whole-screen tint (green = ADD, tomato = REMOVE), giant label and segmented control.
@@ -91,7 +94,7 @@ further away (about 25-40 cm). **Verify on device** which camera and distance su
 
 ## 4. Hidden debug overlay
 
-Tap the connection pill 5 times: shows decoder (`zxing-worker`, `zxing-main`, `native`), fps, decode ms,
+Tap the connection pill 5 times: shows decoder (`zxing-worker`, `zxing-main`, `native`), fps, decode ms (and the share spent on the 0 degree pass and the number of rotated passes in the last frame),
 frame→UI latency of recent scans and the number of pending ops.
 
 ## 5. Reloads and auto-resume
@@ -100,3 +103,45 @@ After a service-worker update (hourly `registration.update()`) the page reloads.
 `navigator.permissions.query({name:'camera'})` reports `granted`, `/scan` goes straight back to scanning (camera, no
 tap). Audio and the wake lock need a user gesture on iOS, so they come back on the first touch. If Safari does not
 support the camera permission query, the Start screen is shown and one tap is needed. **Verify on device.**
+
+## 6. Scanning in any orientation
+
+* **Native `BarcodeDetector`** (Chrome/Android, not iPad) is orientation-invariant and is used unchanged.
+* **ZXing** reads horizontal rows only, so each frame is decoded at 0 degrees first (cheap) and then with a
+  round-robin of rotated copies of the same grayscale crop: 90, 45 and 135 degrees (`ROTATION_ANGLES` in
+  `src/scan/zxingCore.ts`; 180/270 are equivalent to 0/90 for 1D codes). The rotation is a pure function on the luma
+  buffer (`src/scan/rotate.ts`, bilinear, no canvas) so it runs inside the Web Worker. The angle of the last successful rotated read is tried first on the next frames (dropped after 2 misses), so a held code keeps being read every frame. A code is read when it is within
+  about 20 degrees of a pass, so every angle is found within 3 frames (about 0.3 s at ~10-12 fps) even when the time
+  budget allows only one rotated pass per frame (tested for EAN-13/EAN-8 at 0, 15, 30, 45, 60, 90, 120, 135, 180, 225,
+  270, 315 degrees in `src/scan/orientation.test.ts`).
+* **Time budget**: ~40 ms per frame. After the 0 degree pass, up to 3 rotated passes run, but a further pass is only
+  started when the moving average of one pass still fits the budget (at least one pass always runs). Slow devices
+  therefore do fewer rotated passes per frame and take a few more frames to cover all angles; check the debug overlay.
+* The decode crop and the on-screen aiming frame are **square** (90 % of the shorter side of the camera view) so a code
+  held vertically or diagonally still fits. Hold the code so it is fully inside the frame.
+* Duplicate suppression: a code is the same code at any angle, and the same item is never counted twice in succession (contract section 4), so a rotated re-read cannot double count.
+* Android uses ML Kit, which is orientation-invariant; `CameraPreview.kt` passes `imageInfo.rotationDegrees` to
+  `InputImage.fromMediaImage`.
+
+## 7. Direct scanner link
+
+`/scan` can be bookmarked or put on the Home Screen as a scanner that starts by itself:
+
+| Link | Behaviour |
+|---|---|
+| `https://<host>/scan?autostart=1` | Starts scanning in ADD mode without tapping *Start scanning* when the camera permission is already granted (`navigator.permissions.query`, or a remembered successful start where the query is unsupported). Otherwise the big Start button is shown (iOS needs a tap for camera and audio the first time). |
+| `...&mode=remove` | Starts in REMOVE mode; REMOVE still reverts to ADD after the idle timeout. Default is `add`. The `mode` parameter is stripped from the address bar on load (`history.replaceState`, autostart/camera stay), so a reload, including the hourly service-worker update reload, comes back in ADD. |
+| `...&camera=off` | Hand-scanner-only station (camera off, nothing to grant). `camera=on` turns the camera back on. The setting is stored on the device like the Scanner setting. |
+
+Not signed in or not paired: the normal pairing/login screen is shown and scanning continues straight afterwards,
+honouring the parameters. Audio and the wake lock still arm on the first touch.
+
+**Home Screen install from the scanner**: while `/scan` is open the page swaps `<link rel="manifest">` to
+`/manifest-scan.webmanifest` (name "PantryNanny Scan", short name "Scan", `start_url` `/scan?autostart=1`, scope `/`,
+its own `id`, same icons) and sets `apple-mobile-web-app-title` to "Scan"; both are restored when leaving `/scan`. So on
+the iPad: open the link in Safari, then Share, Add to Home Screen. The icon "Scan" opens the scanner directly, always in ADD mode with the camera on (the manifest `start_url` is fixed); the remove and hand-scanner variants are for bookmarks and links, not for the Home Screen icon. The static
+manifest is precached by the service worker and the navigate fallback serves `/scan?...`. The main app's manifest
+shortcut also points at `/scan?autostart=1`. The server must serve `.webmanifest` as `application/manifest+json`.
+
+The links (with a Copy button) are shown in Settings > Scanner and in Settings > Devices (next to the kiosk pairing
+code), built from the current origin.

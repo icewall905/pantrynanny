@@ -78,6 +78,7 @@ class SettingsViewModel(private val c: AppContainer) : ViewModel() {
 
     fun setSound(on: Boolean) = viewModelScope.launch { c.settings.setSound(on) }
     fun setVibrate(on: Boolean) = viewModelScope.launch { c.settings.setVibrate(on) }
+    fun setOtherBarcodeTypes(on: Boolean) = viewModelScope.launch { c.settings.setOtherBarcodeTypes(on) }
     fun setDefaultLocation(id: String?) = viewModelScope.launch { c.settings.setDefaultLocation(id) }
     fun setRearm(ms: Int?) = viewModelScope.launch { c.settings.setRearmOverride(ms) }
     fun syncNow() = c.syncNowManually()
@@ -129,6 +130,7 @@ fun SettingsScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
         SectionTitle(R.string.section_scanning)
         SwitchRow(R.string.setting_sound, s.sound, vm::setSound)
         SwitchRow(R.string.setting_vibrate, s.vibrate, vm::setVibrate)
+        SwitchRow(R.string.setting_other_barcode_types, s.otherBarcodeTypes, vm::setOtherBarcodeTypes)
 
         Text(stringResource(R.string.setting_default_location))
         Dropdown(

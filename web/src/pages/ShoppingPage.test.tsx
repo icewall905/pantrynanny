@@ -30,7 +30,7 @@ describe('ShoppingPage', () => {
     const write = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue()
     renderApp(<ShoppingPage />)
     expect(await screen.findByRole('heading', { name: 'Mejeri' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Andet' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Andet' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Fjern afkrydsede \(1\)/ })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /Kopiér liste/ }))
     await waitFor(() => expect(write).toHaveBeenCalledWith('Mejeri:\n- 2 x Mælk\n\nAndet:\n- Batterier'))

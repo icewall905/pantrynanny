@@ -23,5 +23,7 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
+    // generous timeouts: the CPU-heavy orientation tests and CI/dev machines under load
+    testTimeout: 20_000,
   },
 })

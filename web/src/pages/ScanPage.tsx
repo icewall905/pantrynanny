@@ -5,7 +5,10 @@ import type { HouseholdSettings, Me } from '../api/types'
 import { getStore, registerServiceWorker, startSync } from '../offline'
 import { checkSession, loginRemember, logout, pairKiosk, type AuthError } from '../scan/auth'
 import { armAudioUnlock, unlockAudio } from '../scan/feedback'
+import { parseScanParams, stripModeParam, swapToScanManifest } from '../scan/link'
+import { canAutostartCamera, loadScanPrefs, saveScanPrefs } from '../scan/prefs'
 import { NS } from '../scan/i18n'
+import type { ScanMode } from '../scan/mode'
 import ScanScreen from '../scan/ScanScreen'
 import { WakeLock, type WakeState } from '../scan/wakelock'
 
@@ -32,9 +35,18 @@ export default function ScanPage() {
   const [wake, setWake] = useState<WakeState>('idle')
   const wakeRef = useRef<WakeLock | null>(null)
   const [dropped, setDropped] = useState(0)
+  // direct scanner link: /scan?autostart=1&mode=remove&camera=off (read once per visit)
+  const [params] = useState(() => parseScanParams(window.location.search))
+
+  const [linkMode, setLinkMode] = useState<ScanMode | undefined>(params.mode === 'remove' ? 'remove' : undefined) // one-shot
+
+  // "Add to Home Screen" from this page must install the scanner, not the whole app.
+  useEffect(() => swapToScanManifest(), [])
 
   useEffect(() => {
     void registerServiceWorker()
+    stripModeParam() // one-shot: a reload must not re-apply REMOVE
+    if (params.camera) saveScanPrefs({ ...loadScanPrefs(), camera: params.camera === 'on' })
     let alive = true
     void (async () => {
       const r = await checkSession()
@@ -44,8 +56,8 @@ export default function ScanPage() {
         setSettings(r.me.settings)
         startSync()
         if (r.droppedPending) setDropped(r.droppedPending)
-        // After a reload (e.g. service-worker update) continue without a tap when possible.
-        if (await canAutoResume()) {
+        // After a reload (e.g. service-worker update) or via the direct link continue without a tap when possible.
+        if ((await canAutoResume()) || (params.autostart && (await canAutostartCamera(loadScanPrefs())))) {
           armAudioUnlock() // audio itself waits for the next touch
           wakeRef.current ??= new WakeLock(setWake)
           void wakeRef.current.acquire()
@@ -59,13 +71,16 @@ export default function ScanPage() {
       alive = false
       void wakeRef.current?.release()
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const authed = (m: Me) => {
     setMe(m)
     setSettings(m.settings)
     startSync()
-    setPhase('ready')
+    // pairing/login was a user gesture: a direct scanner link carries straight on into scanning
+    if (params.autostart) void start()
+    else setPhase('ready')
   }
 
   const start = async () => {
@@ -91,8 +106,10 @@ export default function ScanPage() {
         settings={settings}
         kiosk={me?.kiosk ?? false}
         wake={wake}
+        initialMode={linkMode}
         onReauth={() => setPhase('unauth')}
         onExit={() => {
+          setLinkMode(undefined)
           try {
             localStorage.removeItem(RESUME_KEY)
           } catch {

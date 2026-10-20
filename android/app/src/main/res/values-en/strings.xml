@@ -258,4 +258,8 @@
     <string name="uses_up">Uses up: %1$s</string>
     <string name="week_shopped">The week\'s shopping is on the list</string>
     <string name="you">You</string>
+    <string name="already_counted">Already counted – tap + for more</string>
+    <string name="setting_other_barcode_types">Other barcode types</string>
+    <string name="lookup_looking">Looking up…</string>
+    <string name="lookup_slow">Unknown – looking up in the background</string>
 </resources>
