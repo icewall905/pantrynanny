@@ -1,6 +1,7 @@
 import { Component, type ReactNode } from 'react'
 import i18n from '../i18n'
 import { ErrorState } from './ui'
+import { isStaleChunkError, reloadForStaleChunk } from '../lib/staleChunk'
 
 export class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null }
@@ -8,6 +9,8 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { error: E
     return { error }
   }
   componentDidCatch(error: Error) {
+    // A lazy page from an older build was requested after a deploy: reload into the new build.
+    if (isStaleChunkError(error) && reloadForStaleChunk()) return
     console.error(error)
   }
   render() {
