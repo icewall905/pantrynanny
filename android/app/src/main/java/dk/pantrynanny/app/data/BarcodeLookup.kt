@@ -1,6 +1,5 @@
 package dk.pantrynanny.app.data
 
-import dk.pantrynanny.app.data.local.AppDatabase
 import dk.pantrynanny.app.data.remote.ApiClient
 import dk.pantrynanny.app.data.remote.ApiResult
 import dk.pantrynanny.app.data.remote.BarcodeLookupDto
@@ -34,7 +33,7 @@ suspend fun <T> retrying(delaysMs: LongArray, call: suspend () -> ApiResult<T>):
 class BarcodeLookup(
     private val api: ApiClient,
     private val cache: CacheWriter,
-    private val db: AppDatabase,
+    private val scans: ScanRepository,
     private val retryDelaysMs: LongArray = CardLookup.RETRY_DELAYS_MS,
 ) {
     suspend fun lookup(raw: String, symbology: String?): LookupOutcome {
@@ -43,7 +42,7 @@ class BarcodeLookup(
         val dto: BarcodeLookupDto = (r as? ApiResult.Ok)?.value ?: return LookupOutcome.FAILED
         val product = dto.product ?: return LookupOutcome.UNKNOWN
         cache.applyProduct(product)
-        db.historyDao().attachProductByBarcode(raw, product.id, product.name)
+        scans.linkScans(raw, product.id, product.name)
         return if (product.status == "unknown" || dto.status == "created_placeholder") LookupOutcome.UNKNOWN
         else LookupOutcome.FOUND
     }

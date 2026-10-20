@@ -27,12 +27,38 @@ data class ScanOutcome(val clientOpId: String, val productId: String?, val known
  */
 class ScanRepository(private val db: AppDatabase) {
 
-    suspend fun recordScan(raw: String, symbology: String?, mode: ScanMode, locationId: String?): ScanOutcome {
+    suspend fun recordScan(
+        raw: String, symbology: String?, mode: ScanMode, locationId: String?,
+        /** Called with the new op id inside the transaction, before the rows are inserted, on a cache miss. */
+        onCacheMiss: ((String) -> Unit)? = null,
+    ): ScanOutcome {
         val norm = BarcodeNormalizer.normalize(raw, symbology)
         return db.withTransaction {
             val pid = db.barcodeDao().productIdForCode(norm.code)
             val product = pid?.let { db.productDao().getWithQty(it) }?.takeIf { it.product.deletedAt == null }
-            enqueue(mode.apiType, raw, symbology, product, 1.0, locationId)
+            enqueue(mode.apiType, raw, symbology, product, 1.0, locationId, onCacheMiss)
+        }
+    }
+
+    /**
+     * A lookup / pull found the product behind cache-miss scans of [raw]: link their history rows and, for ops that
+     * were not sent yet, the op's product id and optimistic delta so the displayed quantity includes them at once.
+     */
+    suspend fun linkScans(raw: String, productId: String, name: String) {
+        db.withTransaction {
+            for (h in db.historyDao().unlinkedByBarcode(raw)) {
+                var delta = 0.0
+                if (!h.undone && (h.type == "add" || h.type == "remove")) {
+                    val d = if (h.type == "remove") {
+                        val avail = db.productDao().getWithQty(productId)?.displayQuantity ?: 0.0
+                        QuantityMath.clampedRemoveDelta(h.quantity, avail)
+                    } else {
+                        QuantityMath.signedDelta(h.type, h.quantity)
+                    }
+                    if (db.pendingOpDao().linkPending(h.clientOpId, productId, d) > 0) delta = d
+                }
+                db.historyDao().link(h.clientOpId, productId, name, delta)
+            }
         }
     }
 
@@ -50,10 +76,11 @@ class ScanRepository(private val db: AppDatabase) {
      */
     suspend fun addExtra(
         productId: String?, barcode: String, symbology: String?, type: String, quantity: Double, locationId: String?,
+        onCacheMiss: ((String) -> Unit)? = null,
     ): ScanOutcome? = db.withTransaction {
         val product = productId?.let { db.productDao().getWithQty(it) }?.takeIf { it.product.deletedAt == null }
         if (product == null && barcode.isEmpty()) return@withTransaction null
-        enqueue(type, if (product == null) barcode else null, symbology, product, quantity, locationId)
+        enqueue(type, if (product == null) barcode else null, symbology, product, quantity, locationId, onCacheMiss)
     }
 
     private suspend fun enqueue(
@@ -63,6 +90,7 @@ class ScanRepository(private val db: AppDatabase) {
         product: ProductWithQty?,
         quantity: Double,
         locationId: String?,
+        onCacheMiss: ((String) -> Unit)? = null,
     ): ScanOutcome {
         val delta = when {
             product == null -> 0.0
@@ -70,6 +98,7 @@ class ScanRepository(private val db: AppDatabase) {
             else -> QuantityMath.signedDelta(type, quantity)
         }
         val opId = UUID.randomUUID().toString()
+        if (product == null) onCacheMiss?.invoke(opId)
         val now = Instant.now()
         db.pendingOpDao().insert(
             PendingOpEntity(

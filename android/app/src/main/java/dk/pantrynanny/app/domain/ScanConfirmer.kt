@@ -71,11 +71,18 @@ class ScanConfirmer(
     private val windowMs: Long = DEFAULT_WINDOW_MS,
     private val minReads: Int = MIN_READS,
     private val minReadsWeak: Int = MIN_READS_WEAK,
+    private val regionHoldMs: Long = REGION_HOLD_MS,
     private val clock: () -> Long,
 ) {
     private class Read(val code: String, val t: Long, val box: NormBox?, val weak: Boolean)
 
     private val reads = ArrayList<Read>()
+
+    // Last confirmed code T: its region, last confirmed time and the reads it had in the window then.
+    private var lastCode: String? = null
+    private var lastRegion: NormBox? = null
+    private var lastAt = 0L
+    private var lastReads = 0
 
     /** True when [d] is now a confirmed read. */
     @Synchronized
@@ -87,23 +94,38 @@ class ScanConfirmer(
         val mine = reads.filter { it.code == d.raw }
         val need = if (mine.first().weak) minReadsWeak else minReads
         if (mine.size < need) return false
+        // After T was confirmed, a different code from T's region (e.g. a late partial misread) is ignored for
+        // [regionHoldMs] unless it has strictly more reads than T had.
+        val tCode = lastCode
+        if (tCode != null && tCode != d.raw && t - lastAt <= regionHoldMs) {
+            val region = lastRegion
+            val overlaps = region == null || d.box == null || region.overlaps(d.box)
+            if (overlaps && mine.size <= lastReads) return false
+        }
         // Competitors: other codes read from a region overlapping this code's (unknown box = assume overlap).
         val regions = mine.mapNotNull { it.box }
         val rivalBest = reads.filter { it.code != d.raw }
             .filter { r -> r.box == null || regions.isEmpty() || regions.any { it.overlaps(r.box) } }
             .groupBy { it.code }
             .maxOfOrNull { it.value.size } ?: 0
-        return mine.size > rivalBest
+        if (mine.size <= rivalBest) return false
+        lastCode = d.raw
+        lastRegion = mine.mapNotNull { it.box }.lastOrNull()
+        lastAt = t
+        lastReads = mine.size
+        return true
     }
 
     @Synchronized
     fun clear() {
         reads.clear()
+        lastCode = null
     }
 
     companion object {
         const val DEFAULT_WINDOW_MS = 600L
         const val MIN_READS = 2
         const val MIN_READS_WEAK = 3
+        const val REGION_HOLD_MS = 1000L
     }
 }

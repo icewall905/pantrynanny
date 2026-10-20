@@ -42,6 +42,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 /** How long "Registrer" waits for an unsynced unknown scan to come back with its placeholder product. */
 private const val REGISTER_WAIT_MS = 10_000L
 private const val ALREADY_COUNTED_MS = 2_500L
+private const val MAX_WATCHERS = 10
+private const val RECHECK_MS = 20_000L
 
 data class SyncStatusUi(
     val pending: Int = 0,
@@ -192,9 +194,12 @@ class ScannerViewModel(private val c: AppContainer) : ViewModel() {
         feedback.signal(mode, s.sound, s.vibrate)
 
         viewModelScope.launch(Dispatchers.IO) {
+            var preTrack: Long? = null
             val outcome = try {
-                c.scanRepository.recordScan(raw, symbology, mode, s.defaultLocationId)
+                // Cache miss: the card is "looking up" before its history row can show up (no Register flash).
+                c.scanRepository.recordScan(raw, symbology, mode, s.defaultLocationId) { opId -> preTrack = beginTrack(opId) }
             } catch (e: Exception) {
+                preTrack?.let { t -> _track.update { if (it?.token == t) null else it } }
                 guard.release(code, mode)
                 throw e
             }
@@ -205,38 +210,58 @@ class ScannerViewModel(private val c: AppContainer) : ViewModel() {
                 // Cached server placeholder: already known to be unknown; still try to upgrade it.
                 outcome.productId != null -> {
                     _unknownScans.tryEmit(outcome.clientOpId)
-                    startLookup(outcome.clientOpId, raw, symbology, code, cardTracked = false)
+                    startLookup(outcome.clientOpId, raw, symbology, code, null)
                 }
                 // Cache miss: neutral "Looking up…" card until the answer arrives from any source.
-                else -> startLookup(outcome.clientOpId, raw, symbology, code, cardTracked = true)
+                else -> startLookup(outcome.clientOpId, raw, symbology, code, preTrack)
             }
             c.requestSync()
         }
     }
 
-    /**
-     * Resolve a barcode that is not (really) in the local cache: ask the server (retried), and independently watch
-     * the local store by code so the sync OpResult / snapshot / changes pull also resolve the card.
-     */
-    private fun startLookup(opId: String, raw: String, symbology: String, code: String, cardTracked: Boolean) {
+    /** Start the neutral "looking up" state for the card of [opId]; returns its token. */
+    private fun beginTrack(opId: String): Long {
         val token = trackCounter.incrementAndGet()
-        val started = SystemClock.elapsedRealtime()
-        if (cardTracked) {
-            _track.value = LookupTrack(token, opId, started)
-            viewModelScope.launch {
-                delay(CardLookup.SLOW_MS)
-                _track.update { if (it?.token == token) it.copy(slow = true) else it }
+        _track.value = LookupTrack(token, opId, SystemClock.elapsedRealtime())
+        viewModelScope.launch {
+            delay(CardLookup.SLOW_MS)
+            _track.update { if (it?.token == token) it.copy(slow = true) else it }
+        }
+        return token
+    }
+
+    /** Live "watch the store by code" queries, at most [MAX_WATCHERS], one per code (newest wins). */
+    private val watchers = LinkedHashMap<String, Job>()
+
+    private fun registerWatcher(code: String, job: Job) {
+        synchronized(watchers) {
+            watchers.remove(code)?.cancel()
+            watchers[code] = job
+            while (watchers.size > MAX_WATCHERS) {
+                val eldest = watchers.keys.first()
+                watchers.remove(eldest)?.cancel()
             }
         }
+        job.invokeOnCompletion { synchronized(watchers) { if (watchers[code] === job) watchers.remove(code) } }
+    }
+
+    /**
+     * Resolve a barcode that is not (really) in the local cache: ask the server (retried), and independently watch
+     * the local store by code so the sync OpResult / snapshot / changes pull also resolve the card. When the
+     * lookup settles as unknown the live watcher is dropped (one cheap re-check later); [track] is the card's
+     * lookup token (null = no card state, e.g. a cached placeholder being upgraded).
+     */
+    private fun startLookup(opId: String, raw: String, symbology: String, code: String, track: Long?) {
         viewModelScope.launch(Dispatchers.IO) {
             val watcher = launch {
                 withTimeoutOrNull(CardLookup.TTL_MS) {
                     c.db.productDao().observeByCode(code).filterNotNull().first { p ->
-                        c.db.historyDao().attachProductByBarcode(raw, p.id, p.name)
+                        c.scanRepository.linkScans(raw, p.id, p.name)
                         p.status != "unknown"
                     }
                 }
             }
+            registerWatcher(code, watcher)
             val outcome = try {
                 c.barcodeLookup.lookup(raw, symbology)
             } catch (e: kotlinx.coroutines.CancellationException) {
@@ -245,17 +270,24 @@ class ScannerViewModel(private val c: AppContainer) : ViewModel() {
                 LookupOutcome.FAILED
             }
             if (outcome == LookupOutcome.FOUND) watcher.cancel()
-            if (outcome == LookupOutcome.UNKNOWN && cardTracked) {
-                val track = _track.value
-                if (track != null && track.token == token) {
-                    _track.value = track.copy(settledUnknown = true)
-                    if (CardLookup.shouldCueUnknown(currentOpId.value, track, SystemClock.elapsedRealtime())) {
-                        val s = settings.value
-                        feedback.unknown(s.sound, s.vibrate)
-                        _unknownScans.tryEmit(opId)
-                    }
-                }
+            if (outcome == LookupOutcome.UNKNOWN) {
+                if (watcher.isActive) watcher.cancel()
+                if (track != null) settleUnknown(opId, track)
+                // Enrichment may finish later: one cheap re-check instead of a live query.
+                delay(RECHECK_MS)
+                c.db.productDao().observeByCode(code).first()?.let { c.scanRepository.linkScans(raw, it.id, it.name) }
             }
+        }
+    }
+
+    private fun settleUnknown(opId: String, token: Long) {
+        val track = _track.value
+        if (track == null || track.token != token) return
+        _track.value = track.copy(settledUnknown = true)
+        if (CardLookup.shouldCueUnknown(currentOpId.value, track, SystemClock.elapsedRealtime())) {
+            val s = settings.value
+            feedback.unknown(s.sound, s.vibrate)
+            _unknownScans.tryEmit(track.opId)
         }
     }
 
@@ -284,12 +316,11 @@ class ScannerViewModel(private val c: AppContainer) : ViewModel() {
         viewModelScope.launch(Dispatchers.IO) {
             val extra = c.scanRepository.addExtra(
                 row.entry.productId, row.entry.barcode, row.entry.symbology, row.entry.type, quantity.toDouble(), loc,
-            )
-            if (extra != null) {
-                currentOpId.value = extra.clientOpId
-                // The extra op becomes the last card: a running lookup now belongs to it.
-                _track.update { if (it?.opId == row.entry.clientOpId) it.copy(opId = extra.clientOpId) else it }
+            ) { newOpId ->
+                // The extra op becomes the last card: a running lookup now belongs to it (before the row exists).
+                _track.update { if (it?.opId == row.entry.clientOpId) it.copy(opId = newOpId) else it }
             }
+            if (extra != null) currentOpId.value = extra.clientOpId
             c.requestSync()
         }
     }

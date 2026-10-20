@@ -77,6 +77,39 @@ class ScanConfirmerTest {
     }
 
     @Test
+    fun differentCodeInConfirmedRegionIgnoredForAWhile() {
+        val c = confirmer()
+        c.onRead(read("A")); now += 40
+        assertTrue(c.onRead(read("A"))) // 2 reads
+        now += 700 // A's reads left the window, region hold still active
+        assertFalse(c.onRead(read("X"))); now += 40
+        assertFalse(c.onRead(read("X"))) // 2 reads, not strictly more than A's 2
+        now += 40
+        assertTrue(c.onRead(read("X").copy(box = NormBox(0.0f, 0.0f, 0.1f, 0.1f)))) // elsewhere: new candidate window
+    }
+
+    @Test
+    fun differentCodeWithStrictlyMoreReadsWinsInRegion() {
+        val c = confirmer()
+        c.onRead(read("A")); now += 40
+        assertTrue(c.onRead(read("A")))
+        now += 700
+        assertFalse(c.onRead(read("X"))); now += 40
+        assertFalse(c.onRead(read("X"))); now += 40
+        assertTrue(c.onRead(read("X"))) // 3 > 2
+    }
+
+    @Test
+    fun differentCodeAfterHoldIsAccepted() {
+        val c = confirmer()
+        c.onRead(read("A")); now += 40
+        assertTrue(c.onRead(read("A")))
+        now += 1100
+        assertFalse(c.onRead(read("X"))); now += 40
+        assertTrue(c.onRead(read("X")))
+    }
+
+    @Test
     fun weakFirstSightingNeedsThreeReads() {
         val c = confirmer()
         assertFalse(c.onRead(read("A", weak = true))); now += 40

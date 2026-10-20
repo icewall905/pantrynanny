@@ -54,7 +54,7 @@ class AppContainer(val app: Application) {
     val cache = CacheWriter(db)
     val syncRepository = SyncRepository(db, api, settings, tokens, cache)
     val scanRepository = ScanRepository(db)
-    val barcodeLookup = BarcodeLookup(api, cache, db)
+    val barcodeLookup = BarcodeLookup(api, cache, scanRepository)
 
     /** "Never count the same item twice in succession" state, shared by scanner and detail screen. */
     val scanGuard = LastCountedGuard { SystemClock.elapsedRealtime() }
