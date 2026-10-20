@@ -6,6 +6,7 @@ import { del, get, post } from '../../api/client'
 import type { DeviceInfo, KioskCode } from '../../api/types'
 import { useToast } from '../../components/Toast'
 import { Badge, Button, Card, ErrorState, Field, Input, ListSkeleton, Modal } from '../../components/ui'
+import DirectScannerLink from '../DirectScannerLink'
 import { formatDateTime } from '../../lib/format'
 
 export default function AdminDevices() {
@@ -63,6 +64,9 @@ export default function AdminDevices() {
           </li>
         ))}
       </ul>
+      <div className="mt-4 border-t border-cream-100 pt-4">
+        <DirectScannerLink />
+      </div>
       <Modal
         open={open}
         onClose={close}

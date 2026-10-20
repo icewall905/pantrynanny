@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { ScanLine } from 'lucide-react'
 import { Card, Toggle } from '../components/ui'
 import { loadScanPrefs, saveScanPrefs, type ScanPrefs } from '../scan/prefs'
+import DirectScannerLink from './DirectScannerLink'
 import { loadSessions, summarize } from '../scan/session'
 
 /** Device-local scanner set-up plus the last scan sessions on this device. */
@@ -24,6 +25,9 @@ export default function ScannerSettingsCard() {
       <Toggle checked={prefs.hid} onChange={(v) => set({ hid: v })} label={t('scanner.hid')} hint={t('scanner.hidHint')} />
       <Toggle checked={prefs.camera} onChange={(v) => set({ camera: v })} label={t('scanner.camera')} hint={t('scanner.cameraHint')} />
       <Toggle checked={prefs.quantity} onChange={(v) => set({ quantity: v })} label={t('scanner.quantity')} hint={t('scanner.quantityHint')} />
+      <div className="mt-4">
+        <DirectScannerLink />
+      </div>
       <h3 className="mb-1 mt-4 text-sm font-semibold text-ink-700">{t('scanner.sessions')}</h3>
       {sessions.length === 0 ? (
         <p className="text-sm text-ink-500">{t('scanner.noSessions')}</p>

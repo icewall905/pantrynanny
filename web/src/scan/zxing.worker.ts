@@ -1,19 +1,17 @@
 /// <reference lib="webworker" />
-import { ZxingDecoderCore } from './zxingCore'
+import { OrientationDecoder } from './zxingCore'
 
-const core = new ZxingDecoderCore()
+const dec = new OrientationDecoder()
 
 export interface WorkerRequest {
   id: number
   width: number
   height: number
   luma: ArrayBuffer
-  hard: boolean
 }
 
 self.onmessage = (ev: MessageEvent<WorkerRequest>) => {
-  const { id, width, height, luma, hard } = ev.data
-  const t0 = performance.now()
-  const results = core.decode(new Uint8ClampedArray(luma), width, height, hard)
-  ;(self as unknown as Worker).postMessage({ id, results, ms: performance.now() - t0 })
+  const { id, width, height, luma } = ev.data
+  const results = dec.decode(new Uint8ClampedArray(luma), width, height)
+  ;(self as unknown as Worker).postMessage({ id, results, timing: dec.last })
 }

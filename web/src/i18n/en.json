@@ -482,7 +482,17 @@
     "noSessions": "No sessions yet on this device.",
     "sessionMeta": "{{scans}} scans · {{products}} products",
     "sessionUnknown_one": "{{count}} unknown",
-    "sessionUnknown_other": "{{count}} unknown"
+    "sessionUnknown_other": "{{count}} unknown",
+    "link": {
+      "title": "Direct scanner link",
+      "hint": "Opens the scanner straight away (no menu). Use it as a bookmark or on the Home Screen.",
+      "add": "Add / scan in (default)",
+      "remove": "Remove / scan out (reverts to add after idle)",
+      "handOnly": "Hand scanner only (camera off)",
+      "copy": "Copy",
+      "copied": "Copied",
+      "ipad": "iPad: open the link in Safari › Share › Add to Home Screen. The icon is called “Scan” and opens the scanner directly. The first time you must tap Start and allow the camera."
+    }
   },
   "kitchen": {
     "greet_morning": "Good morning",

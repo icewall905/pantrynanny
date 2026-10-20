@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { AlertTriangle, Camera, CameraOff, ClipboardList, Flashlight, Keyboard, MapPin, Minus, Plus, RefreshCw, SwitchCamera, Undo2, Volume2, VolumeX, Wifi, WifiOff, X } from 'lucide-react'
+import { AlertTriangle, Loader2, Camera, CameraOff, ClipboardList, Flashlight, Keyboard, MapPin, Minus, Plus, RefreshCw, SwitchCamera, Undo2, Volume2, VolumeX, Wifi, WifiOff, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useTranslation } from 'react-i18next'
 import { get, qs } from '../api/client'
@@ -16,7 +16,8 @@ import { NS } from './i18n'
 import { opErrorText } from '../lib/opError'
 import { loadMode, removeTimedOut, saveMode, type ScanMode } from './mode'
 import { perf } from './perf'
-import { loadScanPrefs, saveScanPrefs, type ScanPrefs } from './prefs'
+import { LookupTracker, reconcileProduct, type CardPhase } from './lookup'
+import { loadScanPrefs, markCameraOk, saveScanPrefs, type ScanPrefs } from './prefs'
 import { expired, nameLine, recordScan, recordUndo, saveSession, summarize, type ScanRecord, type ScanSession } from './session'
 import type { WakeState } from './wakelock'
 
@@ -55,6 +56,8 @@ interface Card {
   product: Product | null
   qty: number | null
   lookingUp: boolean
+  /** looking = neutral spinner, slow = nothing yet after ~10 s (still listening), known / unknown = settled */
+  phase: CardPhase
   /** the durable local write failed: this scan was NOT recorded */
   failed?: boolean
   /** ops behind this card (the scan plus any +N taps) */
@@ -76,17 +79,19 @@ export interface ScanScreenProps {
   settings: HouseholdSettings | null
   kiosk: boolean
   wake: WakeState
+  /** mode from the direct scanner link (?mode=remove); still reverts to ADD after the idle timeout */
+  initialMode?: ScanMode
   onExit?: () => void
   /** sync lost its session (401): let the user pair/log in again */
   onReauth?: () => void
 }
 
-export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: ScanScreenProps) {
+export default function ScanScreen({ settings, kiosk, wake, initialMode, onExit, onReauth }: ScanScreenProps) {
   const { t, i18n } = useTranslation(NS)
   const store = getStore()
   const sync = useSyncStatus()
 
-  const [mode, setModeState] = useState<ScanMode>(() => loadMode())
+  const [mode, setModeState] = useState<ScanMode>(() => initialMode ?? loadMode())
   const modeRef = useRef(mode)
   const lastActivity = useRef(Date.now())
   const [card, setCard] = useState<Card | null>(null)
@@ -201,9 +206,17 @@ export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: 
     const c = cardRef.current
     if (c) {
       const norm = normalizeBarcode(c.barcode, c.format)
-      const p = c.product ?? (await store.lookupBarcode(c.barcode, c.format)).product
+      // Re-resolve from the store every time: a placeholder on the card must be replaced as soon as the real product
+      // arrives (sync result, pull, lookup), whichever came first.
+      const stored = (await store.lookupBarcode(c.barcode, c.format)).product
+      const p = reconcileProduct(c.product, stored)
       const q = await store.displayedQuantity(p, norm)
-      setCard((cur) => (cur && cur.n === c.n ? { ...cur, product: cur.product ?? p, qty: Math.max(0, q) } : cur))
+      setCard((cur) => {
+        if (!cur || cur.n !== c.n) return cur
+        const prod = reconcileProduct(cur.product, p)
+        const known = !!prod && prod.status !== 'unknown'
+        return { ...cur, product: prod, qty: Math.max(0, q), ...(known ? { phase: 'known' as const, lookingUp: false } : {}) }
+      })
     }
   }, [store])
   useEffect(() => {
@@ -213,27 +226,55 @@ export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: 
   }, [store, refresh])
 
   // ---- scanning ----
-  const background = useCallback(
-    async (ev: { value: string; format: string }, n: number, toastIdUnknown: number) => {
-      try {
-        const r = await get<BarcodeLookupResult>(
-          `/products/by-barcode/${encodeURIComponent(ev.value)}${qs({ lookup: true, symbology: ev.format })}`,
-          { timeoutMs: 6000 },
-        )
-        if (r.product) {
-          await store.cacheProduct(r.product)
-          if (r.product.status === 'known') dropToast(toastIdUnknown)
-          setSession(nameLine(sessionRef.current, ev.value, r.product.name, r.product.status === 'unknown'))
-          const q = await store.displayedQuantity(r.product, normalizeBarcode(ev.value, ev.format))
-          setCard((c) => (c && c.n === n ? { ...c, product: r.product, lookingUp: false, qty: Math.max(0, q) } : c))
-          return
-        }
-      } catch {
-        /* offline or slow: card stays "unknown", op is queued anyway */
-      }
-      setCard((c) => (c && c.n === n ? { ...c, lookingUp: false } : c))
+  const trackerRef = useRef<LookupTracker | null>(null)
+  const unknownToasts = useRef(new Map<number, number>())
+  useEffect(
+    () => () => {
+      trackerRef.current?.dispose()
+      trackerRef.current = null
     },
-    [store, setSession],
+    [],
+  )
+  const getTracker = () =>
+    (trackerRef.current ??= new LookupTracker({
+      remote: (code, format, lookup) =>
+        get<BarcodeLookupResult>(`/products/by-barcode/${encodeURIComponent(code)}${qs({ lookup, symbology: format })}`, { timeoutMs: 6000 }),
+      cache: (p) => store.cacheProduct(p),
+      local: async (code, format) => (await store.lookupBarcode(code, format)).product,
+      subscribe: (fn) => store.subscribeData(fn),
+    }))
+
+  /** Cache miss: the card shows a neutral "looking up" state until the answer is known (from ANY source). */
+  const background = useCallback(
+    (ev: { value: string; format: string }, n: number, initial: Product | null) => {
+      getTracker().track(
+        n,
+        ev.value,
+        ev.format,
+        (u) => {
+          const p = u.product
+          if (p) setSession(nameLine(sessionRef.current, ev.value, p.name, u.phase !== 'known'))
+          if (u.phase === 'known' && p) {
+            const tid = unknownToasts.current.get(n)
+            if (tid) dropToast(tid)
+            unknownToasts.current.delete(n)
+            void store
+              .displayedQuantity(p, normalizeBarcode(ev.value, ev.format))
+              .then((q) => setCard((c) => (c && c.n === n ? { ...c, qty: Math.max(0, q) } : c)))
+              .catch(() => undefined)
+          } else if (u.phase === 'unknown' && !unknownToasts.current.has(n)) {
+            beep('unknown')
+            unknownToasts.current.set(n, toast(t('toast.unknown'), 'amber'))
+          }
+          setCard((c) =>
+            c && c.n === n ? { ...c, product: reconcileProduct(c.product, p), phase: u.phase, lookingUp: u.phase === 'looking' || u.phase === 'slow' } : c,
+          )
+        },
+        initial,
+      )
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [store, setSession, toast, t],
   )
 
   const handleScan = useCallback(
@@ -276,25 +317,30 @@ export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: 
         console.error('enqueue failed', e)
         beep('error')
         vibrate([200, 80, 200])
-        setCard({ n, opId: '', type, barcode: ev.value, format: ev.format, product, qty: null, lookingUp: false, failed: true, ops: [] })
+        setCard({ n, opId: '', type, barcode: ev.value, format: ev.format, product, qty: null, lookingUp: false, phase: 'unknown', failed: true, ops: [] })
         toast(t('toast.saveFailed', { code: ev.value }), 'red')
         return
       }
       // Success feedback only after the durable local write (a few ms).
       const known = !!product && product.status !== 'unknown'
-      beep(known ? type : 'unknown')
-      vibrate(known ? 40 : [40, 60, 40])
-      setCard({ n, opId: op.client_op_id, type, barcode: ev.value, format: ev.format, product, qty: null, lookingUp: !known, ops: [{ id: op.client_op_id, qty: 1 }] })
+      // A cache MISS is not "unknown": the card stays neutral until the lookup says so. Only a placeholder we already
+      // hold locally is a settled "unknown" (the lookup then just tries to upgrade it).
+      const placeholder = !!product && !known
+      beep(placeholder ? 'unknown' : type)
+      vibrate(placeholder ? [40, 60, 40] : 40)
+      setCard({
+        n, opId: op.client_op_id, type, barcode: ev.value, format: ev.format, product, qty: null,
+        lookingUp: !known && !placeholder, phase: known ? 'known' : placeholder ? 'unknown' : 'looking', ops: [{ id: op.client_op_id, qty: 1 }],
+      })
       track({ opId: op.client_op_id, at: Date.now(), type, qty: 1, barcode: ev.value, name: known ? product!.name : null, unknown: !known })
-      let unknownToast = 0
-      if (!known) unknownToast = toast(t('toast.unknown'), 'amber')
+      if (placeholder) unknownToasts.current.set(n, toast(t('toast.unknown'), 'amber'))
       const q = await store.displayedQuantity(product, norm).catch(() => 0)
       setCard((c) => (c && c.n === n ? { ...c, qty: Math.max(0, q) } : c))
       if ('frameAt' in ev && ev.frameAt !== undefined) {
         const at = ev.frameAt
         requestAnimationFrame(() => perf.latency(performance.now() - at))
       }
-      if (!known) void background(ev, n, unknownToast)
+      if (!known) background(ev, n, placeholder ? product : null)
     },
     [store, toast, t, background, setMode, track, settings?.remove_mode_timeout_min],
   )
@@ -369,6 +415,7 @@ export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: 
         setCamState(s)
         setCamErr(err ?? null)
         if (s === 'running') {
+          markCameraOk()
           setTorchOk(engine.torchSupported)
           setSwitchOk(engine.canSwitchCamera)
         }
@@ -488,7 +535,7 @@ export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: 
       <div className="relative flex min-h-0 flex-1 flex-col gap-3 p-3 landscape:flex-row">
         {/* Camera */}
         <div
-          className={clsx('relative min-h-[30vh] flex-1 overflow-hidden rounded-3xl border-[10px] bg-black landscape:flex-[3]', theme.ring, theme.glow)}
+          className={clsx('relative min-h-[30vh] flex-1 overflow-hidden rounded-3xl border-[10px] bg-black [container-type:size] landscape:flex-[3]', theme.ring, theme.glow)}
         >
           {/* the front camera is mirrored like a selfie view; decoding reads the raw frames */}
           <video
@@ -502,7 +549,8 @@ export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: 
           {/* aiming frame (decoder looks only inside it) */}
           <div
             className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-2xl border-2 border-white/70"
-            style={{ width: `${FRAME.w * 100}%`, height: `${FRAME.h * 100}%`, boxShadow: '0 0 0 9999px rgba(0,0,0,0.22)' }}
+            style={{ width: `min(${FRAME.w * 100}cqw, ${FRAME.h * 100}cqh)`, aspectRatio: '1', boxShadow: '0 0 0 9999px rgba(0,0,0,0.22)' }}
+            data-testid="aim-frame"
           />
           {card && <div key={`f${card.n}`} className={clsx('pn-anim pointer-events-none absolute inset-0', theme.flash)} style={{ animation: 'pn-flash .5s ease-out forwards' }} />}
           {!prefs.camera ? (
@@ -856,22 +904,31 @@ function LastCard({ card, theme }: { card: Card | null; theme: (typeof THEME)[Sc
       <div className={clsx('grid min-h-28 place-items-center rounded-3xl p-5 text-center text-xl text-white/80', theme.soft)}>{t('last.empty')}</div>
     )
   const p = card.product && card.product.status !== 'unknown' ? card.product : null
+  // neutral while the answer is open (spinner); "unknown" only once the lookup really finished without a product
+  const searching = !p && !card.failed && (card.phase === 'looking' || card.phase === 'slow')
+  const title = p ? p.name : card.failed ? t('last.unknown') : card.phase === 'looking' ? t('last.lookingUp') : card.phase === 'slow' ? t('last.unknownBackground') : t('last.unknownSaved')
   const n = cardDelta(card)
   const delta = card.failed ? '!' : card.type === 'add' ? `+${n}` : `−${n}`
   return (
     <div key={card.n} className={clsx('flex items-center gap-4 rounded-3xl p-4', theme.soft)} data-testid="last-card">
       <div className="relative grid size-24 shrink-0 place-items-center overflow-hidden rounded-2xl bg-white/90 text-5xl landscape:size-28">
-        {p?.image_url ? <img src={p.image_url} alt="" className="size-full object-contain" /> : <span aria-hidden>{p ? '🛒' : '❓'}</span>}
+        {p?.image_url ? (
+          <img src={p.image_url} alt="" className="size-full object-contain" />
+        ) : searching ? (
+          <Loader2 className="size-12 animate-spin text-ink-500" aria-hidden />
+        ) : (
+          <span aria-hidden>{p ? '🛒' : '❓'}</span>
+        )}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[clamp(1.5rem,3.2vw,2.5rem)] font-black leading-tight" data-testid="last-name">
-          {p ? p.name : t('last.unknown')}
+        <div className="truncate text-[clamp(1.5rem,3.2vw,2.5rem)] font-black leading-tight" data-testid="last-name" data-phase={card.phase}>
+          {title}
         </div>
         {p?.brand && <div className="truncate text-lg text-white/70">{p.brand}</div>}
-        {!p && <div className="truncate font-mono text-lg text-white/80">{card.barcode}</div>}
+        {!p && <div className={clsx('truncate font-mono text-white/80', searching ? 'text-sm' : 'text-lg')} data-testid="last-barcode">{card.barcode}</div>}
         {card.failed && <div className="mt-1 text-lg font-bold text-red-300">{t('toast.notSaved')}</div>}
         <div className="mt-1 text-lg text-white/80">
-          {card.lookingUp ? t('last.lookingUp') : card.qty !== null ? `${t('last.stock')}: ${card.qty}` : ''}
+          {!searching && card.qty !== null ? `${t('last.stock')}: ${card.qty}` : ''}
         </div>
       </div>
       <div
@@ -893,7 +950,7 @@ function DebugOverlay({ pending, onClose }: { pending: number; onClose: () => vo
     <button type="button" onClick={onClose} className="absolute left-3 top-24 z-50 rounded-xl bg-black/85 p-3 text-left font-mono text-xs leading-5 text-lime-300" data-testid="debug-overlay">
       <div>decoder: {p.decoder}</div>
       <div>fps: {p.fps}</div>
-      <div>decode: {p.decodeMs.toFixed(1)} ms</div>
+      <div>decode: {p.decodeMs.toFixed(1)} ms (0°: {p.zeroMs.toFixed(1)}, +{p.passes} rot)</div>
       <div>decode→UI: {p.latencyMs === null ? '-' : `${p.latencyMs.toFixed(0)} ms`}</div>
       <div>last: {p.lastLatencies.map((x) => x.toFixed(0)).join(', ')}</div>
       <div>pending ops: {pending}</div>

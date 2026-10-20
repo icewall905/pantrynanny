@@ -98,6 +98,7 @@ server {
     location = /sw.js { add_header Cache-Control "no-cache" always; include /etc/nginx/snippets/pantrynanny-headers.conf; try_files $uri =404; }
     location = /index.html { add_header Cache-Control "no-cache" always; include /etc/nginx/snippets/pantrynanny-headers.conf; }
     location = /manifest.webmanifest { add_header Cache-Control "no-cache" always; include /etc/nginx/snippets/pantrynanny-headers.conf; default_type application/manifest+json; try_files $uri =404; }
+    location = /manifest-scan.webmanifest { add_header Cache-Control "no-cache" always; include /etc/nginx/snippets/pantrynanny-headers.conf; default_type application/manifest+json; try_files $uri =404; }
 
     location /assets/ {
         expires 1y;

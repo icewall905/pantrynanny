@@ -56,7 +56,7 @@ export class ScannerEngine {
     this.o = o
     this.dedupe = new ScanDeduplicator({ rearmMs: o.rearmMs })
     this.interval = 1000 / (o.fps ?? 12)
-    this.maxW = o.maxDecodeWidth ?? 800
+    this.maxW = o.maxDecodeWidth ?? 640
   }
 
   get torchSupported() {

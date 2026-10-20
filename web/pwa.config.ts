@@ -5,7 +5,8 @@ import type { VitePWAOptions } from 'vite-plugin-pwa'
 export const pwaOptions: Partial<VitePWAOptions> = {
   registerType: 'autoUpdate',
   injectRegister: false, // registered from src/offline (registerServiceWorker)
-  includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
+  // manifest-scan.webmanifest (public/) is the scanner-only manifest swapped in by /scan (src/scan/link.ts)
+  includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'manifest-scan.webmanifest'],
   manifest: {
     id: '/',
     name: 'PantryNanny',
@@ -29,7 +30,7 @@ export const pwaOptions: Partial<VitePWAOptions> = {
         name: 'Scan varer',
         short_name: 'Scan',
         description: 'Åbn scannerstationen',
-        url: '/scan',
+        url: '/scan?autostart=1',
         icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' }],
       },
     ],

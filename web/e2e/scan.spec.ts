@@ -143,3 +143,29 @@ test.describe('hand scanner, quantity and sessions', () => {
     await expect(page.getByTestId('start-scanning')).toBeVisible()
   })
 })
+
+test.describe('direct scanner link', () => {
+  test.skip(!E2E, 'PN_E2E_BASE_URL not set')
+
+  test('autostart=1&mode=remove starts scanning without a tap and uses the scanner manifest', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'desktop only')
+    const state = { online: true, ops: [] as { client_op_id: string; type: string; barcode?: string }[] }
+    await mockBackend(page, state)
+    await page.goto('/scan?autostart=1&mode=remove')
+    await expect(page.getByTestId('scan-screen')).toHaveAttribute('data-mode', 'remove') // no Start tap
+    await expect(page.locator('link[rel="manifest"]')).toHaveAttribute('href', '/manifest-scan.webmanifest')
+    await expect(page.locator('meta[name="apple-mobile-web-app-title"]')).toHaveAttribute('content', 'Scan')
+    const m = await (await page.request.get('/manifest-scan.webmanifest')).json()
+    expect(m).toMatchObject({ short_name: 'Scan', start_url: '/scan?autostart=1', scope: '/', display: 'standalone' })
+  })
+
+  test('autostart=1&camera=off starts the hand-scanner station; without autostart the Start button shows', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'desktop only')
+    const state = { online: true, ops: [] as { client_op_id: string; type: string; barcode?: string }[] }
+    await mockBackend(page, state, false)
+    await page.goto('/scan?autostart=1&camera=off')
+    await expect(page.getByTestId('camera-off')).toBeVisible()
+    await page.goto('/scan?camera=on')
+    await expect(page.getByTestId('start-scanning')).toBeVisible()
+  })
+})

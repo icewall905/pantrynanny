@@ -36,7 +36,9 @@
     "unknown": "Unknown item",
     "lookingUp": "Looking up…",
     "stock": "In stock",
-    "pending": "waiting to sync"
+    "pending": "waiting to sync",
+    "unknownSaved": "Unknown item – saved for later",
+    "unknownBackground": "Unknown – being looked up in the background"
   },
   "toast": {
     "unknown": "Unknown item saved – can be named later",

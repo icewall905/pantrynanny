@@ -36,7 +36,9 @@
     "unknown": "Ukendt vare",
     "lookingUp": "Slår op…",
     "stock": "På lager",
-    "pending": "venter på synkronisering"
+    "pending": "venter på synkronisering",
+    "unknownSaved": "Ukendt vare – gemt til senere",
+    "unknownBackground": "Ukendt – slås op i baggrunden"
   },
   "toast": {
     "unknown": "Ukendt vare gemt – kan navngives senere",
