@@ -193,7 +193,7 @@ interface HistoryDao {
     @Query("UPDATE scan_history SET productId = :productId, titleSnapshot = :title WHERE clientOpId = :clientOpId AND productId IS NULL")
     suspend fun attachProduct(clientOpId: String, productId: String, title: String)
 
-    @Query("SELECT * FROM scan_history WHERE barcode = :raw AND productId IS NULL")
+    @Query("SELECT * FROM scan_history WHERE barcode = :raw AND productId IS NULL ORDER BY occurredAtMs")
     suspend fun unlinkedByBarcode(raw: String): List<ScanHistoryEntity>
 
     @Query("UPDATE scan_history SET productId = :productId, titleSnapshot = :title, localDelta = :delta WHERE clientOpId = :clientOpId AND productId IS NULL")

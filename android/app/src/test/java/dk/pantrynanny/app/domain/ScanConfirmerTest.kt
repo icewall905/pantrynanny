@@ -125,6 +125,28 @@ class ScanConfirmerTest {
         now += 10
         assertFalse(c.onRead(read("A")))
     }
+    @Test
+    fun differentProductQuicklySwappedIntoHeldSpotConfirmsSoon() {
+        val c = confirmer()
+        c.onRead(read("A"))
+        repeat(10) { now += 33; c.onRead(read("A")) } // A held, ~10 confirmed reads
+        var reads = 0
+        var confirmed = false
+        while (!confirmed && reads < 10) { now += 40; reads++; confirmed = c.onRead(read("B")) }
+        assertTrue("B should confirm despite the hold", confirmed)
+        assertTrue("B confirmed within 4 reads, took $reads", reads <= 4)
+    }
+
+    @Test
+    fun misreadRepeatedTwiceRightAfterConfirmIsStillHeld() {
+        val c = confirmer()
+        c.onRead(read("A"))
+        repeat(10) { now += 33; c.onRead(read("A")) }
+        now += 33
+        assertFalse(c.onRead(read("X")))
+        now += 33
+        assertFalse(c.onRead(read("X")))
+    }
 }
 
 class FrameSelectorTest {
@@ -160,4 +182,5 @@ class FrameSelectorTest {
         val big = FrameSelector.select(listOf(cand("b", 100, 500, 620, 780)), 720, 1280)!!
         assertFalse(big.third)
     }
+
 }

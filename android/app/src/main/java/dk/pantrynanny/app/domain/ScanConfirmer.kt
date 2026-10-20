@@ -100,11 +100,17 @@ class ScanConfirmer(
         if (tCode != null && tCode != d.raw && t - lastAt <= regionHoldMs) {
             val region = lastRegion
             val overlaps = region == null || d.box == null || region.overlaps(d.box)
-            if (overlaps && mine.size <= lastReads) return false
+            // Cap the bar: a held T has ~every frame in the window, which a legitimately different
+            // product in the same spot could never beat. One read more than a fresh confirmation suffices
+            // to outvote a misread repeated in 2–3 frames.
+            if (overlaps && mine.size <= minOf(lastReads, minReads + 1)) return false
         }
-        // Competitors: other codes read from a region overlapping this code's (unknown box = assume overlap).
+        // Competitors: other codes read from a region overlapping this code's (unknown box = assume overlap),
+        // counted only since this code's first sighting — a product that was swapped out before this one appeared
+        // is not competing with it (the region hold above covers late misreads after a confirmation).
         val regions = mine.mapNotNull { it.box }
-        val rivalBest = reads.filter { it.code != d.raw }
+        val since = mine.first().t
+        val rivalBest = reads.filter { it.code != d.raw && it.t >= since }
             .filter { r -> r.box == null || regions.isEmpty() || regions.any { it.overlaps(r.box) } }
             .groupBy { it.code }
             .maxOfOrNull { it.value.size } ?: 0
