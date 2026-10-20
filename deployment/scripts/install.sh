@@ -115,6 +115,11 @@ if [[ ! -f $RELEASE_DIR/web/downloads/pantrynanny.apk && -n $PREVIOUS && -f $PRE
   cp -p "$PREVIOUS/web/downloads/pantrynanny.apk" "$RELEASE_DIR/web/downloads/"
   [[ -f $PREVIOUS/web/downloads/android.json ]] && cp -p "$PREVIOUS/web/downloads/android.json" "$RELEASE_DIR/web/downloads/"
 fi
+# Tabs still running the previous build lazy-load hashed chunks from /assets/. Carry recent ones
+# (<=14 days; cp -p keeps the mtime so they age out and growth stays bounded) into the new release.
+if [[ -n $PREVIOUS && -d $PREVIOUS/web/assets && $PREVIOUS != "$RELEASE_DIR" ]]; then
+  find "$PREVIOUS/web/assets" -maxdepth 1 -type f -mtime -14 -exec cp -n -p -t "$RELEASE_DIR/web/assets/" {} + 2>/dev/null || true
+fi
 ln -sfn "$RELEASE_DIR" $APP_ROOT/current.new && mv -T $APP_ROOT/current.new $APP_ROOT/current
 
 # nginx
