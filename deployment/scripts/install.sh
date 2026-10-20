@@ -14,7 +14,7 @@ ENV_FILE=$ETC/pantrynanny.env
 DATA=/var/lib/pantrynanny
 BACKUPS=/var/backups/pantrynanny
 LISTEN_PORT=8734
-KEEP_RELEASES=5
+KEEP_RELEASES=3
 
 log() { printf '\033[1;32m[pantrynanny]\033[0m %s\n' "$*"; }
 die() { printf '\033[1;31m[pantrynanny] ERROR:\033[0m %s\n' "$*" >&2; exit 1; }
@@ -151,9 +151,12 @@ for u in "$RELEASE_DIR"/deployment/systemd/*; do install -m 0644 "$u" /etc/syste
 chmod 0755 "$RELEASE_DIR"/deployment/scripts/*.sh
 systemctl daemon-reload
 systemctl enable -q pantrynanny-api pantrynanny-worker pantrynanny-backup.timer pantrynanny-healthcheck.timer nginx
-systemctl restart pantrynanny-api pantrynanny-worker
-systemctl start pantrynanny-backup.timer pantrynanny-healthcheck.timer
+# The periodic health check would count the restart below as a failure: pause it until the
+# new release answers (it is started again in every outcome further down).
+systemctl stop pantrynanny-healthcheck.timer 2>/dev/null || true
 systemctl reload-or-restart nginx
+systemctl restart pantrynanny-api pantrynanny-worker
+systemctl start pantrynanny-backup.timer
 
 # --- 7. verify, roll back on failure ----------------------------------------------
 log "waiting for health check"
@@ -168,9 +171,12 @@ if ((ok == 0)); then
     ln -sfn "$PREVIOUS" $APP_ROOT/current.new && mv -T $APP_ROOT/current.new $APP_ROOT/current
     systemctl restart pantrynanny-api pantrynanny-worker
   fi
+  systemctl start pantrynanny-healthcheck.timer || true
   journalctl -u pantrynanny-api -n 40 --no-pager || true
   die "new release did not become healthy"
 fi
+
+systemctl start pantrynanny-healthcheck.timer
 
 # --- 8. prune old releases ---------------------------------------------------------
 current="$(readlink -f $APP_ROOT/current)"

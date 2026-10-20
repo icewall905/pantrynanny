@@ -17,6 +17,7 @@ from sqlalchemy import (
     literal,
     or_,
     select,
+    text,
     update,
 )
 from sqlalchemy.exc import IntegrityError
@@ -316,6 +317,18 @@ async def create_placeholder(
     return p
 
 
+async def lock_code(session: AsyncSession, household_id: uuid.UUID, code: str) -> None:
+    """Serialise creators of the same barcode in one household for this transaction.
+
+    Two devices scanning the same new barcode at once would otherwise both insert it. The
+    savepoints below still catch that, but the losing INSERT is logged by PostgreSQL as an
+    ERROR, which buries real errors in the log."""
+    await session.execute(
+        text("SELECT pg_advisory_xact_lock(hashtextextended(:k, 0))"),
+        {"k": f"pn-barcode:{household_id}:{code}"},
+    )
+
+
 async def get_or_create_placeholder(
     session: AsyncSession, household_id: uuid.UUID, nb: NormalizedBarcode
 ) -> tuple[Product, bool]:
@@ -323,6 +336,10 @@ async def get_or_create_placeholder(
     placeholder. Race-safe via a savepoint. The seed check is a primary-key read (no network), so
     scans arriving through ``/sync/ops`` (Android, offline queue) are recognised immediately too."""
     p = await find_by_code(session, household_id, nb.code)
+    if p:
+        return p, False
+    await lock_code(session, household_id, nb.code)
+    p = await find_by_code(session, household_id, nb.code)  # created while we waited
     if p:
         return p, False
     data = await seed_data(session, nb.code)
@@ -375,6 +392,16 @@ async def resolve_barcode(
         log.exception("lookup_failed", code=nb.code)
 
     if data is not None:
+        await lock_code(session, household_id, nb.code)
+        p = await find_by_code(session, household_id, nb.code)  # created during the lookup?
+        if p is not None:
+            await session.commit()
+            return (
+                "found",
+                await get_product(session, household_id, p.id, refresh=True),
+                p.source,
+                nb,
+            )
         try:
             async with session.begin_nested():
                 p = await new_product_from_data(session, household_id, data)

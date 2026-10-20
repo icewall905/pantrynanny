@@ -106,6 +106,17 @@ export default function DashboardPage() {
       )}
       {d && (
         <div className="space-y-6">
+          {d.unknown_count > 0 && (
+            <Link
+              to="/unknown"
+              data-testid="unknown-nudge"
+              className="flex items-center gap-3 rounded-[var(--radius-card)] bg-honey-50 p-4 text-sm ring-1 ring-honey-400/50 transition hover:ring-honey-400"
+            >
+              <HelpCircle className="size-5 shrink-0 text-honey-600" />
+              <span className="min-w-0 flex-1">{t('dashboard.unknownNudge', { count: d.unknown_count })}</span>
+              <span className="font-semibold text-honey-600">{t('dashboard.unknownNudgeAction')}</span>
+            </Link>
+          )}
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
             <Stat to="/inventory" icon={PackageCheck} value={d.totals.products_in_stock} label={t('dashboard.products')} tone="bg-leaf-100 text-leaf-700" />
             <Stat to="/inventory?low=1" icon={TrendingDown} value={d.low_stock.length} label={t('dashboard.low')} tone="bg-honey-50 text-honey-600" />

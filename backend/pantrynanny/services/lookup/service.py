@@ -144,7 +144,11 @@ async def lookup_detailed(
     budget = budget_s if budget_s is not None else settings.lookup_timeout_s
     deadline = time.monotonic() + budget
     overrides = await load_overrides(session)
-    providers = [p for p in build_providers(settings, overrides) if p.enabled()]
+    providers = [
+        p
+        for p in build_providers(settings, overrides)
+        if p.enabled() and (runtime.role == "worker" or not getattr(p, "background_only", False))
+    ]
     if not providers:
         return LookupOutcome("skipped")
     has_remote = any(not getattr(p, "local", False) for p in providers)

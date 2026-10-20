@@ -255,8 +255,11 @@ class OpenBeautyFactsProvider(OpenFoodFactsProvider):
     display_name = "Open Beauty Facts"
     attribution = "Open Beauty Facts – ODbL (images CC BY-SA)"
     default_priority = 20
-    # On by default: only asked after Open Food Facts misses (household and non-food items).
+    # On by default, but only asked by the background worker after Open Food Facts misses
+    # (household and non-food items). The interactive scan path skips them: they almost never
+    # know Danish groceries and would only add latency to an unknown scan.
     default_enabled = True
+    background_only: ClassVar[bool] = True
 
     @property
     def base_url(self) -> str:

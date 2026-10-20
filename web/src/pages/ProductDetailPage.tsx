@@ -19,6 +19,13 @@ import { useStockOps } from '../hooks/useStock'
 import { formatDateTime, formatQty } from '../lib/format'
 import { apiErrorText } from '../lib/opError'
 
+/** EAN-13/8 or UPC of a product the open databases don't know yet (we named it ourselves). */
+function contributableCode(p: Product): string | null {
+  if (p.status !== 'known' || !['user', 'placeholder'].includes(p.source)) return null
+  const gtin = p.barcodes.map((b) => b.code).find((c) => /^\d{14}$/.test(c))
+  return gtin ? (gtin.startsWith('0') ? gtin.slice(1) : gtin) : null // GTIN-14 -> EAN-13
+}
+
 function attribution(p: Product, off: string): string | null {
   if (p.source_attribution) return p.source_attribution
   if (p.source === 'openfoodfacts') return off
@@ -267,6 +274,20 @@ export default function ProductDetailPage() {
             </>
           )}
           {attr && <p className="mt-4 text-xs text-ink-500">{attr}</p>}
+          {contributableCode(p) && (
+            <p className="mt-4 text-xs text-ink-500" data-testid="off-contribute">
+              {t('product.offContribute')}{' '}
+              {/* only a link: nothing is uploaded automatically */}
+              <a
+                href={`https://world.openfoodfacts.org/product/${contributableCode(p)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-leaf-600 hover:underline"
+              >
+                {t('product.offContributeLink')}
+              </a>
+            </p>
+          )}
         </Card>
 
         <Card>

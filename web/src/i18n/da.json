@@ -138,7 +138,10 @@
     "conf_medium": "groft skøn",
     "conf_high": "godt skøn",
     "inAboutDays_one": "~{{count}} dag",
-    "inAboutDays_other": "~{{count}} dage"
+    "inAboutDays_other": "~{{count}} dage",
+    "unknownNudge_one": "{{count}} vare mangler stadig et navn – den er scannet, men ikke genkendt endnu.",
+    "unknownNudge_other": "{{count}} varer mangler stadig et navn – de er scannet, men ikke genkendt endnu.",
+    "unknownNudgeAction": "Navngiv"
   },
   "expiry": {
     "expired": "Udløbet",
@@ -236,7 +239,9 @@
     "notFound": "Varen findes ikke",
     "deleteConfirm": "Slet “{{name}}”?",
     "runOut_one": "I jeres normale tempo holder det ca. {{count}} dag mere",
-    "runOut_other": "I jeres normale tempo holder det ca. {{count}} dage mere"
+    "runOut_other": "I jeres normale tempo holder det ca. {{count}} dage mere",
+    "offContribute": "Findes ikke i Open Food Facts endnu. Du kan tilføje den dér og hjælpe andre.",
+    "offContributeLink": "Åbn i Open Food Facts"
   },
   "status": {
     "known": "Kendt",

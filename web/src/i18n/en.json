@@ -138,7 +138,10 @@
     "conf_medium": "rough estimate",
     "conf_high": "good estimate",
     "inAboutDays_one": "~{{count}} day",
-    "inAboutDays_other": "~{{count}} days"
+    "inAboutDays_other": "~{{count}} days",
+    "unknownNudge_one": "{{count}} product still needs a name – it is scanned but not recognised yet.",
+    "unknownNudge_other": "{{count}} products still need a name – they are scanned but not recognised yet.",
+    "unknownNudgeAction": "Name them"
   },
   "expiry": {
     "expired": "Expired",
@@ -236,7 +239,9 @@
     "notFound": "Product not found",
     "deleteConfirm": "Delete “{{name}}”?",
     "runOut_one": "At your usual pace this lasts about {{count}} more day",
-    "runOut_other": "At your usual pace this lasts about {{count}} more days"
+    "runOut_other": "At your usual pace this lasts about {{count}} more days",
+    "offContribute": "Not in Open Food Facts yet. You can add it there to help others.",
+    "offContributeLink": "Open in Open Food Facts"
   },
   "status": {
     "known": "Known",

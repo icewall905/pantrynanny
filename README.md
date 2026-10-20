@@ -135,7 +135,7 @@ of [`.env.example`](.env.example), which documents every variable. The important
 | `PN_TIMEZONE` | `Europe/Copenhagen` | defines "today" for expiry |
 | `PN_OFF_ENABLED` / `PN_OFF_USER_AGENT` | `true` / – | Open Food Facts lookups; OFF asks for a contact address in the UA |
 | `PN_SEED_ENABLED` | `true` | the bundled offline seed catalogue |
-| `PN_OFF_SISTERS_ENABLED` | `true` | Open Beauty / Pet Food / Products Facts after an Open Food Facts miss |
+| `PN_OFF_SISTERS_ENABLED` | `true` | Open Beauty / Pet Food / Products Facts after an Open Food Facts miss (background worker only) |
 | `PN_OFF_RATE_PER_MIN` / `PN_OFF_WORKER_RATE_PER_MIN` | `8` / `6` | outgoing budget (OFF allows 15 reads/min/IP) |
 | `PN_EANSEARCH_TOKEN` | empty | optional commercial fallback |
 | `PN_AI_BASE_URL` / `PN_AI_MODEL` / `PN_AI_API_KEY` | empty | OpenAI-compatible endpoint; empty disables AI |
@@ -170,6 +170,13 @@ deployment/scripts/restore.sh /var/backups/pantrynanny/daily/<ts> --target-db pa
 # replace the live database and uploads (asks for confirmation; stops services, restores, restarts)
 deployment/scripts/restore.sh /var/backups/pantrynanny/daily/<ts>
 ```
+
+Every deploy also takes a database-only dump **before** running migrations. It is written to
+`/var/backups/pantrynanny/pre-deploy/<time>-<release>/` with `SHA256SUMS`. The installer keeps the last 10
+and refuses to migrate if the dump fails. It restores the same way:
+`deployment/scripts/restore.sh /var/backups/pantrynanny/pre-deploy/<dir>`. Photos are not part of it, and
+existing photos are kept. Restoring it means going back to the schema of the release before that deploy, so
+point `/opt/pantrynanny/current` at that release, or deploy again, which re-applies the migrations.
 
 The database OID changes on a live restore, so every client cursor becomes invalid and devices download
 a full snapshot on their next sync. If the backup came from an older release, run `deployment/deploy.sh`

@@ -706,5 +706,14 @@ async def test_sister_projects_are_asked_after_off_miss(env, lookup_on):
             return_value=httpx.Response(200, json=sister)
         )
         out = await by_barcode(env)
+        # the scan itself only asks Open Food Facts: the sisters would just slow an unknown scan
+        assert opf.call_count == 0 and out["product"]["status"] == "unknown"
+        pid = out["product"]["id"]
+        runtime.set_role("worker")
+        try:
+            assert await run_once(env.app.state.sessionmaker) == 1
+        finally:
+            runtime.set_role("api")
     assert opf.call_count == 1
-    assert out["source"] == "openproductsfacts" and out["product"]["name"] == "Opvaskemiddel"
+    p = (await env.client.get(f"/api/products/{pid}", headers=env.member)).json()
+    assert p["source"] == "openproductsfacts" and p["name"] == "Opvaskemiddel"

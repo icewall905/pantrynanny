@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-10-20 – server review follow-ups
+
+- **Locations.** Items with no known place now go to the fridge (Køleskab) instead of the pantry. Migration 0009
+  only changes households that still have the original seed default. Moving a product's stock to another place
+  makes that its place for future scans, and undoing the move undoes that too. The first add with an explicit
+  location also sets it.
+- **Lookups.** Open Beauty / Pet Food / Products Facts stay enabled, but only the background worker asks them.
+  A scan never waits for them, and each has its own rate budget (the docs said "disabled by default"; corrected).
+- **Fewer PostgreSQL errors.** Concurrent creation of the same new barcode is serialised with an advisory lock,
+  instead of relying on a duplicate-key error caught by a savepoint.
+- **Deploys.**
+  - nginx answers `503` + `Retry-After` (JSON `code: restarting`) instead of `502` while the API restarts.
+    Clients already retry it.
+  - The health-check timer is paused during a deploy.
+  - Releases leave out sourcemaps and backend tests, and the last 3 releases are kept instead of 5.
+- **Logging.** The nginx access log records the forwarded scheme and host, request time and upstream time.
+- **Unknown products.**
+  - The dashboard nudges when products still need a name.
+  - Products you named yourself link to Open Food Facts so you can add them there. Nothing is uploaded
+    automatically.
+- **Docs.** README documents restoring from a pre-deploy dump.
+
 ## 2026-10 – "from functional to outstanding"
 
 Database migrations 0005–0008 only add tables and columns. `install.sh` now takes a verified `pg_dump` into

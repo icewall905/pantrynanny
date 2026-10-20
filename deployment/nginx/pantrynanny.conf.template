@@ -23,6 +23,12 @@ map "$pn_trusted_proxy:$http_x_forwarded_host" $pn_forwarded_host {
     default    $http_host;
     "~^1:(.+)$" $1;
 }
+# Access log with what the reverse proxy saw (scheme, host) and timings, to debug proxy
+# problems and follow scan/sync latency in production.
+log_format pantrynanny '$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent '
+                       '"$http_referer" "$http_user_agent" proto=$pn_forwarded_proto '
+                       'host=$pn_forwarded_host rt=$request_time urt=$upstream_response_time';
+
 map $http_upgrade $pn_connection_upgrade {
     default upgrade;
     ''      '';
@@ -47,7 +53,7 @@ server {
     # so every such location re-includes the security headers.
     include /etc/nginx/snippets/pantrynanny-headers.conf;
 
-    access_log /var/log/nginx/pantrynanny.access.log;
+    access_log /var/log/nginx/pantrynanny.access.log pantrynanny;
     error_log  /var/log/nginx/pantrynanny.error.log warn;
 
     location = /nginx-health { access_log off; return 200 "ok\n"; }
@@ -75,6 +81,17 @@ server {
         proxy_buffering off;
         add_header Cache-Control "no-store" always;
         include /etc/nginx/snippets/pantrynanny-headers.conf;
+        # The API restarts for a few seconds during a deploy: answer "try again shortly" instead
+        # of a bare 502. Clients keep their queued scans and retry.
+        error_page 502 = @api_restarting;
+    }
+
+    location @api_restarting {
+        default_type application/json;
+        add_header Retry-After 3 always;
+        add_header Cache-Control "no-store" always;
+        include /etc/nginx/snippets/pantrynanny-headers.conf;
+        return 503 '{"detail":"PantryNanny is restarting, try again in a few seconds","code":"restarting"}';
     }
 
     # Service worker and entry points must never be cached by intermediaries.

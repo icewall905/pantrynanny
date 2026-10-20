@@ -77,6 +77,9 @@ build_apk() {
 }
 [[ "${PN_DEPLOY_APK:-1}" == 0 ]] || build_apk
 rm -rf "$work/android"
+# Not needed at runtime: sourcemaps (~7 MB; the repo is public, so nothing is lost), backend tests.
+find "$work/web" -name '*.map' -delete
+rm -rf "$work/backend/tests"
 tarball="$work.tar.gz"; trap 'rm -rf "$work" "$tarball"' EXIT
 tar -C "$work" -czf "$tarball" .
 echo "==> release $rel ($(du -h "$tarball" | cut -f1))"

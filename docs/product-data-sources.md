@@ -13,7 +13,7 @@ placeholder + background enrichment. Provider enable/priority/API keys are edita
 | Source | Status | Why |
 |---|---|---|
 | Open Food Facts (OFF) | **Implemented, enabled** (priority 10) | Open API, ODbL data, explicit reuse terms |
-| Open Beauty / Pet Food / Products Facts | Implemented, **disabled by default** (20-22) | Same software, API and licence as OFF; non-food coverage; off by default to keep scan latency low |
+| Open Beauty / Pet Food / Products Facts | Implemented, enabled by default, **background worker only** (20-22) | Same software, API and licence as OFF; non-food coverage; never on the interactive scan path, so they add no scan latency |
 | EAN-Search.org | Implemented, **key-gated, disabled by default** (50) | Official paid REST API with token; enabled only when a token is set |
 | GS1 Denmark (Verified by GS1 / GEPIR) | Not implemented | Company-level data, enterprise/contract access only |
 | Salling Group developer APIs | Not implemented | No product-by-EAN API found |
@@ -60,17 +60,20 @@ placeholder + background enrichment. Provider enable/priority/API keys are edita
 2. The bundled seed catalogue (Open Food Facts, Danish products; local table, no network). This is
    also checked when a scan arrives through `POST /api/sync/ops` (Android, offline queue), so a seeded
    product is named in the sync response itself.
-3. Open Food Facts online, then the sister projects below, then EAN-Search if a token is set. On the
-   sync path this happens in the background worker; the next pull brings the name to the devices.
+3. Open Food Facts online, then EAN-Search if a token is set. The sister projects below are asked
+   only by the background worker. On the sync path all of this happens in the background worker;
+   the next pull brings the name to the devices.
 4. Nothing found: an `unknown` placeholder that the household names once ("Registrer").
 
 ## Open Beauty Facts, Open Pet Food Facts, Open Products Facts
 
 Sister projects (same API shape, ODbL/CC BY-SA) at `world.openbeautyfacts.org`,
 `world.openpetfoodfacts.org`, `world.openproductsfacts.org`. Same rate-limit etiquette applies.
-Implemented as subclasses of the OFF adapter and enabled by default: they are only asked after
-Open Food Facts misses, which is where household cleaning, cosmetics and pet products end up. Turn
-them off under Admin → Providers if you don't want the extra requests.
+Implemented as subclasses of the OFF adapter and enabled by default, but only the background
+enrichment worker asks them, after Open Food Facts misses. That is where household cleaning, cosmetics
+and pet products end up. A scan never waits for them. Each has its own rate-limit bucket, so they
+don't use Open Food Facts' budget. A miss is negatively cached like any other provider. Turn them off
+under Admin → Providers (or `PN_OFF_SISTERS_ENABLED=false`) if you don't want the extra requests.
 
 ## EAN-Search.org
 
