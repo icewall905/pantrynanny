@@ -31,23 +31,25 @@ import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
+import dk.pantrynanny.app.domain.DecodedBarcode
+import dk.pantrynanny.app.domain.FrameCandidate
+import dk.pantrynanny.app.domain.FrameSelector
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 
 private const val TAG = "CameraPreview"
 
-/** Retail formats only; restricting formats makes ML Kit faster and avoids false positives. */
-private fun scannerOptions(): BarcodeScannerOptions =
-    BarcodeScannerOptions.Builder()
-        .setBarcodeFormats(
-            Barcode.FORMAT_EAN_13,
-            Barcode.FORMAT_EAN_8,
-            Barcode.FORMAT_UPC_A,
-            Barcode.FORMAT_UPC_E,
-            Barcode.FORMAT_CODE_128,
-            Barcode.FORMAT_ITF,
-        )
+/**
+ * Retail formats only; restricting formats makes ML Kit faster and avoids false positives. CODE_128/ITF are
+ * only decoded when [others] ("Andre stregkodetyper") is on: they produce many partial misreads on EAN labels.
+ */
+private fun scannerOptions(others: Boolean): BarcodeScannerOptions {
+    val retail = intArrayOf(Barcode.FORMAT_EAN_13, Barcode.FORMAT_EAN_8, Barcode.FORMAT_UPC_A, Barcode.FORMAT_UPC_E)
+    val formats = if (others) retail + intArrayOf(Barcode.FORMAT_CODE_128, Barcode.FORMAT_ITF) else retail
+    return BarcodeScannerOptions.Builder()
+        .setBarcodeFormats(formats.first(), *formats.drop(1).toIntArray())
         .build()
+}
 
 fun symbologyFor(format: Int): String = when (format) {
     Barcode.FORMAT_EAN_13 -> "ean_13"
@@ -67,7 +69,7 @@ private val DirectExecutor = Executor { it.run() }
 private class BarcodeAnalyzer(
     private val scanner: BarcodeScanner,
     private val executor: Executor,
-    private val onBarcode: (String, Int) -> Unit,
+    private val onBarcode: (DecodedBarcode) -> Unit,
 ) : ImageAnalysis.Analyzer {
 
     /** Posts to the analysis thread but swallows RejectedExecutionException after the camera was disposed. */
@@ -86,13 +88,21 @@ private class BarcodeAnalyzer(
             return
         }
         try {
-            val input = InputImage.fromMediaImage(media, imageProxy.imageInfo.rotationDegrees)
+            val rotation = imageProxy.imageInfo.rotationDegrees
+            // ML Kit reports boxes in the rotated (upright) image, so swap the sides for 90/270.
+            val (w, h) = FrameSelector.uprightSize(media.width, media.height, rotation)
+            val input = InputImage.fromMediaImage(media, rotation)
             scanner.process(input)
                 .addOnSuccessListener(safeExecutor) { barcodes ->
-                    for (b in barcodes) {
+                    // One barcode per frame: the most central one that does not touch the frame edge.
+                    val cands = barcodes.mapNotNull { b ->
                         val value = b.rawValue
-                        if (!value.isNullOrEmpty()) onBarcode(value, b.format)
+                        val box = b.boundingBox
+                        if (value.isNullOrEmpty() || box == null) null
+                        else FrameCandidate(Pair(value, b.format), box.left, box.top, box.right, box.bottom)
                     }
+                    val (pick, box, weak) = FrameSelector.select(cands, w, h) ?: return@addOnSuccessListener
+                    onBarcode(DecodedBarcode(pick.first, pick.second, box, weak))
                 }
                 // Direct executor: close() must run even if `executor` was shut down (RejectedExecutionException).
                 .addOnCompleteListener(DirectExecutor) { imageProxy.close() }
@@ -110,9 +120,11 @@ private class BarcodeAnalyzer(
 @Composable
 fun CameraPreview(
     torchOn: Boolean,
-    onBarcode: (String, Int) -> Unit,
+    onBarcode: (DecodedBarcode) -> Unit,
     modifier: Modifier = Modifier,
     frontCamera: Boolean = false,
+    /** Also decode CODE_128/ITF (setting "Andre stregkodetyper"). */
+    otherFormats: Boolean = false,
     /** Called once the camera provider is known: true when the device has both a front and a rear camera. */
     onCanSwitch: (Boolean) -> Unit = {},
 ) {
@@ -126,9 +138,9 @@ fun CameraPreview(
     val currentOnCanSwitch by rememberUpdatedState(onCanSwitch)
 
     // Keyed on the lens too: switching cameras unbinds and rebinds the use cases.
-    DisposableEffect(lifecycleOwner, frontCamera) {
+    DisposableEffect(lifecycleOwner, frontCamera, otherFormats) {
         val executor = Executors.newSingleThreadExecutor()
-        val scanner = BarcodeScanning.getClient(scannerOptions())
+        val scanner = BarcodeScanning.getClient(scannerOptions(otherFormats))
         val providerFuture = ProcessCameraProvider.getInstance(context)
         var provider: ProcessCameraProvider? = null
         var disposed = false
@@ -149,7 +161,7 @@ fun CameraPreview(
                     .setResolutionSelector(resolution)
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .build()
-                analysis.setAnalyzer(executor, BarcodeAnalyzer(scanner, executor) { v, f -> currentOnBarcode(v, f) })
+                analysis.setAnalyzer(executor, BarcodeAnalyzer(scanner, executor) { currentOnBarcode(it) })
                 val hasFront = p.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA)
                 val hasBack = p.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA)
                 currentOnCanSwitch(hasFront && hasBack)

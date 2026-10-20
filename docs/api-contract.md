@@ -211,9 +211,12 @@ tracked[code].lastSeenAt = t
 * Frames without detections simply don't update `lastSeenAt`, so a barcode held in view
   (continuously decoded) never re-fires; removing it for ≥ REARM_MS and showing it again fires.
 * Different codes are independent → no global cooldown.
-* Optional confirmation filter: a code must be decoded in ≥ 2 frames within 250 ms OR have a
-  valid checksum to fire (rejects misreads). EAN/UPC checksum-valid single reads fire
-  immediately.
+* Misread confirmation (Android; runs before the dedupe above): partial left-half decodes can be
+  checksum-valid yet wrong, so a code fires only after the identical raw value was decoded in
+  ≥ 2 frames within 600 ms (3 if the first sighting was small / near the frame edge) and no
+  competing code from an overlapping region has as many reads. Codes touching the frame edge
+  are ignored; per frame only the most central code is considered. Checksum validity is
+  irrelevant. Default formats: EAN-13/8, UPC-A/E (CODE_128/ITF behind a setting).
 * Switching Add/Remove mode clears `tracked` (so the item in view can be counted in the new
   mode only after it is re-presented — avoids an accidental double operation).
 * Entries older than 10 s are garbage-collected.

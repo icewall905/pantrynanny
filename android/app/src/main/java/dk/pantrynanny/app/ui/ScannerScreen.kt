@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -60,6 +61,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dk.pantrynanny.app.R
 import dk.pantrynanny.app.data.local.HistoryRow
+import dk.pantrynanny.app.domain.CardPhase
 import dk.pantrynanny.app.domain.QuantityMath
 import dk.pantrynanny.app.domain.ScanMode
 import kotlinx.coroutines.launch
@@ -140,6 +142,7 @@ fun ScannerScreen(vm: ScannerViewModel, snackbar: SnackbarHostState, onRegisterP
                     onBarcode = vm::onDecoded,
                     modifier = Modifier.fillMaxSize(),
                     frontCamera = state.frontCamera,
+                    otherFormats = state.otherFormats,
                     onCanSwitch = { canSwitch = it },
                 )
                 Row(Modifier.align(Alignment.TopEnd)) {
@@ -187,7 +190,7 @@ fun ScannerScreen(vm: ScannerViewModel, snackbar: SnackbarHostState, onRegisterP
         Spacer(Modifier.height(6.dp))
         ModeToggle(state.mode, onSelect = vm::setMode)
         Spacer(Modifier.height(6.dp))
-        LastScanCard(state.last, accent, state.alreadyCounted, onRegister = vm::register, onExtra = vm::addExtra)
+        LastScanCard(state.last, state.lastPhase, accent, state.alreadyCounted, onRegister = vm::register, onExtra = vm::addExtra)
         Spacer(Modifier.height(4.dp))
 
         LazyColumn(
@@ -304,6 +307,7 @@ private fun needsRegister(row: HistoryRow): Boolean =
 @Composable
 private fun LastScanCard(
     last: HistoryRow?,
+    phase: CardPhase,
     accent: Color,
     alreadyCounted: Boolean,
     onRegister: (String) -> Unit,
@@ -335,7 +339,20 @@ private fun LastScanCard(
                     )
                     Spacer(Modifier.padding(horizontal = 6.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(
+                        if (phase == CardPhase.LOOKING || phase == CardPhase.SLOW) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (phase == CardPhase.LOOKING) {
+                                    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                                    Spacer(Modifier.padding(horizontal = 4.dp))
+                                }
+                                Text(
+                                    stringResource(if (phase == CardPhase.LOOKING) R.string.lookup_looking else R.string.lookup_slow),
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                )
+                            }
+                        } else Text(
                             rowTitle(last),
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
@@ -368,7 +385,7 @@ private fun LastScanCard(
                         }
                     }
                 }
-                if (needsRegister(last)) {
+                if (needsRegister(last) && phase != CardPhase.LOOKING) {
                     Button(
                         onClick = { onRegister(last.entry.clientOpId) },
                         modifier = Modifier.fillMaxWidth().padding(top = 6.dp),

@@ -18,6 +18,16 @@ interface ProductDao {
     @Upsert
     suspend fun upsert(product: ProductEntity)
 
+    /** The product owning a normalised barcode (a real product before a placeholder); emits again on any change. */
+    @Query(
+        """
+        SELECT p.* FROM products p JOIN barcodes b ON b.productId = p.id
+        WHERE b.code = :code AND p.deletedAt IS NULL
+        ORDER BY (p.status = 'unknown') LIMIT 1
+        """
+    )
+    fun observeByCode(code: String): Flow<ProductEntity?>
+
     @Query("UPDATE products SET totalQuantity = :total WHERE id = :id")
     suspend fun setTotal(id: String, total: Double)
 
@@ -178,6 +188,10 @@ interface HistoryDao {
 
     @Query("UPDATE scan_history SET productId = :productId, titleSnapshot = :title WHERE clientOpId = :clientOpId AND productId IS NULL")
     suspend fun attachProduct(clientOpId: String, productId: String, title: String)
+
+    /** Link every still-unlinked scan of this raw barcode to a product that was found by lookup/pull. */
+    @Query("UPDATE scan_history SET productId = :productId, titleSnapshot = :title WHERE barcode = :raw AND productId IS NULL")
+    suspend fun attachProductByBarcode(raw: String, productId: String, title: String)
 
     /** The product a scan resolved to; null until the op has synced (unknown barcodes get a server placeholder). */
     @Query("SELECT productId FROM scan_history WHERE clientOpId = :clientOpId")

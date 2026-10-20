@@ -115,4 +115,7 @@
     <string name="error_http_release">Only https:// is allowed in the release build</string>
     <string name="warn_other_server_pending">This account/server differs from the local database. Unsynchronised operations (count below) will be deleted – tap Log in again to confirm.</string>
     <string name="already_counted">Already counted – tap + for more</string>
+    <string name="setting_other_barcode_types">Other barcode types</string>
+    <string name="lookup_looking">Looking up…</string>
+    <string name="lookup_slow">Unknown – looking up in the background</string>
 </resources>

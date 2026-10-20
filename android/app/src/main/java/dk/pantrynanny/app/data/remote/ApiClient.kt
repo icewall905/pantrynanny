@@ -94,6 +94,16 @@ class ApiClient(
     suspend fun getProduct(id: String): ApiResult<ProductDto> =
         send("GET", "api/products/$id", serializer = ProductDto.serializer())
 
+    /** Barcode lookup incl. external providers (up to ~3 s server-side). A raw value containing '/' cannot be sent. */
+    suspend fun byBarcode(raw: String, symbology: String?): ApiResult<BarcodeLookupDto> {
+        if ('/' in raw) return ApiResult.HttpError(400, "unsupported barcode", null)
+        val query = buildMap {
+            put("lookup", "true")
+            if (symbology != null) put("symbology", symbology)
+        }
+        return send("GET", "api/products/by-barcode/$raw", query = query, serializer = BarcodeLookupDto.serializer())
+    }
+
     /** PATCH with If-Match. On 409 the caller finds the current Product in [ApiResult.HttpError.body]. */
     suspend fun patchProduct(id: String, version: Int, fields: JsonObject): ApiResult<ProductDto> =
         send(

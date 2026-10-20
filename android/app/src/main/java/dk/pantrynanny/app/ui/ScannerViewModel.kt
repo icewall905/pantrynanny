@@ -9,7 +9,13 @@ import dk.pantrynanny.app.data.AppSettings
 import dk.pantrynanny.app.data.UndoResult
 import dk.pantrynanny.app.data.local.HistoryRow
 import dk.pantrynanny.app.domain.BarcodeNormalizer
+import dk.pantrynanny.app.data.LookupOutcome
+import dk.pantrynanny.app.domain.CardLookup
+import dk.pantrynanny.app.domain.CardPhase
+import dk.pantrynanny.app.domain.DecodedBarcode
+import dk.pantrynanny.app.domain.LookupTrack
 import dk.pantrynanny.app.domain.ModePolicy
+import dk.pantrynanny.app.domain.ScanConfirmer
 import dk.pantrynanny.app.domain.ScanDeduplicator
 import dk.pantrynanny.app.domain.ScanMode
 import kotlinx.coroutines.Dispatchers
@@ -27,6 +33,8 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
+import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -51,6 +59,9 @@ data class ScannerUiState(
     val history: List<HistoryRow> = emptyList(),
     val status: SyncStatusUi = SyncStatusUi(),
     val alreadyCounted: Boolean = false,
+    val otherFormats: Boolean = false,
+    /** What the last-scanned card shows (neutral while the product is being looked up). */
+    val lastPhase: CardPhase = CardPhase.KNOWN,
 )
 
 class ScannerViewModel(private val c: AppContainer) : ViewModel() {
@@ -62,6 +73,11 @@ class ScannerViewModel(private val c: AppContainer) : ViewModel() {
     private val _torch = MutableStateFlow(false)
 
     private val dedup = ScanDeduplicator(ScanDeduplicator.DEFAULT_REARM_MS) { SystemClock.elapsedRealtime() }
+    /** Misread filter in front of [dedup]. */
+    private val confirmer = ScanConfirmer { SystemClock.elapsedRealtime() }
+    private val _track = MutableStateFlow<LookupTrack?>(null)
+    private val currentOpId = MutableStateFlow<String?>(null)
+    private val trackCounter = AtomicLong()
     private val guard = c.scanGuard
     private val _already = MutableStateFlow(false)
     private var alreadyJob: Job? = null
@@ -99,7 +115,11 @@ class ScannerViewModel(private val c: AppContainer) : ViewModel() {
         settings.map { it.frontCamera },
     ) { mode, torch, history, st, front ->
         ScannerUiState(mode, torch, front, history.firstOrNull(), history, st)
-    }.combine(_already) { s, already -> s.copy(alreadyCounted = already) }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ScannerUiState())
+    }.combine(_already) { s, already -> s.copy(alreadyCounted = already) }
+        .combine(settings.map { it.otherBarcodeTypes }) { s, other -> s.copy(otherFormats = other) }
+        .combine(_track) { s, track ->
+            s.copy(lastPhase = s.last?.let { CardLookup.phase(it.entry.clientOpId, it.prodStatus, track) } ?: CardPhase.KNOWN)
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ScannerUiState())
 
     init {
         // Cold start: the app always starts in Add mode (a persisted Remove mode is reset).
@@ -135,6 +155,7 @@ class ScannerViewModel(private val c: AppContainer) : ViewModel() {
         val front = !settings.value.frontCamera
         _torch.value = false
         dedup.clear()
+        confirmer.clear()
         viewModelScope.launch { c.settings.setFrontCamera(front) }
     }
 
@@ -143,12 +164,15 @@ class ScannerViewModel(private val c: AppContainer) : ViewModel() {
     }
 
     /** Called on the camera analysis thread for every decoded frame. */
-    fun onDecoded(raw: String, format: Int) {
+    fun onDecoded(d: DecodedBarcode) {
+        val raw = d.raw
+        val format = d.format
         // Blank after the backend strip rule: the server would reject the op (422), so never enqueue it.
         if (BarcodeNormalizer.isBlank(raw)) return
         val symbology = symbologyFor(format)
-        val checksumValid = BarcodeNormalizer.normalize(raw, symbology).valid
-        if (!dedup.onDecoded(raw, checksumValid)) return
+        // Misread filter first: only reads confirmed by several identical frames reach dedupe/owner rule.
+        if (!confirmer.onRead(d)) return
+        if (!dedup.onDecoded(raw)) return
 
         revertRemoveIfIdle(clearDedup = false)
         val mode = _mode.value
@@ -175,8 +199,63 @@ class ScannerViewModel(private val c: AppContainer) : ViewModel() {
                 throw e
             }
             guard.confirm(code, mode, outcome.clientOpId)
-            if (!outcome.known) _unknownScans.tryEmit(outcome.clientOpId)
+            currentOpId.value = outcome.clientOpId
+            when {
+                outcome.known -> {}
+                // Cached server placeholder: already known to be unknown; still try to upgrade it.
+                outcome.productId != null -> {
+                    _unknownScans.tryEmit(outcome.clientOpId)
+                    startLookup(outcome.clientOpId, raw, symbology, code, cardTracked = false)
+                }
+                // Cache miss: neutral "Looking up…" card until the answer arrives from any source.
+                else -> startLookup(outcome.clientOpId, raw, symbology, code, cardTracked = true)
+            }
             c.requestSync()
+        }
+    }
+
+    /**
+     * Resolve a barcode that is not (really) in the local cache: ask the server (retried), and independently watch
+     * the local store by code so the sync OpResult / snapshot / changes pull also resolve the card.
+     */
+    private fun startLookup(opId: String, raw: String, symbology: String, code: String, cardTracked: Boolean) {
+        val token = trackCounter.incrementAndGet()
+        val started = SystemClock.elapsedRealtime()
+        if (cardTracked) {
+            _track.value = LookupTrack(token, opId, started)
+            viewModelScope.launch {
+                delay(CardLookup.SLOW_MS)
+                _track.update { if (it?.token == token) it.copy(slow = true) else it }
+            }
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            val watcher = launch {
+                withTimeoutOrNull(CardLookup.TTL_MS) {
+                    c.db.productDao().observeByCode(code).filterNotNull().first { p ->
+                        c.db.historyDao().attachProductByBarcode(raw, p.id, p.name)
+                        p.status != "unknown"
+                    }
+                }
+            }
+            val outcome = try {
+                c.barcodeLookup.lookup(raw, symbology)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                LookupOutcome.FAILED
+            }
+            if (outcome == LookupOutcome.FOUND) watcher.cancel()
+            if (outcome == LookupOutcome.UNKNOWN && cardTracked) {
+                val track = _track.value
+                if (track != null && track.token == token) {
+                    _track.value = track.copy(settledUnknown = true)
+                    if (CardLookup.shouldCueUnknown(currentOpId.value, track, SystemClock.elapsedRealtime())) {
+                        val s = settings.value
+                        feedback.unknown(s.sound, s.vibrate)
+                        _unknownScans.tryEmit(opId)
+                    }
+                }
+            }
         }
     }
 
@@ -203,9 +282,14 @@ class ScannerViewModel(private val c: AppContainer) : ViewModel() {
         touch()
         val loc = settings.value.defaultLocationId
         viewModelScope.launch(Dispatchers.IO) {
-            c.scanRepository.addExtra(
+            val extra = c.scanRepository.addExtra(
                 row.entry.productId, row.entry.barcode, row.entry.symbology, row.entry.type, quantity.toDouble(), loc,
             )
+            if (extra != null) {
+                currentOpId.value = extra.clientOpId
+                // The extra op becomes the last card: a running lookup now belongs to it.
+                _track.update { if (it?.opId == row.entry.clientOpId) it.copy(opId = extra.clientOpId) else it }
+            }
             c.requestSync()
         }
     }
@@ -242,7 +326,10 @@ class ScannerViewModel(private val c: AppContainer) : ViewModel() {
 
     private fun applyMode(mode: ScanMode, clearDedup: Boolean) {
         _mode.value = mode
-        if (clearDedup) dedup.clear()
+        if (clearDedup) {
+            dedup.clear()
+            confirmer.clear()
+        }
         guard.reset()
         viewModelScope.launch { c.settings.setMode(mode) }
     }

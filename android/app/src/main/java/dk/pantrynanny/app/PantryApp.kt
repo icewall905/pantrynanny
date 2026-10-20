@@ -8,6 +8,7 @@ import dk.pantrynanny.app.data.local.Migrations
 import dk.pantrynanny.app.domain.LastCountedGuard
 import android.app.Application
 import androidx.room.Room
+import dk.pantrynanny.app.data.BarcodeLookup
 import dk.pantrynanny.app.data.CacheWriter
 import dk.pantrynanny.app.data.ImageRepository
 import dk.pantrynanny.app.data.InventoryRepository
@@ -53,6 +54,7 @@ class AppContainer(val app: Application) {
     val cache = CacheWriter(db)
     val syncRepository = SyncRepository(db, api, settings, tokens, cache)
     val scanRepository = ScanRepository(db)
+    val barcodeLookup = BarcodeLookup(api, cache, db)
 
     /** "Never count the same item twice in succession" state, shared by scanner and detail screen. */
     val scanGuard = LastCountedGuard { SystemClock.elapsedRealtime() }
