@@ -37,7 +37,10 @@ systemctl enable --now postgresql >/dev/null
 id pantrynanny >/dev/null 2>&1 || useradd --system --home-dir $DATA --shell /usr/sbin/nologin pantrynanny
 install -d -m 0755 $APP_ROOT $APP_ROOT/releases
 install -d -m 0750 -o root -g pantrynanny $ETC
-install -d -m 0750 -o pantrynanny -g pantrynanny $DATA $DATA/uploads
+# $DATA is traversable (0751) and uploads world-readable (0755) so nginx (www-data) can serve
+# /api/media/ directly; nothing secret lives here (secrets are in /etc/pantrynanny, 0640 root:pantrynanny).
+install -d -m 0751 -o pantrynanny -g pantrynanny $DATA
+install -d -m 0755 -o pantrynanny -g pantrynanny $DATA/uploads
 install -d -m 0700 -o postgres -g postgres $BACKUPS
 chown root:root "$RELEASE_DIR"
 chmod -R u=rwX,go=rX "$RELEASE_DIR"   # mktemp-based release tarballs carry a 0700 root dir
