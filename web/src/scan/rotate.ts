@@ -27,11 +27,18 @@ function norm(deg: number) {
  * interpolation. Pixels that fall outside the source are `fill` (white = quiet zone by default).
  * 0° returns the input buffer itself (no copy).
  */
-export function rotateLuma(src: Uint8ClampedArray, w: number, h: number, deg: number, fill = 255): LumaImage {
+export function rotateLuma(src: Uint8ClampedArray, w: number, h: number, deg: number, fill = 255, reuse?: Map<number, Uint8ClampedArray>): LumaImage {
+  // optional per-size buffer cache so the per-frame passes do not allocate (the result is only valid until the next call)
+  const alloc = (n: number) => {
+    if (!reuse) return new Uint8ClampedArray(n)
+    let b = reuse.get(n)
+    if (!b) reuse.set(n, (b = new Uint8ClampedArray(n)))
+    return b
+  }
   const d = norm(deg)
   if (d === 0) return { data: src, width: w, height: h }
   if (d === 90 || d === 270) {
-    const out = new Uint8ClampedArray(w * h)
+    const out = alloc(w * h)
     // 90° cw: dst(x', y') = src(x = y', y = h-1-x'); dst is h wide, w tall
     if (d === 90) {
       for (let y = 0; y < w; y++) for (let x = 0; x < h; x++) out[y * h + x] = src[(h - 1 - x) * w + y]
@@ -41,12 +48,12 @@ export function rotateLuma(src: Uint8ClampedArray, w: number, h: number, deg: nu
     return { data: out, width: h, height: w }
   }
   if (d === 180) {
-    const out = new Uint8ClampedArray(w * h)
+    const out = alloc(w * h)
     for (let i = 0, n = w * h; i < n; i++) out[i] = src[n - 1 - i]
     return { data: out, width: w, height: h }
   }
   const { width: W, height: H } = rotatedSize(w, h, d)
-  const out = new Uint8ClampedArray(W * H)
+  const out = alloc(W * H)
   const a = (d * Math.PI) / 180
   const cos = Math.cos(a)
   const sin = Math.sin(a)

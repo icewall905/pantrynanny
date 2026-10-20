@@ -38,7 +38,8 @@
     "stock": "In stock",
     "pending": "waiting to sync",
     "unknownSaved": "Unknown item – saved for later",
-    "unknownBackground": "Unknown – being looked up in the background"
+    "unknownBackground": "Unknown – being looked up in the background",
+    "alreadyCounted": "Already counted – tap + for more"
   },
   "toast": {
     "unknown": "Unknown item saved – can be named later",

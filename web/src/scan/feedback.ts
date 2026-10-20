@@ -1,5 +1,5 @@
 // Audio + haptic feedback with iOS autoplay rules in mind.
-export type BeepKind = 'add' | 'remove' | 'unknown' | 'error'
+export type BeepKind = 'add' | 'remove' | 'unknown' | 'error' | 'dup'
 
 type ACtor = typeof AudioContext
 let ctx: AudioContext | null = null
@@ -58,6 +58,7 @@ const TONES: Record<BeepKind, [number, number][]> = {
   remove: [[660, 0.07], [440, 0.1]], // falling
   unknown: [[300, 0.12], [300, 0.12]], // low double
   error: [[200, 0.25]],
+  dup: [[500, 0.06]], // soft neutral tick: seen, but not counted
 }
 
 export function beep(kind: BeepKind) {

@@ -97,3 +97,26 @@ describe('orientation-independent decoding (ZXing path)', () => {
     expect(dec.last.totalMs).toBeGreaterThanOrEqual(dec.last.zeroMs)
   })
 })
+
+describe('sticky angle keeps a held rotated code stable', () => {
+  it('one count and short gaps at 100 ms/frame with one dropped frame (maxPasses 1)', async () => {
+    const { ScanDeduplicator } = await import('./dedupe')
+    const frame = frameWith(CASES[0].img, 45, 11)
+    const blank = new Uint8ClampedArray(520 * 520).fill(200)
+    const dec = new OrientationDecoder()
+    const dd = new ScanDeduplicator({ rearmMs: 250 })
+    let counts = 0
+    let lastHit = -1
+    let maxGap = 0
+    for (let i = 0; i < 40; i++) {
+      const t = i * 100
+      const res = dec.decode(i === 20 ? blank : frame, 520, 520, { maxPasses: 1 }) // frame 20 dropped/unreadable
+      if (!res.length) continue
+      if (lastHit >= 0) maxGap = Math.max(maxGap, t - lastHit)
+      lastHit = t
+      if (dd.onDetection(res[0].rawValue, t, true)) counts++
+    }
+    expect(counts).toBe(1)
+    expect(maxGap).toBeLessThanOrEqual(200) // with only the round-robin it would be 300+
+  })
+})

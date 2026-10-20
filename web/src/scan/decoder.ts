@@ -60,7 +60,7 @@ function createZxingMain(): FrameDecoder {
     name: 'zxing-main',
     async decode(f) {
       luma = rgbaToLuma(getImageData(f).data, luma)
-      const res = core.decode(luma, f.width, f.height)
+      const res = core.decode(luma, f.width, f.height, { maxPasses: 1, budgetMs: 25 }) // main thread: keep the UI responsive
       perf.timing(core.last)
       return res
     },

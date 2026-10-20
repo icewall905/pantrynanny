@@ -491,7 +491,7 @@
       "handOnly": "Kun håndscanner (kamera slået fra)",
       "copy": "Kopiér",
       "copied": "Kopieret",
-      "ipad": "iPad: åbn linket i Safari › Del › Føj til hjemmeskærm. Ikonet hedder “Scan” og åbner direkte scanneren. Første gang skal du trykke Start og tillade kameraet."
+      "ipad": "iPad: åbn linket i Safari › Del › Føj til hjemmeskærm. Ikonet hedder “Scan” og åbner direkte scanneren. Første gang skal du trykke Start og tillade kameraet. Ikonet på iPadens hjemmeskærm åbner altid indscanning (ADD). Udscanning og håndscanner-varianterne er til bogmærker og links."
     }
   },
   "kitchen": {

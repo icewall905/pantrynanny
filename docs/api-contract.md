@@ -218,6 +218,16 @@ tracked[code].lastSeenAt = t
   mode only after it is re-presented — avoids an accidental double operation).
 * Entries older than 10 s are garbage-collected.
 
+**Never the same item twice in succession (owner rule, applies on top of the frame-level
+dedupe above; PWA and Android).** Remember the *last counted scan* `(normalised code, mode,
+scan session, op id)`. A fired scan whose normalised code, mode and session equal the last
+counted one is **not counted**: no op is created. The UI shows a neutral cue (soft tone, no
+success beep) and the hint "Already counted – tap + for more" on that item's card, with the
++1/+2/+5 buttons highlighted; the buttons create their own ops as before. Hand-scanner
+(keyboard wedge) input follows the same rule. The memory is cleared when a *different* code is
+counted, the mode is switched, the scan session ends or a new one starts, or the last counted
+scan is undone (re-scanning then counts again). So A, A = 1; A, B, A = 3; A, undo, A = 2.
+
 ## 5. AI assistant
 
 * `GET /api/ai/status` → `{enabled, reachable, model|null}`.

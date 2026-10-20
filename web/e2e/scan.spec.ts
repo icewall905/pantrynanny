@@ -73,12 +73,14 @@ test.describe('continuous scanner (fake camera)', () => {
 
     // The clip loops: A (held 2 s), A again after a gap, B (unknown, held 2 s). Wait for two B's.
     const bIdx = () => state.ops.map((o, i) => (o.barcode === BARCODE_B ? i : -1)).filter((i) => i >= 0)
+    // the second (rotated) presentation of A right after the first is NOT counted: it shows the hint instead
+    await expect(page.getByTestId('dup-hint')).toBeVisible({ timeout: 30_000 })
     await expect.poll(() => bIdx().length, { timeout: 45_000 }).toBeGreaterThanOrEqual(2)
     await expect(page.getByTestId('last-card')).toBeVisible()
     const [b1, b2] = bIdx()
-    // Exactly one loop between the two B's = exactly [A, A, B]: the held item counted once per
-    // presentation (not once per frame) and the re-presented identical item counted again.
-    expect(state.ops.slice(b1 + 1, b2 + 1).map((o) => o.barcode)).toEqual([BARCODE_A, BARCODE_A, BARCODE_B])
+    // Exactly one loop between the two B's = [A, B]: the held item counts once; the identical item presented again
+    // straight after (rotated 45 degrees, same code at any angle) is not counted twice in succession; A after B is.
+    expect(state.ops.slice(b1 + 1, b2 + 1).map((o) => o.barcode)).toEqual([BARCODE_A, BARCODE_B])
     expect(state.ops.every((o) => o.type === 'add')).toBe(true)
     expect(new Set(state.ops.map((o) => o.client_op_id)).size).toBe(state.ops.length)
 
@@ -128,6 +130,11 @@ test.describe('hand scanner, quantity and sessions', () => {
     await page.keyboard.type(BARCODE_A, { delay: 5 })
     await page.keyboard.press('Enter')
     await expect(page.getByTestId('last-name')).toHaveText('Letmælk')
+    // the same item again right away is not counted (hand scanner follows the same rule): hint, still +1
+    await page.keyboard.type(BARCODE_A, { delay: 5 })
+    await page.keyboard.press('Enter')
+    await expect(page.getByTestId('dup-hint')).toBeVisible()
+    await expect(page.getByTestId('last-delta')).toHaveText('+1')
     await page.getByTestId('more-5').click()
     await expect(page.getByTestId('last-delta')).toHaveText('+6')
     await expect.poll(() => state.ops.map((o) => [o.barcode, o.quantity]), { timeout: 20_000 }).toEqual([

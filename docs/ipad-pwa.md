@@ -75,6 +75,9 @@ further away (about 25-40 cm). **Verify on device** which camera and distance su
 
 ## 3. Safety behaviours implemented
 
+* **The same item is never counted twice in succession** (also not after a gap, from the camera or a hand scanner):
+  scanning it again shows "Already counted – tap + for more", a soft tick and highlights +1/+2/+5. A different item,
+  switching mode, a new scan session or undoing that scan re-arms it (contract section 4).
 * REMOVE mode reverts to ADD after `remove_mode_timeout_min` (default 10) idle minutes and on every page reload.
 * Mode switch clears the duplicate-suppression state (an item still in view is not counted twice in the new mode).
 * Whole-screen tint (green = ADD, tomato = REMOVE), giant label and segmented control.
@@ -107,7 +110,7 @@ support the camera permission query, the Start screen is shown and one tap is ne
 * **ZXing** reads horizontal rows only, so each frame is decoded at 0 degrees first (cheap) and then with a
   round-robin of rotated copies of the same grayscale crop: 90, 45 and 135 degrees (`ROTATION_ANGLES` in
   `src/scan/zxingCore.ts`; 180/270 are equivalent to 0/90 for 1D codes). The rotation is a pure function on the luma
-  buffer (`src/scan/rotate.ts`, bilinear, no canvas) so it runs inside the Web Worker. A code is read when it is within
+  buffer (`src/scan/rotate.ts`, bilinear, no canvas) so it runs inside the Web Worker. The angle of the last successful rotated read is tried first on the next frames (dropped after 2 misses), so a held code keeps being read every frame. A code is read when it is within
   about 20 degrees of a pass, so every angle is found within 3 frames (about 0.3 s at ~10-12 fps) even when the time
   budget allows only one rotated pass per frame (tested for EAN-13/EAN-8 at 0, 15, 30, 45, 60, 90, 120, 135, 180, 225,
   270, 315 degrees in `src/scan/orientation.test.ts`).
@@ -116,7 +119,7 @@ support the camera permission query, the Start screen is shown and one tap is ne
   therefore do fewer rotated passes per frame and take a few more frames to cover all angles; check the debug overlay.
 * The decode crop and the on-screen aiming frame are **square** (90 % of the shorter side of the camera view) so a code
   held vertically or diagonally still fits. Hold the code so it is fully inside the frame.
-* Duplicate suppression is unchanged: a code is the same code at any angle (contract section 4).
+* Duplicate suppression: a code is the same code at any angle, and the same item is never counted twice in succession (contract section 4), so a rotated re-read cannot double count.
 * Android uses ML Kit, which is orientation-invariant; `CameraPreview.kt` passes `imageInfo.rotationDegrees` to
   `InputImage.fromMediaImage`.
 
@@ -127,7 +130,7 @@ support the camera permission query, the Start screen is shown and one tap is ne
 | Link | Behaviour |
 |---|---|
 | `https://<host>/scan?autostart=1` | Starts scanning in ADD mode without tapping *Start scanning* when the camera permission is already granted (`navigator.permissions.query`, or a remembered successful start where the query is unsupported). Otherwise the big Start button is shown (iOS needs a tap for camera and audio the first time). |
-| `...&mode=remove` | Starts in REMOVE mode; REMOVE still reverts to ADD after the idle timeout. Default is `add`. |
+| `...&mode=remove` | Starts in REMOVE mode; REMOVE still reverts to ADD after the idle timeout. Default is `add`. The `mode` parameter is stripped from the address bar on load (`history.replaceState`, autostart/camera stay), so a reload, including the hourly service-worker update reload, comes back in ADD. |
 | `...&camera=off` | Hand-scanner-only station (camera off, nothing to grant). `camera=on` turns the camera back on. The setting is stored on the device like the Scanner setting. |
 
 Not signed in or not paired: the normal pairing/login screen is shown and scanning continues straight afterwards,
@@ -136,7 +139,7 @@ honouring the parameters. Audio and the wake lock still arm on the first touch.
 **Home Screen install from the scanner**: while `/scan` is open the page swaps `<link rel="manifest">` to
 `/manifest-scan.webmanifest` (name "PantryNanny Scan", short name "Scan", `start_url` `/scan?autostart=1`, scope `/`,
 its own `id`, same icons) and sets `apple-mobile-web-app-title` to "Scan"; both are restored when leaving `/scan`. So on
-the iPad: open the link in Safari, then Share, Add to Home Screen. The icon "Scan" opens the scanner directly. The static
+the iPad: open the link in Safari, then Share, Add to Home Screen. The icon "Scan" opens the scanner directly, always in ADD mode with the camera on (the manifest `start_url` is fixed); the remove and hand-scanner variants are for bookmarks and links, not for the Home Screen icon. The static
 manifest is precached by the service worker and the navigate fallback serves `/scan?...`. The main app's manifest
 shortcut also points at `/scan?autostart=1`. The server must serve `.webmanifest` as `application/manifest+json`.
 

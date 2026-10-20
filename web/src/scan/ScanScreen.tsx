@@ -16,8 +16,9 @@ import { NS } from './i18n'
 import { opErrorText } from '../lib/opError'
 import { loadMode, removeTimedOut, saveMode, type ScanMode } from './mode'
 import { perf } from './perf'
+import { LastCounted } from './lastCounted'
 import { LookupTracker, reconcileProduct, type CardPhase } from './lookup'
-import { loadScanPrefs, markCameraOk, saveScanPrefs, type ScanPrefs } from './prefs'
+import { clearCameraOk, loadScanPrefs, markCameraOk, saveScanPrefs, type ScanPrefs } from './prefs'
 import { expired, nameLine, recordScan, recordUndo, saveSession, summarize, type ScanRecord, type ScanSession } from './session'
 import type { WakeState } from './wakelock'
 
@@ -58,6 +59,8 @@ interface Card {
   lookingUp: boolean
   /** looking = neutral spinner, slow = nothing yet after ~10 s (still listening), known / unknown = settled */
   phase: CardPhase
+  /** set when the same item was scanned again and NOT counted (hint + highlighted +buttons for a few seconds) */
+  dupAt?: number | null
   /** the durable local write failed: this scan was NOT recorded */
   failed?: boolean
   /** ops behind this card (the scan plus any +N taps) */
@@ -144,6 +147,7 @@ export default function ScanScreen({ settings, kiosk, wake, initialMode, onExit,
   }
   const [session, setSessionState] = useState<ScanSession | null>(null)
   const sessionRef = useRef<ScanSession | null>(null)
+  const lastCounted = useRef(new LastCounted())
   const setSession = useCallback((s: ScanSession | null) => {
     sessionRef.current = s
     setSessionState(s)
@@ -175,6 +179,7 @@ export default function ScanScreen({ settings, kiosk, wake, initialMode, onExit,
   // ---- mode ----
   const setMode = useCallback((m: ScanMode) => {
     modeRef.current = m
+    lastCounted.current.reset() // a mode switch starts afresh
     lastActivity.current = Date.now()
     engineRef.current?.dedupe.clear() // contract §4: mode switch clears tracked codes
     saveMode(m)
@@ -210,6 +215,11 @@ export default function ScanScreen({ settings, kiosk, wake, initialMode, onExit,
       // arrives (sync result, pull, lookup), whichever came first.
       const stored = (await store.lookupBarcode(c.barcode, c.format)).product
       const p = reconcileProduct(c.product, stored)
+      if (p && p.status !== 'unknown') {
+        const tid = unknownToasts.current.get(c.n)
+        if (tid) dropToast(tid)
+        unknownToasts.current.delete(c.n)
+      }
       const q = await store.displayedQuantity(p, norm)
       setCard((cur) => {
         if (!cur || cur.n !== c.n) return cur
@@ -247,6 +257,7 @@ export default function ScanScreen({ settings, kiosk, wake, initialMode, onExit,
   /** Cache miss: the card shows a neutral "looking up" state until the answer is known (from ANY source). */
   const background = useCallback(
     (ev: { value: string; format: string }, n: number, initial: Product | null) => {
+      const scannedAt = Date.now()
       getTracker().track(
         n,
         ev.value,
@@ -262,7 +273,8 @@ export default function ScanScreen({ settings, kiosk, wake, initialMode, onExit,
               .displayedQuantity(p, normalizeBarcode(ev.value, ev.format))
               .then((q) => setCard((c) => (c && c.n === n ? { ...c, qty: Math.max(0, q) } : c)))
               .catch(() => undefined)
-          } else if (u.phase === 'unknown' && !unknownToasts.current.has(n)) {
+          } else if (u.phase === 'unknown' && !unknownToasts.current.has(n) && cardRef.current?.n === n && Date.now() - scannedAt < 5000) {
+            // late-settling unknowns (offline scans resolving minutes later) update silently
             beep('unknown')
             unknownToasts.current.set(n, toast(t('toast.unknown'), 'amber'))
           }
@@ -294,6 +306,19 @@ export default function ScanScreen({ settings, kiosk, wake, initialMode, onExit,
       const n = ++cardN.current
       let product: Product | null = null
       let norm = normalizeBarcode(ev.value, ev.format)
+      // The same item is never counted twice in succession (contract section 4): tap +1/+2/+5 for more.
+      const live = sessionRef.current && !expired(sessionRef.current, Date.now()) ? sessionRef.current.id : null
+      if (lastCounted.current.isRepeat(norm.code, type, live)) {
+        const cur = cardRef.current
+        if (cur && !cur.failed && normalizeBarcode(cur.barcode, cur.format).code === norm.code) {
+          const at = Date.now()
+          beep('dup')
+          vibrate(15)
+          setCard((c) => (c && c.n === cur.n ? { ...c, dupAt: at } : c))
+          setTimeout(() => setCard((c) => (c && c.n === cur.n && c.dupAt === at ? { ...c, dupAt: null } : c)), 4000)
+        }
+        return
+      }
       let op: Awaited<ReturnType<typeof enqueueOp>>
       try {
         try {
@@ -333,6 +358,7 @@ export default function ScanScreen({ settings, kiosk, wake, initialMode, onExit,
         lookingUp: !known && !placeholder, phase: known ? 'known' : placeholder ? 'unknown' : 'looking', ops: [{ id: op.client_op_id, qty: 1 }],
       })
       track({ opId: op.client_op_id, at: Date.now(), type, qty: 1, barcode: ev.value, name: known ? product!.name : null, unknown: !known })
+      lastCounted.current.record(norm.code, type, sessionRef.current?.id ?? null, op.client_op_id)
       if (placeholder) unknownToasts.current.set(n, toast(t('toast.unknown'), 'amber'))
       const q = await store.displayedQuantity(product, norm).catch(() => 0)
       setCard((c) => (c && c.n === n ? { ...c, qty: Math.max(0, q) } : c))
@@ -414,6 +440,7 @@ export default function ScanScreen({ settings, kiosk, wake, initialMode, onExit,
       onState: (s, err) => {
         setCamState(s)
         setCamErr(err ?? null)
+        if (err?.kind === 'denied') clearCameraOk() // permission revoked: autostart must show the Start button again
         if (s === 'running') {
           markCameraOk()
           setTorchOk(engine.torchSupported)
@@ -442,6 +469,7 @@ export default function ScanScreen({ settings, kiosk, wake, initialMode, onExit,
     const r = await store.undoScan(id)
     if (r !== 'noop') {
       setSession(recordUndo(sessionRef.current, id))
+      lastCounted.current.undone(id)
       setCard((c) => (c && c.ops.some((o) => o.id === id) ? { ...c, ops: c.ops.filter((o) => o.id !== id) } : c))
       beep('remove')
       toast(t('toast.undone', { name: name ?? '' }))
@@ -648,7 +676,10 @@ export default function ScanScreen({ settings, kiosk, wake, initialMode, onExit,
                   data-testid={`more-${k}`}
                   onClick={() => more(k)}
                   aria-label={t(card.type === 'add' ? 'more.add' : 'more.remove', { count: k })}
-                  className="min-h-14 flex-1 rounded-2xl bg-white/15 text-2xl font-black ring-2 ring-white/30 active:scale-95"
+                  className={clsx(
+                    'min-h-14 flex-1 rounded-2xl text-2xl font-black active:scale-95',
+                    card.dupAt ? 'animate-pulse bg-white/35 ring-4 ring-white' : 'bg-white/15 ring-2 ring-white/30',
+                  )}
                 >
                   {card.type === 'add' ? '+' : '−'}
                   {k}
@@ -927,6 +958,11 @@ function LastCard({ card, theme }: { card: Card | null; theme: (typeof THEME)[Sc
         {p?.brand && <div className="truncate text-lg text-white/70">{p.brand}</div>}
         {!p && <div className={clsx('truncate font-mono text-white/80', searching ? 'text-sm' : 'text-lg')} data-testid="last-barcode">{card.barcode}</div>}
         {card.failed && <div className="mt-1 text-lg font-bold text-red-300">{t('toast.notSaved')}</div>}
+        {card.dupAt && (
+          <div className="mt-1 text-lg font-bold text-honey-400" data-testid="dup-hint">
+            {t('last.alreadyCounted')}
+          </div>
+        )}
         <div className="mt-1 text-lg text-white/80">
           {!searching && card.qty !== null ? `${t('last.stock')}: ${card.qty}` : ''}
         </div>

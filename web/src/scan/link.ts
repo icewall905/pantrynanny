@@ -32,6 +32,17 @@ export function buildScanLink(origin: string, v: ScanLinkVariant = {}): string {
   return s
 }
 
+/**
+ * Remove `mode` from the address bar (keeps autostart/camera) so a reload - e.g. the hourly service-worker
+ * update reload - comes back in ADD: REMOVE never survives a reload.
+ */
+export function stripModeParam(loc: Location = window.location, hist: History = window.history) {
+  const u = new URL(loc.href)
+  if (!u.searchParams.has('mode')) return
+  u.searchParams.delete('mode')
+  hist.replaceState(hist.state, '', u.pathname + u.search + u.hash)
+}
+
 export const SCAN_MANIFEST_HREF = '/manifest-scan.webmanifest'
 
 /**

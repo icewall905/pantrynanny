@@ -5,7 +5,7 @@ import type { HouseholdSettings, Me } from '../api/types'
 import { getStore, registerServiceWorker, startSync } from '../offline'
 import { checkSession, loginRemember, logout, pairKiosk, type AuthError } from '../scan/auth'
 import { armAudioUnlock, unlockAudio } from '../scan/feedback'
-import { parseScanParams, swapToScanManifest } from '../scan/link'
+import { parseScanParams, stripModeParam, swapToScanManifest } from '../scan/link'
 import { canAutostartCamera, loadScanPrefs, saveScanPrefs } from '../scan/prefs'
 import { NS } from '../scan/i18n'
 import type { ScanMode } from '../scan/mode'
@@ -45,6 +45,7 @@ export default function ScanPage() {
 
   useEffect(() => {
     void registerServiceWorker()
+    stripModeParam() // one-shot: a reload must not re-apply REMOVE
     if (params.camera) saveScanPrefs({ ...loadScanPrefs(), camera: params.camera === 'on' })
     let alive = true
     void (async () => {

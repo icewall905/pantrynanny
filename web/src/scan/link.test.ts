@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildScanLink, parseScanParams, swapToScanManifest } from './link'
+import { buildScanLink, parseScanParams, stripModeParam, swapToScanManifest } from './link'
 
 describe('parseScanParams', () => {
   it('defaults', () => {
@@ -33,5 +33,17 @@ describe('swapToScanManifest', () => {
     restore()
     expect(document.querySelector('link[rel="manifest"]')?.getAttribute('href')).toBe('/manifest.webmanifest')
     expect(document.querySelector('meta[name="apple-mobile-web-app-title"]')?.getAttribute('content')).toBe('PantryNanny')
+  })
+})
+
+describe('stripModeParam', () => {
+  it('a reload of /scan?autostart=1&mode=remove comes back in ADD, keeping autostart and camera', () => {
+    window.history.replaceState(null, '', '/scan?autostart=1&mode=remove&camera=off')
+    expect(parseScanParams(window.location.search).mode).toBe('remove')
+    stripModeParam()
+    // what a reload would parse
+    expect(parseScanParams(window.location.search)).toEqual({ autostart: true, mode: 'add', camera: 'off' })
+    stripModeParam() // idempotent
+    expect(window.location.search).toBe('?autostart=1&camera=off')
   })
 })

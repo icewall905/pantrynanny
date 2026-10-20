@@ -135,7 +135,21 @@ export class OrientationDecoder {
   private next = 0
   /** moving average of one rotated pass (rotate + decode) in ms */
   private passMs = 0
+  /** angle of the last successful rotated read: tried first on the following frames (a held code stays put) */
+  private sticky: number | null = null
+  private stickyMisses = 0
+  private bufs = new Map<number, Uint8ClampedArray>()
   last: FrameTiming = { zeroMs: 0, totalMs: 0, passes: 0 }
+
+  private nextAngle(skip: number | null): number {
+    let a = ROTATION_ANGLES[this.next]
+    this.next = (this.next + 1) % ROTATION_ANGLES.length
+    if (a === skip) {
+      a = ROTATION_ANGLES[this.next]
+      this.next = (this.next + 1) % ROTATION_ANGLES.length
+    }
+    return a
+  }
 
   decode(luma: Uint8ClampedArray, width: number, height: number, o: MultiOptions = {}): DecodedBarcode[] {
     const { budgetMs = 40, minPasses = 1, maxPasses = 3, now = () => performance.now() } = o
@@ -144,18 +158,27 @@ export class OrientationDecoder {
     const r0 = this.core.decode(luma, width, height)
     const t1 = now()
     this.last = { zeroMs: t1 - t0, totalMs: t1 - t0, passes: 0 }
-    if (r0.length) return r0
+    if (r0.length) {
+      this.sticky = null
+      return r0
+    }
     for (let i = 0; i < maxPasses; i++) {
       const ts = now()
       if (i >= minPasses && ts - t0 + this.passMs > budgetMs) break
-      const angle = ROTATION_ANGLES[this.next]
-      this.next = (this.next + 1) % ROTATION_ANGLES.length
-      const rot = rotateLuma(luma, width, height, angle)
+      const useSticky = i === 0 && this.sticky !== null
+      const angle = useSticky ? this.sticky! : this.nextAngle(this.sticky)
+      const rot = rotateLuma(luma, width, height, angle, 255, this.bufs)
       const res = this.core.decode(rot.data, rot.width, rot.height)
       const te = now()
       this.passMs = this.passMs ? this.passMs * 0.7 + (te - ts) * 0.3 : te - ts
       this.last = { zeroMs: t1 - t0, totalMs: te - t0, passes: i + 1 }
-      if (res.length) return res
+      if (res.length) {
+        this.sticky = angle
+        this.stickyMisses = 0
+        return res
+      }
+      // a sticky angle that misses twice in a row is dropped: back to the plain round-robin
+      if (useSticky && ++this.stickyMisses >= 2) this.sticky = null
     }
     return []
   }

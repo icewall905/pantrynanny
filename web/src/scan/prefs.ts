@@ -40,6 +40,14 @@ export function markCameraOk() {
   }
 }
 
+export function clearCameraOk() {
+  try {
+    localStorage.removeItem(CAM_OK_KEY)
+  } catch {
+    /* ignore */
+  }
+}
+
 export function cameraWasOk(): boolean {
   try {
     return localStorage.getItem(CAM_OK_KEY) === '1'

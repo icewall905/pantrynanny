@@ -491,7 +491,7 @@
       "handOnly": "Hand scanner only (camera off)",
       "copy": "Copy",
       "copied": "Copied",
-      "ipad": "iPad: open the link in Safari › Share › Add to Home Screen. The icon is called “Scan” and opens the scanner directly. The first time you must tap Start and allow the camera."
+      "ipad": "iPad: open the link in Safari › Share › Add to Home Screen. The icon is called “Scan” and opens the scanner directly. The first time you must tap Start and allow the camera. The iPad Home Screen icon always opens the ADD scanner. The remove and hand-scanner variants are for bookmarks and links."
     }
   },
   "kitchen": {

@@ -38,7 +38,8 @@
     "stock": "På lager",
     "pending": "venter på synkronisering",
     "unknownSaved": "Ukendt vare – gemt til senere",
-    "unknownBackground": "Ukendt – slås op i baggrunden"
+    "unknownBackground": "Ukendt – slås op i baggrunden",
+    "alreadyCounted": "Allerede talt – tryk + for flere"
   },
   "toast": {
     "unknown": "Ukendt vare gemt – kan navngives senere",
