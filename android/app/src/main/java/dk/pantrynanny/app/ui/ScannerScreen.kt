@@ -2,6 +2,7 @@ package dk.pantrynanny.app.ui
 
 import android.Manifest
 import android.content.Context
+import android.graphics.Bitmap
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -78,6 +79,7 @@ fun ScannerScreen(vm: ScannerViewModel, snackbar: SnackbarHostState, onRegisterP
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     KeepScreenOn()
+    var frameGrabber by remember { mutableStateOf<(() -> Bitmap?)?>(null) }
 
     LaunchedEffect(vm) {
         vm.events.collect { msg ->
@@ -87,6 +89,8 @@ fun ScannerScreen(vm: ScannerViewModel, snackbar: SnackbarHostState, onRegisterP
     }
     LaunchedEffect(vm) {
         vm.unknownScans.collect { clientOpId ->
+            // What the camera sees right now is the unknown item: keep it as its photo.
+            frameGrabber?.invoke()?.let { vm.keepSnapshot(clientOpId, it) }
             snackbar.currentSnackbarData?.dismiss()
             scope.launch {
                 val result = snackbar.showSnackbar(
@@ -141,6 +145,7 @@ fun ScannerScreen(vm: ScannerViewModel, snackbar: SnackbarHostState, onRegisterP
                     modifier = Modifier.fillMaxSize(),
                     frontCamera = state.frontCamera,
                     onCanSwitch = { canSwitch = it },
+                    onFrameGrabber = { frameGrabber = it },
                 )
                 Row(Modifier.align(Alignment.TopEnd)) {
                     if (canSwitch) {

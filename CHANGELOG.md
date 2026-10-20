@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-10-20 – Android app parity, photos of unknown items
+
+- **Android is now a full app.** It still opens in the scanner. Five tabs: Scan · Lager · Indkøb · Mad · Mere.
+  - **Product screen:** nutrition per 100 g, ingredients, allergens, history, run-out forecast and favourite.
+    You can take out N, count, move and set expiry (+N days), and add the product to the shopping list.
+  - **Native screens:** shopping list (shops, suggestions, put away), recipes ("what can we cook", cook with
+    confirmation and undo, missing items to the list, import from a link, editor), week meal plan, overview,
+    activity and assistant (suggested actions only on tap).
+  - The "Indkøbsliste" launcher shortcut now opens the app's own list.
+- **Photos of unknown items.** When a barcode is not recognised, the scanner (web and Android) keeps the camera
+  frame and uploads it as the item's photo once its placeholder exists. Offline, it waits until the next sync.
+  - It is stored as a *snapshot*: never replaces a real photo, not locked, and replaced automatically when
+    Open Food Facts later finds the product (migration 0010 adds `products.image_is_snapshot`).
+  - `POST /products/{id}/photo?snapshot=true`.
+
 ## 2026-10-20 – server review follow-ups
 
 - **Locations.** Items with no known place now go to the fridge (Køleskab) instead of the pantry. Migration 0009

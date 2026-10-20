@@ -318,6 +318,7 @@ async def new_product_from_data(
 class ApplyResult:
     changed: bool = False
     image_used: bool = False
+    replaced_image: str | None = None  # a scanner snapshot that the provider image replaced
 
 
 async def apply_product_data(
@@ -381,8 +382,11 @@ async def apply_product_data(
         if ok(field, getattr(p, field), value):
             setattr(p, field, value)
             touched = True
-    if image_filename and "image" not in locked and not p.image_path:
+    if image_filename and "image" not in locked and (not p.image_path or p.image_is_snapshot):
+        # A snapshot from the scanner only stands in until a real product image is known.
+        res.replaced_image = p.image_path if p.image_is_snapshot else None
         p.image_path = image_filename
+        p.image_is_snapshot = False
         res.image_used = touched = True
 
     if touched:
@@ -414,7 +418,11 @@ async def enrich_product(
     filename = None
     async with sm() as s:
         p = await get_product(s, household_id, product_id)
-        wants_image = bool(data.image_url) and not p.image_path and "image" not in (p.locked_fields)
+        wants_image = (
+            bool(data.image_url)
+            and (not p.image_path or p.image_is_snapshot)
+            and "image" not in (p.locked_fields)
+        )
     if wants_image:
         filename = await download_image(data.image_url)
     async with sm() as s:
@@ -428,6 +436,8 @@ async def enrich_product(
             raise
     if filename and not res.image_used:
         delete_image(filename)
+    if res.replaced_image:
+        delete_image(res.replaced_image)
     return res.changed
 
 

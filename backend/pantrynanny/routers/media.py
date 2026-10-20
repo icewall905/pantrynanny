@@ -39,12 +39,19 @@ async def upload_photo(
     product_id: uuid.UUID,
     request: Request,
     file: UploadFile = File(...),
+    snapshot: bool = False,
     principal: Principal = Depends(get_principal),
     session: AsyncSession = Depends(get_session),
 ):
-    """Store a household photo (re-encoded to WebP, EXIF stripped). Locks the ``image`` field."""
+    """Store a household photo (re-encoded to WebP, EXIF stripped). Locks the ``image`` field.
+
+    ``snapshot=true``: a frame the scanner grabbed for an unknown barcode, so the household can see
+    what it was. It never replaces an existing photo, is not locked, and a product image found
+    later (Open Food Facts …) replaces it."""
     cfg = request.app.state.settings
-    await svc.get_product(session, principal.household_id, product_id)  # 404 before reading body
+    current = await svc.get_product(session, principal.household_id, product_id)  # 404 first
+    if snapshot and current.image_path:
+        return svc.product_out(current)
     data = await _read_limited(file, cfg.upload_max_bytes)
     if not data:
         raise AppError(422, "invalid_image", "Empty file")
@@ -56,9 +63,15 @@ async def upload_photo(
         p = await svc.get_product(
             session, principal.household_id, product_id, for_update=True, refresh=True
         )
+        if snapshot and p.image_path:  # a real photo arrived while we were reading the upload
+            await session.rollback()
+            delete_image(name, cfg.upload_dir)
+            return svc.product_out(p)
         old = p.image_path
         p.image_path = name
-        p.locked_fields = sorted({*(p.locked_fields or []), "image"})
+        p.image_is_snapshot = snapshot
+        if not snapshot:
+            p.locked_fields = sorted({*(p.locked_fields or []), "image"})
         p.version += 1
         await session.flush()
         await session.commit()

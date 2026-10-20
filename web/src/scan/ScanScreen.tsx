@@ -16,6 +16,7 @@ import { NS } from './i18n'
 import { opErrorText } from '../lib/opError'
 import { loadMode, removeTimedOut, saveMode, type ScanMode } from './mode'
 import { perf } from './perf'
+import { flushSnapshots, grabFrame, keepSnapshot } from './snapshots'
 import { loadScanPrefs, saveScanPrefs, type ScanPrefs } from './prefs'
 import { expired, nameLine, recordScan, recordUndo, saveSession, summarize, type ScanRecord, type ScanSession } from './session'
 import type { WakeState } from './wakelock'
@@ -208,7 +209,11 @@ export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: 
   }, [store])
   useEffect(() => {
     void refresh()
-    const off = store.subscribeData(() => void refresh())
+    void flushSnapshots() // frames kept while offline
+    const off = store.subscribeData(() => {
+      void refresh()
+      void flushSnapshots()
+    })
     return () => void off()
   }, [store, refresh])
 
@@ -294,7 +299,14 @@ export default function ScanScreen({ settings, kiosk, wake, onExit, onReauth }: 
         const at = ev.frameAt
         requestAnimationFrame(() => perf.latency(performance.now() - at))
       }
-      if (!known) void background(ev, n, unknownToast)
+      if (!known) {
+        // Keep what the camera saw, so the unknown item can be recognised when it is named later.
+        const fromCamera = 'frameAt' in ev && ev.frameAt !== undefined
+        const snap = fromCamera
+          ? grabFrame(videoRef.current).then((b) => (b ? keepSnapshot(ev.value, ev.format, b) : undefined))
+          : Promise.resolve()
+        void Promise.all([snap, background(ev, n, unknownToast)]).then(() => flushSnapshots())
+      }
     },
     [store, toast, t, background, setMode, track, settings?.remove_mode_timeout_min],
   )

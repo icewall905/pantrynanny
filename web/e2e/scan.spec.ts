@@ -31,7 +31,7 @@ const PRODUCT = {
 }
 const SETTINGS = { locale: 'da', allow_negative_stock: false, expiry_soon_days: 3, auto_shopping_low_stock: true, remove_mode_timeout_min: 10, scan_rearm_ms: 600 }
 
-async function mockBackend(page: Page, state: { online: boolean; ops: { client_op_id: string; type: string; barcode?: string; quantity?: number }[] }, kiosk = true) {
+async function mockBackend(page: Page, state: { online: boolean; photo?: string; ops: { client_op_id: string; type: string; barcode?: string; quantity?: number }[] }, kiosk = true) {
   const json = (body: unknown, status = 200) => ({ status, contentType: 'application/json', body: JSON.stringify(body) })
   let total = 0
   await page.route('**/api/**', async (route) => {
@@ -53,7 +53,15 @@ async function mockBackend(page: Page, state: { online: boolean; ops: { client_o
       })
       return route.fulfill(json({ results, server_time: new Date().toISOString() }))
     }
-    if (p.startsWith('/api/products/by-barcode/')) return route.fulfill(json({ status: 'created_placeholder', product: null, source: null }))
+    if (p.startsWith('/api/products/by-barcode/')) {
+      const code = decodeURIComponent(p.split('/').pop() ?? '')
+      if (code !== BARCODE_B) return route.fulfill(json({ status: 'created_placeholder', product: null, source: null }))
+      return route.fulfill(json({ status: 'created_placeholder', product: { ...PRODUCT, id: 'placeholder-b', name: `Ukendt vare ${code}`, status: 'unknown', image_url: state.photo ? '/api/media/x.webp' : null, barcodes: [] }, source: null }))
+    }
+    if (p === '/api/products/placeholder-b/photo') {
+      state.photo = `${url.search} ${route.request().postDataBuffer()?.length ?? 0}`
+      return route.fulfill(json({ ...PRODUCT, id: 'placeholder-b', status: 'unknown', image_url: '/api/media/x.webp' }))
+    }
     return route.fulfill(json({}, 404))
   })
 }
@@ -64,7 +72,7 @@ test.describe('continuous scanner (fake camera)', () => {
   test('hold = one count, re-present = another, unknown does not stop scanning, offline queue syncs', async ({ page }, info) => {
     test.skip(info.project.name !== 'desktop', 'camera flags are set up for the desktop project')
     test.setTimeout(90_000)
-    const state = { online: true, ops: [] as { client_op_id: string; type: string; barcode?: string }[] }
+    const state: { online: boolean; photo?: string; ops: { client_op_id: string; type: string; barcode?: string }[] } = { online: true, ops: [] }
     await mockBackend(page, state)
 
     await page.goto('/scan')
@@ -81,6 +89,8 @@ test.describe('continuous scanner (fake camera)', () => {
     expect(state.ops.slice(b1 + 1, b2 + 1).map((o) => o.barcode)).toEqual([BARCODE_A, BARCODE_A, BARCODE_B])
     expect(state.ops.every((o) => o.type === 'add')).toBe(true)
     expect(new Set(state.ops.map((o) => o.client_op_id)).size).toBe(state.ops.length)
+    // the unknown item got the camera frame as its photo (snapshot, so a real image can replace it)
+    await expect.poll(() => state.photo ?? '', { timeout: 15_000 }).toMatch(/^\?snapshot=true \d{4,}/)
 
     // Switching to REMOVE is unmistakable and scans become 'remove'
     await page.getByTestId('mode-remove').click()

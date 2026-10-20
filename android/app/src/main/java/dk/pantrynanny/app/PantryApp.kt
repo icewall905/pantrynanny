@@ -8,6 +8,7 @@ import dk.pantrynanny.app.data.InventoryRepository
 import dk.pantrynanny.app.data.NetworkMonitor
 import dk.pantrynanny.app.data.ScanRepository
 import dk.pantrynanny.app.data.SettingsStore
+import dk.pantrynanny.app.data.Snapshots
 import dk.pantrynanny.app.data.SyncRepository
 import dk.pantrynanny.app.data.TokenStore
 import dk.pantrynanny.app.data.local.AppDatabase
@@ -48,6 +49,7 @@ class AppContainer(val app: Application) {
     val inventoryRepository = InventoryRepository(api, cache)
     val network = NetworkMonitor(app)
     val scheduler = SyncScheduler(app)
+    val snapshots = Snapshots(app, db, api, cache)
 
     /** Scanner mode asked for by a launcher shortcut; the scanner consumes it (sets back to null). */
     val requestedMode = MutableStateFlow<ScanMode?>(null)
@@ -64,6 +66,7 @@ class AppContainer(val app: Application) {
                 delay(1500)
                 syncTrigger.tryReceive() // collapse triggers that arrived during the delay
                 syncRepository.syncNow()
+                snapshots.flush() // photos of unknown scans whose placeholder now exists
             }
         }
         scheduler.schedulePeriodic()

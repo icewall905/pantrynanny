@@ -205,6 +205,10 @@ class Product(Base):
         "locations.id", nullable=True, ondelete="SET NULL"
     )
     image_path: Mapped[str | None] = mapped_column(Text)
+    # The photo is a frame grabbed by the scanner for an unknown barcode (replaceable).
+    image_is_snapshot: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false")
+    )
     package_size: Mapped[Decimal | None] = mapped_column(Numeric(12, 3))
     package_unit: Mapped[str | None] = mapped_column(String(8))
     stock_unit: Mapped[str] = mapped_column(String(8), default="pcs", server_default="pcs")

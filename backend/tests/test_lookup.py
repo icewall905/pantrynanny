@@ -439,6 +439,41 @@ async def test_photo_upload_reencodes_and_strips_exif(env, lookup_on):
     assert not stored.exists()
 
 
+async def test_scanner_snapshot_of_unknown_item_is_kept_until_a_real_image(env, lookup_on, off):
+    # an unknown barcode: the scanner sends the frame it saw, so the household can tell what it was
+    # one upload directory, as in production (the fixture gives the worker its own temp dir)
+    runtime.set_settings(
+        lookup_on.model_copy(update={"upload_dir": env.app.state.settings.upload_dir})
+    )
+    off.get(OFF_URL).mock(return_value=httpx.Response(404, json={"status": 0}))
+    out = await by_barcode(env)
+    pid = out["product"]["id"]
+    url = f"/api/products/{pid}/photo?snapshot=true"
+    r = await env.client.post(
+        url, files={"file": ("s.jpg", png_bytes(), "image/jpeg")}, headers=env.member
+    )
+    assert r.status_code == 200, r.text
+    snap = r.json()["image_url"]
+    assert snap and "image" not in r.json()["locked_fields"]
+    snap_file = Path(env.app.state.settings.upload_dir) / snap.rsplit("/", 1)[1]
+    assert snap_file.exists()
+
+    # a second snapshot never replaces the first (nor a real photo)
+    r = await env.client.post(
+        url, files={"file": ("s.jpg", png_bytes(), "image/jpeg")}, headers=env.member
+    )
+    assert r.json()["image_url"] == snap
+
+    # later Open Food Facts knows it: its image replaces the snapshot
+    off.get(OFF_URL).mock(return_value=httpx.Response(200, json=OFF_JSON))
+    async with env.app.state.sessionmaker() as s, s.begin():
+        await s.execute(text("DELETE FROM lookup_cache"))
+    assert await run_once(env.app.state.sessionmaker) == 1
+    p = (await env.client.get(f"/api/products/{pid}", headers=env.member)).json()
+    assert p["name"] == "Arla Letmælk" and p["image_url"] and p["image_url"] != snap
+    assert not snap_file.exists()
+
+
 async def test_photo_rejects_garbage_and_oversize(env, lookup_on):
     p = await env.product("Foto")
     url = f"/api/products/{p['id']}/photo"

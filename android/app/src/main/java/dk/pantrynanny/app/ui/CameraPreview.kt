@@ -1,5 +1,6 @@
 package dk.pantrynanny.app.ui
 
+import android.graphics.Bitmap
 import android.util.Log
 import android.util.Size
 import androidx.annotation.OptIn
@@ -115,6 +116,8 @@ fun CameraPreview(
     frontCamera: Boolean = false,
     /** Called once the camera provider is known: true when the device has both a front and a rear camera. */
     onCanSwitch: (Boolean) -> Unit = {},
+    /** Receives a function returning the current preview frame (main thread; null before the first frame). */
+    onFrameGrabber: ((() -> Bitmap?) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -182,6 +185,8 @@ fun CameraPreview(
     LaunchedEffect(camera, torchOn) {
         camera?.cameraControl?.enableTorch(torchOn)
     }
+
+    LaunchedEffect(previewView) { onFrameGrabber?.invoke { previewView.bitmap } }
 
     AndroidView(factory = { previewView }, modifier = modifier)
 }

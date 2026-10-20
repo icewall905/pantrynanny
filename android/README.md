@@ -4,6 +4,22 @@ Native Kotlin / Jetpack Compose client for the PantryNanny household inventory s
 It is built around fast, offline-first barcode scanning (CameraX + ML Kit) with a Room
 database and a persistent operation queue that is synchronised in the background.
 
+## Screens
+
+The app opens in the scanner (quick scans in and out). The bottom bar has five tabs:
+
+| Tab | What it does |
+|---|---|
+| **Scan** | Continuous scanning in Add/Remove mode, undo, register unknown items. The camera frame of an unknown barcode is kept as its photo. |
+| **Lager** | Inventory with search, location and "unknown" filters. A product shows stock per location, expiry (with quick +N days), take out N, count, move, favourite, add to shopping, run-out forecast, and online details: nutrition, ingredients, allergens, history. |
+| **Indkøb** | Shopping list grouped by shop, suggestions, quantities, tick off, and "put the shopping away" into stock. |
+| **Mad** | Recipes ranked by what is at home ("Hvad kan vi lave?"), recipe details with "Cook this" (confirm amounts, undo), missing items to the list, import from a link. The meal plan has a week view and "shop for the week". |
+| **Mere** | Overview (numbers, use first, running low, products to name), activity timeline, assistant (suggested actions run only when tapped), settings, and a link to the web app for statistics, export and admin. |
+
+Stock changes (scans, take out, count, move, cooking, putting shopping away) go through the
+offline op queue. Lists such as shopping, recipes and the meal plan read and write the server
+directly, and show "Ingen forbindelse" when it can't be reached.
+
 * Package: `dk.pantrynanny.app`, min SDK 26 (Android 8.0), compile/target SDK 37
 * Default language Danish (`values/`), English in `values-en/`
 * API contract: [`../docs/api-contract.md`](../docs/api-contract.md)
@@ -142,7 +158,7 @@ has been verified on a device.
 ```
 app/src/main/java/dk/pantrynanny/app/
   PantryApp.kt            Application + AppContainer (manual DI), debounced sync trigger
-  MainActivity.kt         single activity, bottom navigation (Scan / Lager / Indstillinger)
+  MainActivity.kt         single activity, bottom navigation (Scan / Lager / Indkøb / Mad / Mere)
   domain/                 pure Kotlin: ScanDeduplicator, BarcodeNormalizer, QuantityMath (unit tested)
   data/local/             Room entities, DAOs, database
   data/remote/            kotlinx.serialization DTOs, OkHttp ApiClient
@@ -154,6 +170,7 @@ app/src/test/             JVM unit tests (testDebugUnitTest)
 
 ## Known limitations
 
-* Product edits (PATCH with `If-Match`) need a connection; they are not queued offline.
+* Product edits (PATCH with `If-Match`), shopping list, recipes, meal plan, details and the assistant need a
+  connection; stock changes are queued offline.
 * No on-device verification has been done by the authors of this scaffold beyond CI: please test the
   scanner on a real device (camera, autofocus, torch, beep/vibration) before relying on it.

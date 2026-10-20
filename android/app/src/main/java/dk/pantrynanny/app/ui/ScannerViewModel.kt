@@ -175,6 +175,14 @@ class ScannerViewModel(private val c: AppContainer) : ViewModel() {
         }
     }
 
+    /** Keep the camera frame of an unknown scan; it becomes the product's photo once synced. */
+    fun keepSnapshot(clientOpId: String, frame: android.graphics.Bitmap) {
+        viewModelScope.launch {
+            c.snapshots.keep(clientOpId, frame)
+            c.requestSync()
+        }
+    }
+
     fun undo() {
         viewModelScope.launch(Dispatchers.IO) {
             when (c.scanRepository.undoLast()) {

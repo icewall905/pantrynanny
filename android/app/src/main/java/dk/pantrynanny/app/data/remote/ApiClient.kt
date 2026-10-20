@@ -131,13 +131,14 @@ class ApiClient(
     // ---- Plumbing ---------------------------------------------------------------------------
 
     /** Multipart photo upload; the server re-encodes to WebP, strips EXIF and locks the image field. */
-    suspend fun uploadPhoto(productId: String, jpeg: ByteArray): ApiResult<ProductDto> {
+    suspend fun uploadPhoto(productId: String, jpeg: ByteArray, snapshot: Boolean = false): ApiResult<ProductDto> {
         val form = MultipartBody.Builder()
             .setType(MultipartBody.FORM)
             .addFormDataPart("file", "photo.jpg", jpeg.toRequestBody("image/jpeg".toMediaType()))
             .build()
         return send(
             "POST", "api/products/$productId/photo",
+            query = if (snapshot) mapOf("snapshot" to "true") else emptyMap(),
             requestBody = form, serializer = ProductDto.serializer(), long = true,
         )
     }
