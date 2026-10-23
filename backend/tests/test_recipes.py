@@ -92,8 +92,8 @@ def test_matching_needs_the_same_thing_not_just_a_shared_word():
     assert best_match("onion", more).name == "Løg, gule"
     assert best_match("soy sauce", more).name == "Soja sauce"
     other = [cand("Jasmine rice"), cand("Mel"), cand("Peanut butter"), cand("Kokosmælk")]
-    other += [cand("Rød karry pasta"), cand("Kikærter")]
-    for wrong in ["ice", "saltkaramel", "butter", "milk", "pasta", "ærter", "tacosauce"]:
+    other += [cand("Rød karry pasta"), cand("Kikærter"), cand("Pickled Onions")]
+    for wrong in ["ice", "saltkaramel", "butter", "milk", "pasta", "ærter", "tacosauce", "onion"]:
         assert best_match(wrong, other) is None, wrong
     assert best_match("olive or rapeseed oil", [cand("Oliven"), cand("Olivenolie")]).name == (
         "Olivenolie"
@@ -282,6 +282,7 @@ async def test_what_can_we_cook_ranks_cookable_and_expiring_first(env):
     await mk("Spinatomelet", ["3 æg", "100 g spinat"])
     await mk("Langtidsstegt", ["2 æg"], mins=300)
     await mk("Lagkage", ["4 æg", "200 g smør", "1 l fløde"])
+    await mk("Alt er valgfrit", ["evt. 2 æg"])
     r = await c.get("/api/recipes/suggest?max_minutes=60", headers=h)
     titles = [x["recipe"]["title"] for x in r.json()]
     assert titles == ["Spinatomelet", "Omelet", "Kage"]  # two missing: not a suggestion

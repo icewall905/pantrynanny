@@ -314,8 +314,8 @@ def rank(
         total = (r.prep_min or 0) + (r.cook_min or 0)
         if max_minutes is not None and total and total > max_minutes:
             continue
-        if max_missing is not None and a.missing > max_missing:
-            continue
+        if max_missing is not None and (a.missing > max_missing or not a.required):
+            continue  # nothing to check is not "cookable" (e.g. every line marked optional)
         out.append((r, a))
     out.sort(
         key=lambda x: (

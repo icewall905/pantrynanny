@@ -153,7 +153,9 @@ CHANGES_IDENTITY = {
     "peanut", "jordnødde", "coconut", "kokos", "almond", "mandel", "cashew", "oat", "havre",
     "soy", "soja", "rice", "ris", "sour", "cocoa", "kakao", "garlic", "hvidløg", "sesame",
     "sesam", "vegan", "plant", "plante", "erstatning", "replacer", "substitute", "flavour",
-    "flavor", "smag", "karry", "curry",
+    "flavor", "smag", "karry", "curry", "pickled", "syltet", "syltede", "marinated",
+    "marineret", "marinerede", "ristede", "fried", "crispy", "chips", "crisps", "powder",
+    "pulver", "granulat", "extract", "ekstrakt", "essens", "juice", "saft",
 }
 # fmt: on
 # Package sizes at the end of product names ("Letmælk 1 l", "Æg 10 stk").
