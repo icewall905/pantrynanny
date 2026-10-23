@@ -9,7 +9,12 @@ import pytest
 from pantrynanny.errors import AppError
 from pantrynanny.recipes.fetch import fetch_page
 from pantrynanny.recipes.jsonld import extract, minutes
-from pantrynanny.recipes.match import ProductCandidate, best_match, needed_in_stock_units
+from pantrynanny.recipes.match import (
+    Pantry,
+    ProductCandidate,
+    best_match,
+    needed_in_stock_units,
+)
 from pantrynanny.recipes.parse import parse_line
 
 
@@ -63,6 +68,43 @@ def test_matching_handles_compounds_synonyms_and_traps():
     # in-stock product wins among equal matches
     two = [cand("Sødmælk", total=0), cand("Minimælk", total=2)]
     assert best_match("mælk", two).name == "Minimælk"
+
+
+def test_matching_needs_the_same_thing_not_just_a_shared_word():
+    pantry = [
+        cand("Ollineo Sunflower Oil"),
+        cand("æg erstatningspulver"),
+        cand("Sour Cream & Onion Flavour Chips"),
+        cand("Halkidiki oliven m. hvidløg og peberfrugt"),
+        cand("Jasmine rice"),
+        cand("Gochujang Sauce"),
+    ]
+    assert best_match("eggs", pantry) is None  # egg replacer powder is not eggs
+    assert best_match("green onion", pantry) is None  # crisps are not onions
+    assert best_match("garlic", pantry) is None  # olives stuffed with garlic are olives
+    assert best_match("light soy sauce", pantry) is None  # any sauce is not soy sauce
+    assert best_match("sesame oil", pantry) is None  # another oil
+    assert best_match("oil", pantry).name == "Ollineo Sunflower Oil"
+    assert best_match("cooked Jasmin rice", pantry).name == "Jasmine rice"
+    more = [cand("Æg 10 stk"), cand("Løg, gule"), cand("Rødløg"), cand("Soja sauce")]
+    assert best_match("eggs", more).name == "Æg 10 stk"
+    assert best_match("red onion", more).name == "Rødløg"
+    assert best_match("onion", more).name == "Løg, gule"
+    assert best_match("soy sauce", more).name == "Soja sauce"
+    other = [cand("Jasmine rice"), cand("Mel"), cand("Peanut butter"), cand("Kokosmælk")]
+    other += [cand("Rød karry pasta"), cand("Kikærter")]
+    for wrong in ["ice", "saltkaramel", "butter", "milk", "pasta", "ærter", "tacosauce"]:
+        assert best_match(wrong, other) is None, wrong
+    assert best_match("olive or rapeseed oil", [cand("Oliven"), cand("Olivenolie")]).name == (
+        "Olivenolie"
+    )
+
+
+def test_pantry_index_gives_the_same_answers_as_scoring_everything():
+    products = [cand(n) for n in ["Rødløg", "Løg", "Letmælk", "Mel", "Jasmine rice", "Æg"]]
+    pantry = Pantry(products)
+    for name in ["løg", "red onion", "milk", "hvedemel", "rice", "ice", "eggs", "kanel"]:
+        assert pantry.best(name) is best_match(name, products), name
 
 
 def test_amount_conversion_to_stock_units():
@@ -239,11 +281,14 @@ async def test_what_can_we_cook_ranks_cookable_and_expiring_first(env):
     await mk("Omelet", ["3 æg", "salt"])
     await mk("Spinatomelet", ["3 æg", "100 g spinat"])
     await mk("Langtidsstegt", ["2 æg"], mins=300)
+    await mk("Lagkage", ["4 æg", "200 g smør", "1 l fløde"])
     r = await c.get("/api/recipes/suggest?max_minutes=60", headers=h)
     titles = [x["recipe"]["title"] for x in r.json()]
-    assert titles == ["Spinatomelet", "Omelet", "Kage"]
+    assert titles == ["Spinatomelet", "Omelet", "Kage"]  # two missing: not a suggestion
     assert r.json()[0]["availability"]["uses_expiring"] == ["Spinat"]
     assert r.json()[2]["availability"]["missing"] == 1
+    r = await c.get("/api/recipes/suggest?max_minutes=60&max_missing=0", headers=h)
+    assert [x["recipe"]["title"] for x in r.json()] == ["Spinatomelet", "Omelet"]
     assert eggs  # untouched: suggesting never changes stock
     inv = (await c.get(f"/api/inventory/{eggs['id']}", headers=h)).json()
     assert inv["total_quantity"] == 6

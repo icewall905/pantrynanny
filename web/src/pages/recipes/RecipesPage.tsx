@@ -70,7 +70,11 @@ export default function RecipesPage() {
       ) : !data.data ? (
         <ListSkeleton rows={4} />
       ) : data.data.length === 0 ? (
-        <EmptyState icon={<BookOpen />} title={t('recipes.empty')} hint={t('recipes.emptyHint')} />
+        tab === 'cook' ? (
+          <EmptyState icon={<BookOpen />} title={t('recipes.cookEmpty')} hint={t('recipes.cookEmptyHint')} />
+        ) : (
+          <EmptyState icon={<BookOpen />} title={t('recipes.empty')} hint={t('recipes.emptyHint')} />
+        )
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2" data-testid="recipe-list">
           {data.data.map((s) => (

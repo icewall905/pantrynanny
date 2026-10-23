@@ -533,6 +533,8 @@
     "search": "Søg i opskrifter",
     "empty": "Ingen opskrifter endnu",
     "emptyHint": "Skriv jeres egne, eller hent en fra en opskriftsside.",
+    "cookEmpty": "Intet du kan lave lige nu",
+    "cookEmptyHint": "Kun opskrifter, der mangler højst én ingrediens, vises. Se alle opskrifter, eller fyld op.",
     "minutes": "{{n}} min",
     "servings_one": "{{count}} person",
     "servings_other": "{{count}} personer",

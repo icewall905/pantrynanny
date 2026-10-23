@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..errors import AppError, conflict, not_found
 from ..models import Product, ProductAlias, Recipe, RecipeIngredient
 from ..recipes.match import (
+    Pantry,
     ProductCandidate,
     best_match,
     is_staple,
@@ -182,7 +183,7 @@ async def delete_recipe(session: AsyncSession, household_id: uuid.UUID, rid: uui
 # --------------------------------------------------------------------------- pantry matching
 
 
-async def pantry(session: AsyncSession, household_id: uuid.UUID) -> list[ProductCandidate]:
+async def pantry(session: AsyncSession, household_id: uuid.UUID) -> Pantry:
     products = list(
         (
             await session.execute(
@@ -222,7 +223,7 @@ async def pantry(session: AsyncSession, household_id: uuid.UUID) -> list[Product
                 image_url=f"/api/media/{p.image_path}" if p.image_path else None,
             )
         )
-    return out
+    return Pantry(out)
 
 
 def availability(
@@ -302,13 +303,18 @@ def availability(
 
 
 def rank(
-    pairs: list[tuple[Recipe, Availability]], *, max_minutes: int | None = None
+    pairs: list[tuple[Recipe, Availability]],
+    *,
+    max_minutes: int | None = None,
+    max_missing: int | None = None,
 ) -> list[tuple[Recipe, Availability]]:
     """Cookable now first, then most of it in the house, then what uses up expiring food."""
     out = []
     for r, a in pairs:
         total = (r.prep_min or 0) + (r.cook_min or 0)
         if max_minutes is not None and total and total > max_minutes:
+            continue
+        if max_missing is not None and a.missing > max_missing:
             continue
         out.append((r, a))
     out.sort(

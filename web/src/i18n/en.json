@@ -533,6 +533,8 @@
     "search": "Search recipes",
     "empty": "No recipes yet",
     "emptyHint": "Add your own or import one from a recipe website.",
+    "cookEmpty": "Nothing you can make right now",
+    "cookEmptyHint": "Only recipes missing at most one ingredient are shown. See all recipes, or stock up.",
     "minutes": "{{n}} min",
     "servings_one": "{{count}} serving",
     "servings_other": "{{count}} servings",

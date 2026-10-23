@@ -317,7 +317,7 @@ async def what_can_we_cook(ctx: ToolContext, a: CookArgs) -> dict:
     products = await rsvc.pantry(ctx.session, ctx.household_id)
     pairs = [(r, rsvc.availability(r, products, today=ctx.today)) for r in recipes]
     items = []
-    for r, av in rsvc.rank(pairs, max_minutes=a.max_minutes)[:15]:
+    for r, av in rsvc.rank(pairs, max_minutes=a.max_minutes, max_missing=1)[:15]:
         items.append(
             {
                 "recipe": clean(r.title),

@@ -62,11 +62,14 @@ async def what_can_we_cook(
     request: Request,
     max_minutes: int | None = Query(default=None, ge=1, le=10_000),
     servings: int | None = Query(default=None, ge=1, le=100),
+    max_missing: int = Query(default=1, ge=0, le=100),
     limit: int = Query(default=20, ge=1, le=100),
     principal: Principal = Depends(get_principal),
     session: AsyncSession = Depends(get_session),
 ):
-    """Saved recipes ranked by what is in the house right now (deterministic, no AI)."""
+    """Saved recipes ranked by what is in the house right now (deterministic, no AI). Only
+    recipes missing at most `max_missing` required ingredients (default: one shopping trip
+    item) are suggested."""
     recipes = await svc.list_recipes(session, principal.household_id)
     products = await svc.pantry(session, principal.household_id)
     soon, today = await _soon_days(session, principal.household_id), _today(request)
@@ -76,7 +79,7 @@ async def what_can_we_cook(
     ]
     return [
         RecipeSummary(recipe=svc.recipe_out(r), availability=a)
-        for r, a in svc.rank(pairs, max_minutes=max_minutes)[:limit]
+        for r, a in svc.rank(pairs, max_minutes=max_minutes, max_missing=max_missing)[:limit]
     ]
 
 
