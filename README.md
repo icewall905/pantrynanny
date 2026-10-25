@@ -154,7 +154,7 @@ Admin → Providers.
 | Timers | `pantrynanny-backup.timer` (03:15 nightly), `pantrynanny-healthcheck.timer` (restarts a hung API after 2 failed checks) |
 | Logs | `journalctl -u pantrynanny-api -u pantrynanny-worker` (structured JSON; tokens, cookies and query strings are never logged) |
 | Paths | code `/opt/pantrynanny/current`, data `/var/lib/pantrynanny`, config `/etc/pantrynanny`, backups `/var/backups/pantrynanny` |
-| Admin CLI | `pantrynanny-admin create-user / reset-password / list-users / create-kiosk-code / import-seed` |
+| Admin CLI | `pantrynanny-admin create-user / reset-password / list-users / create-kiosk-code / import-seed / backfill-recipes / classify-recipes` |
 
 ### Backups and restore
 

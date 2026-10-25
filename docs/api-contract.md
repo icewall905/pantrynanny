@@ -20,7 +20,10 @@ Two token kinds, both opaque random strings (32 bytes, url-safe base64), stored 
 * **Device token** – for Android and kiosk iPad. `Authorization: Bearer <token>`. Obtained via
   `POST /api/auth/token {username, password, device_name, platform}` → `{token, me}` (role of
   the user; 365 days sliding), or via kiosk pairing (below). Bearer requests do not need CSRF
-  header.
+  header. Add `"scope": "read"` to get a **read-only device token**: it may only `GET`/`HEAD`
+  (and log itself out); anything else is `403 read_only_token`. `GET /api/auth/me` then has
+  `read_only: true`, and `GET /api/devices` shows `scope: "read"`. Use it for scripts and
+  assistants that only need to look (Home Assistant, the diet coach).
 * `POST /api/auth/logout` revokes current session/token. `GET /api/auth/me` → `Me`.
 * **Kiosk pairing**: an admin calls `POST /api/devices/kiosk-codes {name}` → `{code, expires_at}`
   (8-char code, valid 15 min, single use). The iPad opens `/scan`, enters the code →
@@ -289,8 +292,8 @@ None of them change stock except through the normal ops in §3 (`POST /sync/ops`
 | `GET /stats/runout?days=14[&product_id]` | Run-out forecast from the household's own removals (90-day window). `confidence` is `medium` (≥3 events) or `high` (≥6 events over ≥21 days); products with less history get no forecast. |
 | `GET/POST /recipes`, `GET/PUT/DELETE /recipes/{id}` | Recipe CRUD. Ingredients are sent as raw lines and parsed server-side. `PUT` accepts `If-Match`. |
 | `POST /recipes/parse {lines}` | Preview how ingredient lines are understood. |
-| `POST /recipes/import {url}` | Read a schema.org Recipe (JSON-LD) from a public page. Returns a draft; nothing is saved. See below. |
-| `GET /recipes/suggest?max_minutes&servings` | "What can we cook": saved recipes ranked by availability. |
+| `POST /recipes/import {url}` | Read a schema.org Recipe (JSON-LD, else microdata) from a public page. Returns a draft (now with `course`); nothing is saved. See below. |
+| `GET /recipes/suggest?max_minutes&servings&max_missing&limit` | "What can we cook": saved recipes ranked by availability. Filters and `include=summary`: §8.1. |
 | `GET /recipes/{id}/availability?servings` | Per ingredient: `have`/`low`/`missing`/`staple`/`optional`, matched product, `need` in the product's stock unit. |
 | `POST /recipes/{id}/shopping {servings?, ingredient_ids?}` | Add missing ingredients to the shopping list (no duplicate free-text items). |
 | `GET /meal-plan?start&days`, `POST /meal-plan`, `PATCH/DELETE /meal-plan/{id}` | Meal plan. `PATCH {cooked}` only stamps the entry. Planning never changes stock. |
@@ -308,6 +311,72 @@ is reduced to plain text and never rendered as HTML.
 **Cooking.** The client shows the proposed deductions (`need`, capped at stock). Unknown amounts are unticked. After
 the user confirms, the client sends one `remove` op per product with `reason: "recipe"`. Undo sends `undo` ops for
 exactly those op ids.
+
+### 8.1 Machine clients: courses, staples, ranking (October 2026)
+
+Everything here is added; no field changed name or meaning.
+
+**Recipes.** `RecipeOut` gains `course` and `minutes` (`prep_min + cook_min`, `null` when neither is known).
+`course` is one of `breakfast` (incl. brunch), `lunch`, `dinner` (main dishes), `side`, `dessert`, `baking`,
+`drink`, `snack`, `condiment` (sauces, dips, jams, spice mixes) or `null` (unknown). It is worked out on create from
+the page's own `recipeCategory`/`keywords` (kept as tags), else the title, else the ingredients; recipes saved
+before courses existed get the same guess until they are re-read or edited. `RecipeIn.course` sets it by hand; an
+update that leaves it out keeps the stored value.
+
+**Query parameters** on `GET /recipes` and `GET /recipes/suggest`:
+
+| Param | Meaning |
+|---|---|
+| `course` (repeatable) | Only these courses, e.g. `course=lunch&course=dinner`. |
+| `exclude_course` (repeatable) | Leave these out. |
+| `tag` (repeatable) | Has every tag (case-insensitive). |
+| `min_ingredients` | At least this many required ingredients (not staple, not optional). |
+| `include=summary` | One flat row per recipe instead of `{recipe, availability}` (below). Default `full`. |
+| `q` (`/recipes` only) | Title/tag search, as before. |
+
+`include=summary` rows: `{id, title, course, tags, servings, prep_min, cook_min, minutes, source_url, coverage,
+have, required, missing, missing_names, low_names, staple_names, uses_expiring}` — no instructions or ingredient
+objects. Lists are ordered deterministically: `/recipes` by title then id, `/suggest` as below.
+
+**Ranking** (`/recipes/suggest`): filters first (`max_minutes`, `max_missing`, `min_ingredients`, course, tag; a
+recipe with nothing to check is never suggested). Then: fewest missing → smoothed coverage `have / (required + 2)`
+(a short list has to earn its place: 2 of 2 scores 0.50, 5 of 5 0.71, so a two-line sweet no longer beats a real
+dish) → most expiring food used → most ingredients in the house → quickest → title → id.
+
+**Staples** ("always in the house"). `GET /settings` has `staples: string[]` and `default_staples`; an admin
+`PATCH /settings {"staples": [...]}` replaces the list (lower-cased, de-duplicated), `{"staples": null}` goes back
+to the defaults (salt, pepper, water, oil, olive oil, sugar, wheat flour, baking powder, bicarbonate, common
+dried spices). A line counts as a staple (`status: "staple"`, never missing, never put on the shopping list)
+when every part of it is on the list once qualifiers are dropped: "salt og friskkværnet peber", "kosher salt",
+"flagesalt", "water or broth" (first alternative), "ground cumin" (synonyms apply). **A staple the household keeps
+as a product is a product**: it is matched like any other and reported `have`/`low`/`missing` from stock.
+
+**Matching** (ingredient → product) is unchanged in shape. It now also understands Danish adjective endings
+(finvalset = finvalsede), product names with a variant after " - ", "," or "(…)", pack sizes and percentages
+("Boo Chopped Tomatoes - Herbs", "Sushi Nori 11g Blue Dragon", "Skyr 0,2%"), leading unit words left by the
+parser ("c. tahini", "can black beans"), colours (a colour the recipe names must be the product's) and a
+synonym table (`backend/pantrynanny/recipes/synonyms.txt`; households add their own names as product aliases).
+Measured with `scripts/match_eval.py` on a hand-checked golden set of 317 names: precision 0.869 → 1.000,
+recall 0.521 → 0.982.
+
+**Re-reading recipe pages** (admin). `POST /admin/recipes/backfill {limit?, delay_s?=2}` → `202` starts a
+background job that re-reads the source page of recipes without cooking time or course, one page at a time
+(`delay_s` apart) through the same safe fetcher and limits as an import. Only empty fields are filled (times,
+course, tags). Every recipe tried is stamped (`source_checked_at`), so a stopped job resumes with the rest.
+`GET /admin/recipes/backfill` → `{running, checked, times_filled, courses_filled, failed, remaining, started_at,
+finished_at, last_error}`. The same from the shell: `pantrynanny-admin backfill-recipes [--limit N] [--delay S]`.
+
+### 8.2 Stock data at scan time (October 2026)
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /inventory/place {client_op_id, add_client_op_id, expires_at?, location_id?}` | One tap after a scan: give what one `add` op put in stock an expiry and/or another location. Fields left out are kept; `expires_at: null` clears it. Idempotent by `client_op_id` (a repeat returns `status: "duplicate"`). Recorded as a `move` with `reason: "place:<add op id>"`; undoing the add also undoes this. `404 not_found` when the server does not know the add (e.g. still queued offline). Returns an op result (§3.1). |
+| `POST /batches/fix-up {batch_ids (≤500), location_id?, expires_at?}` | The "fix up stock" screen: set location and/or expiry on many batches at once. Each batch that changes moves whole into the batch for its new (location, expiry), recorded as one `move` per batch (`reason: "fix-up"`). → `{changed, unchanged}`. |
+
+Categories gain `default_expiry_days` (offered as the highlighted expiry chip after a scan; `PATCH
+/categories/{id}`) and `default_location_id` (learned: the last place stock of that category was put on purpose;
+also settable). Where an `add` op has no location, the server now uses: the requested location → the product's own
+place → **its category's place** → the household default.
 
 **AI tools.** These are read-only in addition to §5: `what_can_we_cook`, `get_meal_plan`, `get_running_out`. The
 `propose_add_to_shopping`, `propose_plan_meal` and `propose_use_up` tools only record a suggestion. Each one is

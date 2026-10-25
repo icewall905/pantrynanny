@@ -7,6 +7,9 @@ from pydantic import BaseModel, Field, field_validator
 from .common import Qty
 
 Slot = Literal["breakfast", "lunch", "dinner", "snack"]
+Course = Literal[
+    "breakfast", "lunch", "dinner", "side", "dessert", "baking", "drink", "snack", "condiment"
+]
 IngredientStatus = Literal["have", "low", "missing", "staple", "optional"]
 
 
@@ -32,6 +35,8 @@ class RecipeIn(BaseModel):
     cook_min: int | None = Field(default=None, ge=0, le=10_000)
     instructions: list[str] = Field(default_factory=list, max_length=80)
     tags: list[str] = Field(default_factory=list, max_length=20)
+    # left out: worked out from the tags/title/ingredients on create, kept as it was on update
+    course: Course | None = None
     source_url: str | None = Field(default=None, max_length=1000)
     source_name: str | None = Field(default=None, max_length=120)
     image_url: str | None = Field(default=None, max_length=1000)
@@ -72,6 +77,8 @@ class RecipeOut(BaseModel):
     cook_min: int | None
     instructions: list[str]
     tags: list[str]
+    course: Course | None = None
+    minutes: int | None = None  # prep_min + cook_min, None when neither is known
     source_url: str | None
     source_name: str | None
     image_url: str | None
@@ -115,6 +122,29 @@ class RecipeSummary(BaseModel):
     availability: Availability
 
 
+class RecipeBrief(BaseModel):
+    """`include=summary`: one flat row per recipe for machine clients (no instructions or
+    ingredient objects)."""
+
+    id: UUID
+    title: str
+    course: Course | None
+    tags: list[str]
+    servings: int
+    prep_min: int | None
+    cook_min: int | None
+    minutes: int | None
+    source_url: str | None
+    coverage: float
+    have: int
+    required: int
+    missing: int
+    missing_names: list[str]
+    low_names: list[str]
+    staple_names: list[str]
+    uses_expiring: list[str]
+
+
 class RecipeDraftOut(BaseModel):
     """An imported recipe for the user to review; nothing is saved yet."""
 
@@ -129,6 +159,7 @@ class RecipeDraftOut(BaseModel):
     image_url: str | None
     source_url: str
     source_name: str | None
+    course: Course | None = None
 
 
 class ImportIn(BaseModel):

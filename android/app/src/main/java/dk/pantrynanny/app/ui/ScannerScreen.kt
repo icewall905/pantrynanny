@@ -12,6 +12,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,6 +31,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -63,6 +66,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dk.pantrynanny.app.R
 import dk.pantrynanny.app.data.local.HistoryRow
 import dk.pantrynanny.app.domain.CardPhase
+import dk.pantrynanny.app.domain.ExpiryChip
 import dk.pantrynanny.app.domain.QuantityMath
 import dk.pantrynanny.app.domain.ScanMode
 import kotlinx.coroutines.launch
@@ -197,7 +201,10 @@ fun ScannerScreen(vm: ScannerViewModel, snackbar: SnackbarHostState, onRegisterP
         Spacer(Modifier.height(6.dp))
         ModeToggle(state.mode, onSelect = vm::setMode)
         Spacer(Modifier.height(6.dp))
-        LastScanCard(state.last, state.lastPhase, accent, state.alreadyCounted, onRegister = vm::register, onExtra = vm::addExtra)
+        LastScanCard(
+            state.last, state.lastPhase, accent, state.alreadyCounted, onRegister = vm::register, onExtra = vm::addExtra,
+            placement = state.placement, onExpiry = vm::placeExpiry, onLocation = vm::placeLocation,
+        )
         Spacer(Modifier.height(4.dp))
 
         LazyColumn(
@@ -319,6 +326,9 @@ private fun LastScanCard(
     alreadyCounted: Boolean,
     onRegister: (String) -> Unit,
     onExtra: (HistoryRow, Int) -> Unit,
+    placement: PlacementUi? = null,
+    onExpiry: (ExpiryChip) -> Unit = {},
+    onLocation: (String) -> Unit = {},
 ) {
     Card(
         Modifier
@@ -392,12 +402,61 @@ private fun LastScanCard(
                         }
                     }
                 }
+                if (placement != null) PlaceChips(placement, onExpiry, onLocation)
                 if (needsRegister(last) && phase != CardPhase.LOOKING) {
                     Button(
                         onClick = { onRegister(last.entry.clientOpId) },
                         modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
                     ) { Text(stringResource(R.string.register_now)) }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun expiryLabel(chip: ExpiryChip): String = when (chip) {
+    is ExpiryChip.Days -> stringResource(R.string.chip_days, chip.n)
+    is ExpiryChip.Weeks -> stringResource(R.string.chip_weeks, chip.n)
+    is ExpiryChip.Months -> stringResource(R.string.chip_months, chip.n)
+    ExpiryChip.None -> stringResource(R.string.chip_no_expiry)
+}
+
+/**
+ * One-tap expiry and location for the add just applied by the server. Optional: ignoring them is
+ * fine, the next scan (or a short timeout) makes them go away.
+ */
+@Composable
+private fun PlaceChips(p: PlacementUi, onExpiry: (ExpiryChip) -> Unit, onLocation: (String) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(stringResource(R.string.place_expiry_label), fontSize = 13.sp)
+        for (chip in p.expiryChips) {
+            // Tapped chip is selected; until then the category's default is pre-highlighted.
+            val selected = if (p.chosenExpiry != null) chip == p.chosenExpiry else chip == p.suggested
+            FilterChip(
+                selected = selected,
+                onClick = { onExpiry(chip) },
+                label = {
+                    Text(expiryLabel(chip), fontWeight = if (chip == p.suggested) FontWeight.Bold else FontWeight.Normal)
+                },
+            )
+        }
+    }
+    if (p.locations.size > 1) {
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            for (loc in p.locations) {
+                FilterChip(
+                    selected = loc.id == p.currentLocationId,
+                    onClick = { onLocation(loc.id) },
+                    label = { Text(loc.name, maxLines = 1) },
+                )
             }
         }
     }

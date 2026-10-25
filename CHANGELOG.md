@@ -1,5 +1,40 @@
 # Changelog
 
+## 2026-10-25 – recipes and stock data good enough for a diet coach
+
+- **Matching recipe lines to products** (measured with the new `scripts/match_eval.py` on a hand-checked golden set
+  of 317 ingredient names, `backend/tests/fixtures/match_golden.json`): precision 0.869 → 1.000, recall 0.521 →
+  0.982.
+  - Danish adjective endings (finvalset = finvalsede), the main product name before " - variant", ", variant",
+    "(…)", pack size or percentage ("Boo Chopped Tomatoes - Herbs" is chopped tomatoes), unit words the parser left
+    ("c. tahini", "can black beans") and Korean/other-script labels are handled.
+  - Synonyms moved to a data file, `backend/pantrynanny/recipes/synonyms.txt`, applied to both sides, with
+    "kind of" rules (sunflower oil is a neutral oil, cannellini beans are white beans).
+  - New traps: a colour the recipe names must be the product's ("sorte bønner" ≠ "hvide bønner", brown rice ≠
+    jasmine rice), "tamari" ≠ Tamarind, vanilla sugar ≠ sugar, "tomatoes" ≠ canned chopped tomatoes,
+    "flour" ≠ whole-wheat flour, "ice" ≠ juice, a bare "sauce" ≠ Gochujang Sauce.
+- **Staples are a household list** (Admin → Indstillinger; `GET/PATCH /settings` `staples`), seeded with salt,
+  pepper, water, oil, olive oil, sugar, wheat flour, baking powder, bicarbonate and common dried spices.
+  "salt og friskkværnet peber", "kosher salt", "flagesalt", "water or broth" now count. A staple the household keeps
+  as a product is reported from stock like any product. On the real data, staple lines went from 4.6 % to 19.7 %
+  and missing lines from 84 % to 64 %.
+- **Courses and ranking.** Recipes have a `course` (breakfast, lunch, dinner, side, dessert, baking, drink, snack,
+  condiment) from the page's category, else the title, else the ingredients; editable. `/recipes` and
+  `/recipes/suggest` take `course`, `exclude_course`, `tag`, `min_ingredients` and `include=summary` (flat rows for
+  machine clients). Ranking uses smoothed coverage `have / (required + 2)`, so a two-line sweet no longer beats a
+  real dish.
+- **Cooking times.** Imports read schema.org microdata when there is no JSON-LD (valdemarsro.dk), and use the total
+  time when it is longer than prep + cook. An admin job (`POST /admin/recipes/backfill`,
+  `pantrynanny-admin backfill-recipes`) re-reads source pages for recipes without time or course: safe fetcher,
+  one page every 2 s, resumable.
+- **Stock data at scan time** (web and Android): after an add, one-tap expiry chips (+3 d, +1 u, +1 m, +6 m,
+  ingen; the category's default highlighted) and location chips (`POST /inventory/place`). Categories remember where
+  their things go and have a default shelf life. New **"Ryd op"** screen (`/fix-up`) sets location/expiry for many
+  items at once (`POST /batches/fix-up`).
+- **Read-only device tokens**: `POST /auth/token {…, "scope": "read"}` can only read.
+- Migration 0011 (reversible): `household_settings.staples`, `recipes.course`, `recipes.source_checked_at`,
+  `categories.default_expiry_days`, `categories.default_location_id`, `sessions.scope`.
+
 ## 2026-10-20 – Android app parity, photos of unknown items
 
 - **Android is now a full app.** It still opens in the scanner. Five tabs: Scan · Lager · Indkøb · Mad · Mere.

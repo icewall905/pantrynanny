@@ -402,7 +402,14 @@
     "rearm": "Scan re-arm (ms)",
     "rearmHint": "How long a barcode must be gone before it counts again",
     "passwordMin": "At least 8 characters",
-    "tab_ai": "AI"
+    "tab_ai": "AI",
+    "staples": "Always in the house",
+    "staplesHint": "Used by recipes: never counted as missing and never put on the shopping list (unless you keep them as a product).",
+    "staplesAdd": "Add (e.g. salt)",
+    "staplesReset": "Reset to defaults",
+    "staplesRemove": "Remove {{name}}",
+    "defaultExpiryDays": "Default shelf life (days)",
+    "defaultExpiryDaysHint": "Suggested after a scan. Empty = none."
   },
   "opError": {
     "invalid_quantity": "Invalid quantity",
@@ -593,7 +600,19 @@
     "fMethod": "Method",
     "fMethodHint": "Leave an empty line between steps.",
     "fTags": "Tags",
-    "fTagsPh": "dinner, quick, vegetarian"
+    "fTagsPh": "dinner, quick, vegetarian",
+    "course": "Course",
+    "courseAuto": "Automatic",
+    "allCourses": "All courses",
+    "course_breakfast": "Breakfast",
+    "course_lunch": "Lunch",
+    "course_dinner": "Dinner",
+    "course_side": "Side",
+    "course_dessert": "Dessert",
+    "course_baking": "Baking",
+    "course_drink": "Drink",
+    "course_snack": "Snack",
+    "course_condiment": "Condiment"
   },
   "plan": {
     "title": "Meal plan",
@@ -639,5 +658,20 @@
     "undone": "Undone",
     "undoFailed": "Could not undo",
     "more": "Show older"
+  },
+  "fixUp": {
+    "title": "Fix up stock",
+    "subtitle": "Give many items a location and expiry at once",
+    "link": "Fix up",
+    "noExpiry": "No expiry",
+    "selectAll": "Select all ({{count}})",
+    "selectNone": "Select none",
+    "moveTo": "Move to",
+    "setExpiry": "Set expiry",
+    "setDate": "Set date",
+    "done_one": "{{count}} batch updated",
+    "done_other": "{{count}} batches updated",
+    "empty": "Nothing to fix up",
+    "emptyHint": "No stock matches the filters."
   }
 }

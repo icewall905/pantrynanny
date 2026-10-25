@@ -26,7 +26,7 @@ function Section({ kind }: { kind: Kind }) {
     mutationFn: (v: Partial<Item>) => {
       const body = kind === 'locations'
         ? { name: v.name, icon: v.icon || null, is_default: !!v.is_default }
-        : { name: v.name, icon: v.icon || null, color: v.color || null }
+        : { name: v.name, icon: v.icon || null, color: v.color || null, default_expiry_days: v.default_expiry_days ?? null }
       return v.id ? patch(`/${kind}/${v.id}`, body) : post(`/${kind}`, body)
     },
     onSuccess: () => {
@@ -57,6 +57,9 @@ function Section({ kind }: { kind: Kind }) {
         {rows.map((i) => (
           <li key={i.id} className="flex items-center gap-2 py-2">
             <span className="flex-1 font-medium">{i.name}</span>
+            {kind === 'categories' && i.default_expiry_days != null && (
+              <Badge tone="neutral">{t('scan.place.chip.days', { count: i.default_expiry_days })}</Badge>
+            )}
             {kind === 'locations' && i.is_default && (
               <Badge tone="good">
                 <Star className="size-3" /> {t('admin.default')}
@@ -90,7 +93,26 @@ function Section({ kind }: { kind: Kind }) {
             {kind === 'locations' ? (
               <Toggle checked={!!edit.is_default} onChange={(v) => setEdit({ ...edit, is_default: v })} label={t('admin.defaultLocation')} hint={t('admin.defaultLocationHint')} />
             ) : (
-              <Field label={t('admin.color')}>{(id) => <Input id={id} type="color" value={edit.color ?? '#2f9a5c'} onChange={(e) => setEdit({ ...edit, color: e.target.value })} />}</Field>
+              <>
+                <Field label={t('admin.color')}>{(id) => <Input id={id} type="color" value={edit.color ?? '#2f9a5c'} onChange={(e) => setEdit({ ...edit, color: e.target.value })} />}</Field>
+                <Field label={t('admin.defaultExpiryDays')} hint={t('admin.defaultExpiryDaysHint')}>
+                  {(id) => (
+                    <Input
+                      id={id}
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      max={3650}
+                      value={edit.default_expiry_days ?? ''}
+                      onChange={(e) => {
+                        const v = e.target.value
+                        setEdit({ ...edit, default_expiry_days: v === '' ? null : Math.max(0, Math.min(3650, Math.round(Number(v)))) })
+                      }}
+                      data-testid="category-default-expiry"
+                    />
+                  )}
+                </Field>
+              </>
             )}
           </div>
         )}

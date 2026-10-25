@@ -3,7 +3,7 @@ import { AlertTriangle, Loader2, Camera, CameraOff, ClipboardList, Flashlight, K
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useTranslation } from 'react-i18next'
 import { get, qs } from '../api/client'
-import type { BarcodeLookupResult, HouseholdSettings, Location, Product } from '../api/types'
+import type { BarcodeLookupResult, Category, HouseholdSettings, Location, Product } from '../api/types'
 import { enqueueOp, getStore, isBlankBarcode, normalizeBarcode, useSyncStatus } from '../offline'
 import type { FailedRecord } from '../offline'
 import { CameraError, type Facing } from './camera'
@@ -18,6 +18,7 @@ import { loadMode, removeTimedOut, saveMode, type ScanMode } from './mode'
 import { perf } from './perf'
 import { flushSnapshots, grabFrame, keepSnapshot } from './snapshots'
 import { LastCounted } from './lastCounted'
+import PlaceChips from './PlaceChips'
 import { LookupTracker, reconcileProduct, type CardPhase } from './lookup'
 import { clearCameraOk, loadScanPrefs, markCameraOk, saveScanPrefs, type ScanPrefs } from './prefs'
 import { expired, nameLine, recordScan, recordUndo, saveSession, summarize, type ScanRecord, type ScanSession } from './session'
@@ -66,6 +67,12 @@ interface Card {
   failed?: boolean
   /** ops behind this card (the scan plus any +N taps) */
   ops: { id: string; qty: number }[]
+  /** location the scan asked for (null = automatic) */
+  loc?: string | null
+  /** every op behind the card has been applied by the server (expiry/location chips may show) */
+  applied?: boolean
+  /** the chips have been shown for this card: they stay (disabled while a +N tap syncs) */
+  placeShown?: boolean
 }
 
 const cardDelta = (c: Card) => c.ops.reduce((a, o) => a + o.qty, 0)
@@ -104,6 +111,7 @@ export default function ScanScreen({ settings, kiosk, wake, initialMode, onExit,
   const [history, setHistory] = useState<HistoryRow[]>([])
   const [toasts, setToasts] = useState<Toast[]>([])
   const [locations, setLocations] = useState<Location[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
   const [locationId, setLocationId] = useState<string | null>(() => {
     try {
       return localStorage.getItem('pn.scan.location')
@@ -207,9 +215,23 @@ export default function ScanScreen({ settings, kiosk, wake, initialMode, onExit,
   // ---- data refresh ----
   const refresh = useCallback(async () => {
     setHistory(await store.getHistory(20))
-    setFailed(await store.getFailedOps())
+    const failedOps = await store.getFailedOps()
+    setFailed(failedOps)
     setLocations(await store.getLocations())
+    setCategories((await store.getCategories()).filter((x) => !x.deleted_at))
     const c = cardRef.current
+    if (c && c.type === 'add' && !c.failed && c.ops.length > 0) {
+      // applied = no longer queued and not rejected (only then can the server place it)
+      const waiting = new Set([...(await store.getPending()).map((r) => r.client_op_id), ...failedOps.map((f) => f.client_op_id)])
+      const ids = c.ops.map((o) => o.id).join(',')
+      const applied = c.ops.every((o) => !waiting.has(o.id))
+      // a +N tap while we were reading the queue is not covered by this snapshot: leave it alone
+      setCard((cur) =>
+        cur && cur.n === c.n && cur.ops.map((o) => o.id).join(',') === ids && cur.applied !== applied
+          ? { ...cur, applied, placeShown: cur.placeShown || applied }
+          : cur,
+      )
+    }
     if (c) {
       const norm = normalizeBarcode(c.barcode, c.format)
       // Re-resolve from the store every time: a placeholder on the card must be replaced as soon as the real product
@@ -367,6 +389,7 @@ export default function ScanScreen({ settings, kiosk, wake, initialMode, onExit,
       setCard({
         n, opId: op.client_op_id, type, barcode: ev.value, format: ev.format, product, qty: null,
         lookingUp: !known && !placeholder, phase: known ? 'known' : placeholder ? 'unknown' : 'looking', ops: [{ id: op.client_op_id, qty: 1 }],
+        loc: locationRef.current, applied: false,
       })
       track({ opId: op.client_op_id, at: Date.now(), type, qty: 1, barcode: ev.value, name: known ? product!.name : null, unknown: !known })
       lastCounted.current.record(norm.code, type, sessionRef.current?.id ?? null, op.client_op_id)
@@ -412,7 +435,7 @@ export default function ScanScreen({ settings, kiosk, wake, initialMode, onExit,
           })
           beep(c.type)
           vibrate(30)
-          setCard((cur) => (cur && cur.n === c.n ? { ...cur, ops: [...cur.ops, { id: op.client_op_id, qty: k }] } : cur))
+          setCard((cur) => (cur && cur.n === c.n ? { ...cur, ops: [...cur.ops, { id: op.client_op_id, qty: k }], applied: false } : cur))
           const p = c.product && c.product.status !== 'unknown' ? c.product : null
           track({ opId: op.client_op_id, at: Date.now(), type: c.type, qty: k, barcode: c.barcode, name: p?.name ?? null, unknown: !p })
         } catch (e) {
@@ -702,6 +725,18 @@ export default function ScanScreen({ settings, kiosk, wake, initialMode, onExit,
                 </button>
               ))}
             </div>
+          )}
+          {card && card.type === 'add' && (card.applied || card.placeShown) && !card.failed && card.ops.length > 0 && (
+            <PlaceChips
+              key={card.n}
+              addOpIds={card.ops.map((o) => o.id)}
+              ready={!!card.applied}
+              product={card.product}
+              categories={categories}
+              locations={locations}
+              requestedLocationId={card.loc ?? null}
+              toast={toast}
+            />
           )}
           <div className="flex gap-3">
             <button

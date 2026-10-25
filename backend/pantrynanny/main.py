@@ -24,6 +24,7 @@ from .logging import configure_logging, get_logger
 from .routers import (
     admin_ai,
     admin_catalogue,
+    admin_recipes,
     ai,
     auth,
     categories,
@@ -195,6 +196,7 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
         stats,
         admin_catalogue,
         admin_ai,
+        admin_recipes,
         kitchen,
         recipes,
         meal_plan,

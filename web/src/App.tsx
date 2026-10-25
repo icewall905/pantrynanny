@@ -29,6 +29,7 @@ const RecipeDetailPage = lazy(() => import('./pages/recipes/RecipeDetailPage'))
 const RecipeEditPage = lazy(() => import('./pages/recipes/RecipeEditPage'))
 const MealPlanPage = lazy(() => import('./pages/MealPlanPage'))
 const ActivityPage = lazy(() => import('./pages/ActivityPage'))
+const FixUpPage = lazy(() => import('./pages/FixUpPage'))
 
 export default function App() {
   return (
@@ -66,6 +67,7 @@ export default function App() {
             >
               <Route index element={<DashboardPage />} />
               <Route path="inventory" element={<InventoryPage />} />
+              <Route path="fix-up" element={<FixUpPage />} />
               <Route path="products/new" element={<NewProductPage />} />
               <Route path="products/:id" element={<ProductDetailPage />} />
               <Route path="unknown" element={<UnknownPage />} />

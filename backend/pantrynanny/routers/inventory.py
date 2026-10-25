@@ -10,11 +10,14 @@ from ..db import get_session, get_sessionmaker
 from ..errors import AppError, not_found
 from ..models import Product, StockTransaction, User
 from ..schemas.inventory import (
+    BatchFixUpIn,
+    BatchFixUpOut,
     BatchOut,
     BatchPatch,
     InventoryDetailOut,
     InventoryItemOut,
     OpResultOut,
+    PlaceIn,
     SyncOp,
     TransactionOut,
     TxnWithProduct,
@@ -87,6 +90,46 @@ async def patch_batch(
     batch = await svc.update_batch_meta(session, principal.household_id, batch_id, fields)
     await session.commit()
     return batch
+
+
+@router.post("/inventory/place", response_model=OpResultOut)
+async def place_added_stock(
+    body: PlaceIn,
+    principal: Principal = Depends(get_principal),
+    session: AsyncSession = Depends(get_session),
+):
+    """One tap after a scan: give what was just added an expiry and/or another location."""
+    fields = {k: getattr(body, k) for k in body.model_fields_set & {"expires_at", "location_id"}}
+    try:
+        r = await svc.place_added(
+            session,
+            principal,
+            client_op_id=body.client_op_id,
+            add_client_op_id=body.add_client_op_id,
+            fields=fields,
+        )
+    except svc.OpRejected as exc:
+        await session.rollback()
+        raise AppError(404 if exc.code == "not_found" else 422, exc.code, exc.message) from exc
+    await session.commit()
+    return op_result_out(r)
+
+
+@router.post("/batches/fix-up", response_model=BatchFixUpOut)
+async def fix_up_batches(
+    body: BatchFixUpIn,
+    principal: Principal = Depends(get_principal),
+    session: AsyncSession = Depends(get_session),
+):
+    """Set location and/or expiry on many batches at once (the "fix up stock" screen)."""
+    fields = {k: getattr(body, k) for k in body.model_fields_set & {"expires_at", "location_id"}}
+    try:
+        changed, unchanged = await svc.fix_up_batches(session, principal, body.batch_ids, fields)
+    except svc.OpRejected as exc:
+        await session.rollback()
+        raise AppError(422, exc.code, exc.message) from exc
+    await session.commit()
+    return BatchFixUpOut(changed=changed, unchanged=unchanged)
 
 
 def _parse_before(value: str | None) -> tuple[datetime, uuid.UUID | None] | None:

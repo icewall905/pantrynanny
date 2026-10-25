@@ -78,6 +78,7 @@ export default function RecipeDetailPage() {
                   <ExternalLink className="size-4" /> {r.source_name || new URL(r.source_url).hostname}
                 </a>
               )}
+              {r.course && <Badge tone="info">{t(`recipes.course_${r.course}`)}</Badge>}
               {r.tags.map((tag) => (
                 <Badge key={tag}>{tag}</Badge>
               ))}

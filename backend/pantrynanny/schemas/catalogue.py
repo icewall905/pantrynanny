@@ -51,6 +51,10 @@ class CategoryOut(ORM):
     icon: str | None
     color: str | None
     sort_order: int
+    # offered after a scan: "+N days" as the expiry for new stock, and the last place things in
+    # this category were put (learned; used for products that have no place of their own yet)
+    default_expiry_days: int | None = None
+    default_location_id: UUID | None = None
     deleted_at: datetime | None
 
 
@@ -59,6 +63,7 @@ class CategoryIn(BaseModel):
     icon: str | None = Field(default=None, max_length=40)
     color: str | None = Field(default=None, max_length=20)
     sort_order: int = 0
+    default_expiry_days: int | None = Field(default=None, ge=0, le=3650)
 
 
 class CategoryPatch(BaseModel):
@@ -66,6 +71,8 @@ class CategoryPatch(BaseModel):
     icon: str | None = Field(default=None, max_length=40)
     color: str | None = Field(default=None, max_length=20)
     sort_order: int | None = None
+    default_expiry_days: int | None = Field(default=None, ge=0, le=3650)
+    default_location_id: UUID | None = None
 
 
 class BarcodeOut(ORM):

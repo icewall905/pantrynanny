@@ -41,6 +41,7 @@ async def list_devices(
             last_used_at=s.last_used_at,
             expires_at=s.expires_at,
             current=s.id == principal.session_id,
+            scope=s.scope,
         )
         for s, username in rows.all()
     ]

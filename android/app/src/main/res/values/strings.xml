@@ -263,4 +263,10 @@
     <string name="setting_other_barcode_types">Andre stregkodetyper</string>
     <string name="lookup_looking">Slår op…</string>
     <string name="lookup_slow">Ukendt – slås op i baggrunden</string>
+    <string name="chip_days">+%1$d d</string>
+    <string name="chip_weeks">+%1$d u</string>
+    <string name="chip_months">+%1$d m</string>
+    <string name="chip_no_expiry">Ingen</string>
+    <string name="place_expiry_label">Holdbar</string>
+    <string name="place_failed">Kunne ikke gemme holdbarhed/sted</string>
 </resources>

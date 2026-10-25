@@ -1,0 +1,227 @@
+# Ingredient and product names that mean the same thing, for recipe matching (recipes/match.py).
+#
+#   words = canonical words   both recipe lines and product names are rewritten to the right-hand
+#                             side (longest phrase first, up to three words), so "olive oil",
+#                             "Pomace Olive Oil" and "olivenolie" all end in "olivenolie".
+#   words > also called       a product whose name ends in the left-hand side also counts as the
+#                             right-hand side ("Sunflower Oil" is a neutral oil); one direction only.
+#
+# Lower case, one rule per line. Grown from misses in scripts/match_eval.py; check precision there
+# after adding a rule. A household can add its own names as product aliases (Admin -> product).
+
+# --- English -> Danish, single words
+milk = mælk
+egg = æg
+eggs = æg
+butter = smør
+flour = mel
+sugar = sukker
+pepper = peber
+onion = løg
+onions = løg
+garlic = hvidløg
+potato = kartoffel
+potatoes = kartofler
+carrot = gulerod
+carrots = gulerødder
+rice = ris
+cheese = ost
+cream = fløde
+yogurt = yoghurt
+oil = olie
+tomato = tomat
+tomatoes = tomater
+chicken = kylling
+beef = oksekød
+pork = svinekød
+bread = brød
+oats = havregryn
+lemon = citron
+apple = æble
+apples = æbler
+banana = banan
+bananas = bananer
+honey = honning
+water = vand
+coffee = kaffe
+tea = te
+beans = bønner
+bean = bønner
+peas = ærter
+spinach = spinat
+mushrooms = champignon
+mushroom = champignon
+ham = skinke
+salmon = laks
+tuna = tun
+yeast = gær
+cinnamon = kanel
+broth = bouillon
+stock = bouillon
+cucumber = agurk
+lettuce = salat
+parsley = persille
+dill = dild
+chives = purløg
+leek = porre
+cabbage = kål
+soy = soja
+scallion = forårsløg
+scallions = forårsløg
+coconut = kokos
+almond = mandel
+almonds = mandler
+oat = havre
+peanut = jordnødde
+peanuts = jordnødder
+red = rød
+green = grøn
+white = hvid
+yellow = gul
+black = sort
+brown = brun
+dark = mørk
+olive = oliven
+olives = oliven
+mustard = sennep
+vinegar = eddike
+noodles = nudler
+noodle = nudler
+lentils = linser
+lentil = linser
+lentilles = linser
+dates = dadler
+date = dadler
+dadel = dadler
+apricots = abrikoser
+apricot = abrikoser
+chocolate = chokolade
+sumac = sumak
+shredded = revet
+grated = revet
+chopped = hakkede
+diced = hakkede
+hakket = hakkede
+cumin = spidskommen
+turmeric = gurkemeje
+thyme = timian
+coriander = koriander
+cardamom = kardemomme
+nutmeg = muskatnød
+ginger = ingefær
+pineapple = ananas
+beetroot = rødbeder
+beets = rødbeder
+sunflower = solsikke
+sesame = sesam
+tahin = tahini
+mozzarellaost = mozzarella
+bakepulver = bagepulver
+jasmin = jasmine
+
+# --- phrases
+wheat flour = hvedemel
+all purpose flour = hvedemel
+whole wheat flour = fuldkornshvedemel
+weizenmehl vollkorn = fuldkornshvedemel
+weizenmehl = hvedemel
+vollkorn = fuldkorn
+volkoren = fuldkorn
+olive oil = olivenolie
+sunflower oil = solsikkeolie
+vegetable oil = neutral olie
+neutral oil = neutral olie
+coconut oil = kokosolie
+sesame oil = sesamolie
+coconut milk = kokosmælk
+peanut butter = jordnøddesmør
+peanutbutter = jordnøddesmør
+minced beef = hakket oksekød
+ground beef = hakket oksekød
+baking powder = bagepulver
+baking soda = natron
+bicarbonate of soda = natron
+vanilla sugar = vaniljesukker
+sour cream = creme fraiche
+cremefraiche = creme fraiche
+soy sauce = soja sauce
+spring onion = forårsløg
+green onion = forårsløg
+rolled oats = havregryn
+old fashioned oats = havregryn
+brown sugar = brun farin
+chopped tomatoes = hakkede tomater
+diced tomatoes = hakkede tomater
+crushed tomatoes = hakkede tomater
+tomato paste = tomatpuré
+tomato puree = tomatpuré
+tomatpure = tomatpuré
+tomato passata = passata
+tomat passata = passata
+tomatpassata = passata
+cherrytomater = cherry tomater
+cherry tomat = cherry tomater
+cannellini bønner = cannellinibønner
+white beans = hvide bønner
+black beans = sorte bønner
+kidney beans = kidneybønner
+rice noodles = risnudler
+rice paper = rispapir
+reis papier = rispapir
+sushi rice = sushiris
+sushi ris = sushiris
+jasmine rice = jasminris
+jasmine ris = jasminris
+basmati rice = basmatiris
+basmati ris = basmatiris
+israeli couscous = perlecouscous
+perle couscous = perlecouscous
+pearl couscous = perlecouscous
+sunflower seeds = solsikkekerner
+sesame seeds = sesamfrø
+dried apricots = tørrede abrikoser
+dark chocolate = mørk chokolade
+white chocolate = hvid chokolade
+milk chocolate = mælkechokolade
+red curry paste = rød karrypasta
+yellow curry paste = gul karrypasta
+green curry paste = grøn karrypasta
+basil pesto = grøn pesto
+pesto rosso = rød pesto
+pesto genovese = grøn pesto
+gochujang sauce = gochujang
+gochujang paste = gochujang
+sesame tahini = tahini
+tahinpasta = tahini
+tahini paste = tahini
+lemon juice = citronsaft
+lime juice = limesaft
+apple cider vinegar = æblecidereddike
+rice vinegar = riseddike
+ground cumin = stødt spidskommen
+ground cinnamon = stødt kanel
+ground coriander = stødt koriander
+ground ginger = stødt ingefær
+ground turmeric = stødt gurkemeje
+dried thyme = tørret timian
+dried oregano = tørret oregano
+smoked paprika = røget paprika
+red pepper flakes = chiliflager
+chili flakes = chiliflager
+bay leaves = laurbærblade
+cayenne pepper = cayennepeber
+cayenne peber = cayennepeber
+greek yogurt = græsk yoghurt
+greek yoghurt = græsk yoghurt
+plain yogurt = yoghurt naturel
+plain yoghurt = yoghurt naturel
+
+# --- kinds: a product named like the left side is also what recipes call the right side
+solsikkeolie > neutral olie
+rapsolie > neutral olie
+cannellinibønner > hvide bønner
+puddersukker > brun farin
+jasminris > hvide ris
+sushiris > hvide ris
+basmatiris > hvide ris
+lagereddike > hvid eddike

@@ -217,9 +217,9 @@ PANCAKES = {
     "ingredients": [
         {"raw": "3 æg"},
         {"raw": "5 dl mælk"},
-        {"raw": "250 g hvedemel"},
+        {"raw": "250 g speltmel"},
         {"raw": "1 knivspids salt"},
-        {"raw": "evt. sukker"},
+        {"raw": "evt. rosiner"},
     ],
 }
 
@@ -231,15 +231,15 @@ async def test_recipe_crud_availability_and_shopping(env):
     r = await c.post("/api/recipes", json=PANCAKES, headers=h)
     assert r.status_code == 201, r.text
     rec = r.json()
-    assert [i["name"] for i in rec["ingredients"]][:3] == ["æg", "mælk", "hvedemel"]
+    assert [i["name"] for i in rec["ingredients"]][:3] == ["æg", "mælk", "speltmel"]
     assert rec["ingredients"][4]["optional"] is True
 
     a = (await c.get(f"/api/recipes/{rec['id']}/availability?servings=8", headers=h)).json()
     st = {i["ingredient"]["name"]: i for i in a["items"]}
     assert st["æg"]["status"] == "have" and st["æg"]["need"] == 6
     assert st["mælk"]["status"] == "have" and st["mælk"]["need"] == 1  # 10 dl of a 1 l carton
-    assert st["hvedemel"]["status"] == "missing"
-    assert st["salt"]["status"] == "staple" and st["sukker"]["status"] == "optional"
+    assert st["speltmel"]["status"] == "missing"
+    assert st["salt"]["status"] == "staple" and st["rosiner"]["status"] == "optional"
     assert (a["have"], a["missing"], a["required"]) == (2, 1, 3)
 
     a = (await c.get(f"/api/recipes/{rec['id']}/availability?servings=12", headers=h)).json()
@@ -247,12 +247,12 @@ async def test_recipe_crud_availability_and_shopping(env):
     assert st["mælk"]["status"] == "low" and st["mælk"]["enough"] is False
 
     r = await c.post(f"/api/recipes/{rec['id']}/shopping", json={}, headers=h)
-    assert r.json()["added"] == ["hvedemel"]
+    assert r.json()["added"] == ["speltmel"]
     shop = (await c.get("/api/shopping", headers=h)).json()
-    assert [s["name"] for s in shop] == ["hvedemel"]
-    # asking again does not put a second "hvedemel" on the list
+    assert [s["name"] for s in shop] == ["speltmel"]
+    # asking again does not put a second "speltmel" on the list
     r = await c.post(f"/api/recipes/{rec['id']}/shopping", json={}, headers=h)
-    assert r.json() == {"added": [], "skipped": ["hvedemel"]}
+    assert r.json() == {"added": [], "skipped": ["speltmel"]}
 
     # editing replaces the ingredient list; a stale version is refused
     body = {**PANCAKES, "title": "Pandekager (dobbelt)", "ingredients": [{"raw": "6 æg"}]}

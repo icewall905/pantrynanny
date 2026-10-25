@@ -3,8 +3,8 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { post, get, api } from '../../api/client'
-import type { ParsedLine, Recipe, RecipeDraft, RecipeInput } from '../../api/recipes'
-import { Button, Card, ErrorState, Field, Input, ListSkeleton, PageHeader, Textarea } from '../../components/ui'
+import { COURSES, type Course, type ParsedLine, type Recipe, type RecipeDraft, type RecipeInput } from '../../api/recipes'
+import { Button, Card, ErrorState, Field, Input, ListSkeleton, PageHeader, Select, Textarea } from '../../components/ui'
 import { useToast } from '../../components/Toast'
 import { formatQty } from '../../lib/format'
 
@@ -17,6 +17,8 @@ interface Form {
   ingredients: string
   instructions: string
   tags: string
+  /** '' = automatic */
+  course: Course | ''
   source_url: string | null
   source_name: string | null
   image_url: string | null
@@ -31,6 +33,7 @@ const empty: Form = {
   ingredients: '',
   instructions: '',
   tags: '',
+  course: '',
   source_url: null,
   source_name: null,
   image_url: null,
@@ -46,6 +49,7 @@ function fromRecipe(r: Recipe | RecipeDraft): Form {
     ingredients: ('id' in r ? r.ingredients.map((i) => i.raw) : r.ingredients).join('\n'),
     instructions: r.instructions.join('\n\n'),
     tags: r.tags.join(', '),
+    course: r.course ?? '',
     source_url: r.source_url,
     source_name: r.source_name,
     image_url: r.image_url,
@@ -77,6 +81,7 @@ function toInput(f: Form, existing?: Recipe): RecipeInput {
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean),
+    course: f.course || null,
     source_url: f.source_url,
     source_name: f.source_name,
     image_url: f.image_url,
@@ -167,6 +172,18 @@ export default function RecipeEditPage() {
         <Card className="space-y-4">
           <Field label={t('recipes.fMethod')} hint={t('recipes.fMethodHint')}>
             {(i) => <Textarea id={i} rows={10} value={f.instructions} onChange={(e) => set('instructions', e.target.value)} />}
+          </Field>
+          <Field label={t('recipes.course')}>
+            {(i) => (
+              <Select id={i} value={f.course} onChange={(e) => set('course', e.target.value as Course | '')} data-testid="recipe-course">
+                <option value="">{t('recipes.courseAuto')}</option>
+                {COURSES.map((c) => (
+                  <option key={c} value={c}>
+                    {t(`recipes.course_${c}`)}
+                  </option>
+                ))}
+              </Select>
+            )}
           </Field>
           <Field label={t('recipes.fTags')}>{(i) => <Input id={i} value={f.tags} onChange={(e) => set('tags', e.target.value)} placeholder={t('recipes.fTagsPh')} />}</Field>
         </Card>

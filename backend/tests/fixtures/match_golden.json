@@ -1,0 +1,2935 @@
+{
+ "products": [
+  {
+   "name": "70 % Mørk Chokolade Med Orange",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Æbler, grønne",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "1.000",
+   "package_unit": "kg"
+  },
+  {
+   "name": "æg erstatningspulver",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Alesto peanuts XXI",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "1.000",
+   "package_unit": "kg"
+  },
+  {
+   "name": "Algues Séchées",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Ananas I Skiver",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "ansjosfileter i olivenolie",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Arffmanns Sennep",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Aspargessnitter",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Bagepulver",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "1.000",
+   "package_unit": "pcs"
+  },
+  {
+   "name": "Bagepulver",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Bagepulver (Natron)",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "140.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Bakepulver 140 g",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "140.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Banana chips",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "125.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Bio Fusilli Organic volkoren/complet",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "500.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "BIO VOLLKORN SPAGHETTI",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "500.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Blandede småkager",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "400.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Boo Chopped Tomatoes - Herbs",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "400.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Brie",
+   "aliases": [],
+   "total": "0.000",
+   "stock_unit": "pcs",
+   "package_size": "200.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Brun Farin",
+   "aliases": [],
+   "total": "2.000",
+   "stock_unit": "pcs",
+   "package_size": "500.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Buldak Kimchi : Hot chicken flavor ramen",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "135.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "cannellini beans",
+   "aliases": [],
+   "total": "2.000",
+   "stock_unit": "pcs",
+   "package_size": "350.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Cevapcici",
+   "aliases": [],
+   "total": "0.000",
+   "stock_unit": "pcs",
+   "package_size": "350.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Cherry Blommetomater",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "400.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "CHOCO MIX",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Coconut Milk Light",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "400.000",
+   "package_unit": "ml"
+  },
+  {
+   "name": "Condimento Rosso",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Creatine Powder",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "634.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Daddelpasta",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Dansk honning",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Dark chocolate 50% Cocoa",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "100.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Dark Chocolate - 85% Cocoa",
+   "aliases": [],
+   "total": "2.000",
+   "stock_unit": "pcs",
+   "package_size": "125.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Dates liqurice",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Dipmix holiday",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Elvira Tun i tomat",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "125.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Fersken, halve i sirup",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "480.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Fint speltmel",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Finvalsede økologiske havregryn",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "1.000",
+   "package_unit": "kg"
+  },
+  {
+   "name": "Free From",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "1.000",
+   "package_unit": "kg"
+  },
+  {
+   "name": "Fuldkornsnudler",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Fynbo Classic Tyttebærmarmelade",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "340.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Garlic & Corriander Naan Breads",
+   "aliases": [],
+   "total": "0.000",
+   "stock_unit": "pcs",
+   "package_size": "315.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Gochugaru Fine 고추가루",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Gochujang Sauce",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Granola chocolate with raspberries",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Green jackfruit in brine (jacquier very en saumure)",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Groft Rugmel",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "grønne oliven",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Grøn Pesto",
+   "aliases": [],
+   "total": "2.000",
+   "stock_unit": "pcs",
+   "package_size": "190.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Grøntsagsdrik",
+   "aliases": [],
+   "total": "0.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Halkidiki oliven m. hvidløg og peberfrugt",
+   "aliases": [],
+   "total": "2.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Harvest Best Baked Beans In Tomato Sauce",
+   "aliases": [],
+   "total": "2.000",
+   "stock_unit": "pcs",
+   "package_size": "420.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Hverdagshonning",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "250.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Hvid chokolade",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "hvide bønner",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Isvafler",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Jasmine rice",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Juicy Dates",
+   "aliases": [],
+   "total": "2.000",
+   "stock_unit": "pcs",
+   "package_size": "400.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Kakao drik pulver",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "400.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Kansoura shtoura hummus tahina",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "380.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Kartoffelmel",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Kokosmælk",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "400.000",
+   "package_unit": "ml"
+  },
+  {
+   "name": "Kokosmælk 8%",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Kokosmel",
+   "aliases": [],
+   "total": "3.000",
+   "stock_unit": "pcs",
+   "package_size": "250.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Koldpresset Ekstra Jomfru Kokosolie",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Konjac Noodles",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "270.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Lagereddike 5% klar",
+   "aliases": [],
+   "total": "0.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Lasagneplader Fuldkorn",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "500.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Lentilles Lidl",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "400.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Letmælk 1.5%",
+   "aliases": [],
+   "total": "0.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Luksus Rogn",
+   "aliases": [],
+   "total": "2.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Maggi Würze",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "100.000",
+   "package_unit": "ml"
+  },
+  {
+   "name": "Melk Lait",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "100.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "mini liquorice pastilles",
+   "aliases": [],
+   "total": "0.000",
+   "stock_unit": "pcs",
+   "package_size": "80.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Mint pastiller",
+   "aliases": [],
+   "total": "0.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Mix for vegans - Burgers",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "150.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Mix for Vegetable patties",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Møn Rugkiks med øl og maskmel",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Mørk Chokopålæg Vekao",
+   "aliases": [],
+   "total": "2.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Multifrugtjuice 0.2L",
+   "aliases": [],
+   "total": "2.000",
+   "stock_unit": "pcs",
+   "package_size": "90.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "næmt pizzadej",
+   "aliases": [],
+   "total": "0.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "natron",
+   "aliases": [],
+   "total": "2.000",
+   "stock_unit": "pcs",
+   "package_size": "1.000",
+   "package_unit": "pcs"
+  },
+  {
+   "name": "No Kebab",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Nutella",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "15.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Økologiske Fuldkorns Pasta",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "500.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Økologisk haveedrik kakao",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Økologisk Passata",
+   "aliases": [],
+   "total": "4.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Økologisk peanut butter smooth",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Okra",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "620.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Ollineo Sunflower Oil",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "1.000",
+   "package_unit": "l"
+  },
+  {
+   "name": "Orecchiette Arcobaleno Colourful Pasta",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "500.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Pepperoni",
+   "aliases": [],
+   "total": "0",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Pepsi max",
+   "aliases": [],
+   "total": "2.000",
+   "stock_unit": "pcs",
+   "package_size": "2.000",
+   "package_unit": "l"
+  },
+  {
+   "name": "perle couscous",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "900.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Pesto Rosso",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "190.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Pfefferoni, Scharf",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "165.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Pickled Onions",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "320.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Piratos",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Pistaches de Californie grillées et salées",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Pomace Olive Oil",
+   "aliases": [],
+   "total": "3.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Prima Tyttebær Syltetøy",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Proteinpulver med vaniljesmak",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Puddersukker",
+   "aliases": [],
+   "total": "3.000",
+   "stock_unit": "pcs",
+   "package_size": "250.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Reis Papier",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "1.000",
+   "package_unit": "pcs"
+  },
+  {
+   "name": "Revet mozzarella",
+   "aliases": [],
+   "total": "0.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Ribsgele",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "340.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Riskiks med havsalt",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Risnudler tørrede",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Rispapir",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Rispapir",
+   "aliases": [],
+   "total": "2.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Rødbeder",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "480.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "rød karrypasta",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Sæby Makrel i tomat",
+   "aliases": [],
+   "total": "3.000",
+   "stock_unit": "pcs",
+   "package_size": "125.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Salling ØKO Perlespelt øko",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "400.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Salt Coarse",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "1.000",
+   "package_unit": "kg"
+  },
+  {
+   "name": "Samsø Syltefabrik Syltede asier",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "420.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Samyang 2x buldak spicy ramen",
+   "aliases": [],
+   "total": "2.000",
+   "stock_unit": "pcs",
+   "package_size": "140.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Sandwich Kiks",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Savoury Sauce Mix",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "28.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "SCHWARZBROT",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Seasoned Fried Soyabean Curd (Ajitsuke Inari)",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "240.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Sennep",
+   "aliases": [],
+   "total": "0.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Skyr 0,2%",
+   "aliases": [],
+   "total": "0.000",
+   "stock_unit": "pcs",
+   "package_size": "1.000",
+   "package_unit": "kg"
+  },
+  {
+   "name": "Soba Noodles",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "300.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Sødmælksyoghurt",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Solsikkekerner Øko",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "650.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Sorte Nudler",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "sorte oliven",
+   "aliases": [],
+   "total": "2.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Sour Cream & Onion Flavour Chipd",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "sour lemon mallows",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Strøssel Blandet 120g Dr.Oetker",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "120.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Studenter Mix",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Succo di limone",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "200.000",
+   "package_unit": "ml"
+  },
+  {
+   "name": "Sumak",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Sushi Nori 11g Blue Dragon",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "11.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Sushi Rice",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "500.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Sushi Rice",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "500.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Sveskegrød spiseklar",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Tahini",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "454.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Tamarind",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "454.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Thai Dancer Tørrede limeblade",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "25.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Tofu mariniert",
+   "aliases": [],
+   "total": "0.000",
+   "stock_unit": "pcs",
+   "package_size": "180.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "tørrede abrikoser",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Tun i vand",
+   "aliases": [],
+   "total": "2.000",
+   "stock_unit": "pcs",
+   "package_size": "180.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Twisters",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Vådservietter",
+   "aliases": [],
+   "total": "0.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Vaffel",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Vafler",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Vanila",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "100.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Vanilje sukker",
+   "aliases": [],
+   "total": "2.000",
+   "stock_unit": "pcs",
+   "package_size": null,
+   "package_unit": null
+  },
+  {
+   "name": "Vegan Caviar Seaweed Pearls",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "100.000",
+   "package_unit": "g"
+  },
+  {
+   "name": "Weizenmehl Vollkorn",
+   "aliases": [],
+   "total": "1.000",
+   "stock_unit": "pcs",
+   "package_size": "1.000",
+   "package_unit": "kg"
+  },
+  {
+   "name": "Yum Yum Chicken Flavour",
+   "aliases": [],
+   "total": "2.000",
+   "stock_unit": "pcs",
+   "package_size": "60.000",
+   "package_unit": "g"
+  }
+ ],
+ "cases": [
+  {
+   "ingredient": "mælk",
+   "expect": [
+    "Letmælk 1.5%"
+   ]
+  },
+  {
+   "ingredient": "milk",
+   "expect": [
+    "Letmælk 1.5%"
+   ]
+  },
+  {
+   "ingredient": "olivenolie",
+   "expect": [
+    "Pomace Olive Oil"
+   ]
+  },
+  {
+   "ingredient": "olive oil",
+   "expect": [
+    "Pomace Olive Oil"
+   ]
+  },
+  {
+   "ingredient": "extra-virgin olive oil",
+   "expect": [
+    "Pomace Olive Oil"
+   ]
+  },
+  {
+   "ingredient": "extra virgin olive oil",
+   "expect": [
+    "Pomace Olive Oil"
+   ]
+  },
+  {
+   "ingredient": "c. extra-virgin olive oil",
+   "expect": [
+    "Pomace Olive Oil"
+   ]
+  },
+  {
+   "ingredient": "oil",
+   "expect": [
+    "Ollineo Sunflower Oil",
+    "Pomace Olive Oil"
+   ]
+  },
+  {
+   "ingredient": "vegetable oil",
+   "expect": [
+    "Ollineo Sunflower Oil"
+   ]
+  },
+  {
+   "ingredient": "c. vegetable oil",
+   "expect": [
+    "Ollineo Sunflower Oil"
+   ]
+  },
+  {
+   "ingredient": "solsikkeolie",
+   "expect": [
+    "Ollineo Sunflower Oil"
+   ]
+  },
+  {
+   "ingredient": "neutral olie",
+   "expect": [
+    "Ollineo Sunflower Oil"
+   ]
+  },
+  {
+   "ingredient": "coconut oil",
+   "expect": [
+    "Koldpresset Ekstra Jomfru Kokosolie"
+   ]
+  },
+  {
+   "ingredient": "kokosolie",
+   "expect": [
+    "Koldpresset Ekstra Jomfru Kokosolie"
+   ]
+  },
+  {
+   "ingredient": "finvalset havregryn",
+   "expect": [
+    "Finvalsede økologiske havregryn"
+   ]
+  },
+  {
+   "ingredient": "havregryn",
+   "expect": [
+    "Finvalsede økologiske havregryn"
+   ]
+  },
+  {
+   "ingredient": "rolled oats",
+   "expect": [
+    "Finvalsede økologiske havregryn"
+   ]
+  },
+  {
+   "ingredient": "finvalsede havregryn",
+   "expect": [
+    "Finvalsede økologiske havregryn"
+   ]
+  },
+  {
+   "ingredient": "hakkede tomater",
+   "expect": [
+    "Boo Chopped Tomatoes - Herbs"
+   ]
+  },
+  {
+   "ingredient": "can chopped tomatoes",
+   "expect": [
+    "Boo Chopped Tomatoes - Herbs"
+   ]
+  },
+  {
+   "ingredient": "chopped tomatoes",
+   "expect": [
+    "Boo Chopped Tomatoes - Herbs"
+   ]
+  },
+  {
+   "ingredient": "can diced tomatoes",
+   "expect": [
+    "Boo Chopped Tomatoes - Herbs"
+   ]
+  },
+  {
+   "ingredient": "diced tomatoes",
+   "expect": [
+    "Boo Chopped Tomatoes - Herbs"
+   ]
+  },
+  {
+   "ingredient": "hakkede tomater på dåse",
+   "expect": [
+    "Boo Chopped Tomatoes - Herbs"
+   ]
+  },
+  {
+   "ingredient": "cherrytomater",
+   "expect": [
+    "Cherry Blommetomater"
+   ]
+  },
+  {
+   "ingredient": "cherry tomatoes",
+   "expect": [
+    "Cherry Blommetomater"
+   ]
+  },
+  {
+   "ingredient": "blommetomater",
+   "expect": [
+    "Cherry Blommetomater"
+   ]
+  },
+  {
+   "ingredient": "pint cherry tomatoes",
+   "expect": [
+    "Cherry Blommetomater"
+   ]
+  },
+  {
+   "ingredient": "tomatpassata",
+   "expect": [
+    "Økologisk Passata"
+   ]
+  },
+  {
+   "ingredient": "tomat passata",
+   "expect": [
+    "Økologisk Passata"
+   ]
+  },
+  {
+   "ingredient": "tomato passata",
+   "expect": [
+    "Økologisk Passata"
+   ]
+  },
+  {
+   "ingredient": "passata",
+   "expect": [
+    "Økologisk Passata"
+   ]
+  },
+  {
+   "ingredient": "hvide bønner",
+   "expect": [
+    "hvide bønner",
+    "cannellini beans"
+   ]
+  },
+  {
+   "ingredient": "white beans",
+   "expect": [
+    "hvide bønner",
+    "cannellini beans"
+   ]
+  },
+  {
+   "ingredient": "cannellini beans",
+   "expect": [
+    "hvide bønner",
+    "cannellini beans"
+   ]
+  },
+  {
+   "ingredient": "can cannellini beans",
+   "expect": [
+    "hvide bønner",
+    "cannellini beans"
+   ]
+  },
+  {
+   "ingredient": "cooked white beans",
+   "expect": [
+    "hvide bønner",
+    "cannellini beans"
+   ]
+  },
+  {
+   "ingredient": "cans white beans",
+   "expect": [
+    "hvide bønner",
+    "cannellini beans"
+   ]
+  },
+  {
+   "ingredient": "cannellinibønner",
+   "expect": [
+    "hvide bønner",
+    "cannellini beans"
+   ]
+  },
+  {
+   "ingredient": "kokosmælk",
+   "expect": [
+    "Kokosmælk",
+    "Kokosmælk 8%",
+    "Coconut Milk Light"
+   ]
+  },
+  {
+   "ingredient": "coconut milk",
+   "expect": [
+    "Kokosmælk",
+    "Kokosmælk 8%",
+    "Coconut Milk Light"
+   ]
+  },
+  {
+   "ingredient": "can coconut milk",
+   "expect": [
+    "Kokosmælk",
+    "Kokosmælk 8%",
+    "Coconut Milk Light"
+   ]
+  },
+  {
+   "ingredient": "light coconut milk",
+   "expect": [
+    "Coconut Milk Light"
+   ]
+  },
+  {
+   "ingredient": "jasmine rice",
+   "expect": [
+    "Jasmine rice"
+   ]
+  },
+  {
+   "ingredient": "c. jasmine rice",
+   "expect": [
+    "Jasmine rice"
+   ]
+  },
+  {
+   "ingredient": "jasminris",
+   "expect": [
+    "Jasmine rice"
+   ]
+  },
+  {
+   "ingredient": "sushi ris",
+   "expect": [
+    "Sushi Rice"
+   ]
+  },
+  {
+   "ingredient": "sushi rice",
+   "expect": [
+    "Sushi Rice"
+   ]
+  },
+  {
+   "ingredient": "ris",
+   "expect": [
+    "Jasmine rice",
+    "Sushi Rice"
+   ]
+  },
+  {
+   "ingredient": "rice",
+   "expect": [
+    "Jasmine rice",
+    "Sushi Rice"
+   ]
+  },
+  {
+   "ingredient": "cooked rice",
+   "expect": [
+    "Jasmine rice",
+    "Sushi Rice"
+   ]
+  },
+  {
+   "ingredient": "risnudler",
+   "expect": [
+    "Risnudler tørrede"
+   ]
+  },
+  {
+   "ingredient": "rice noodles",
+   "expect": [
+    "Risnudler tørrede"
+   ]
+  },
+  {
+   "ingredient": "nudler",
+   "expect": [
+    "Fuldkornsnudler",
+    "Sorte Nudler",
+    "Risnudler tørrede",
+    "Soba Noodles",
+    "Konjac Noodles"
+   ]
+  },
+  {
+   "ingredient": "soba noodles",
+   "expect": [
+    "Soba Noodles"
+   ]
+  },
+  {
+   "ingredient": "pasta",
+   "expect": [
+    "Økologiske Fuldkorns Pasta",
+    "Bio Fusilli Organic volkoren/complet",
+    "BIO VOLLKORN SPAGHETTI",
+    "Orecchiette Arcobaleno Colourful Pasta"
+   ]
+  },
+  {
+   "ingredient": "spaghetti",
+   "expect": [
+    "BIO VOLLKORN SPAGHETTI"
+   ]
+  },
+  {
+   "ingredient": "fuldkornsspaghetti",
+   "expect": [
+    "BIO VOLLKORN SPAGHETTI"
+   ]
+  },
+  {
+   "ingredient": "fusilli",
+   "expect": [
+    "Bio Fusilli Organic volkoren/complet"
+   ]
+  },
+  {
+   "ingredient": "lasagneplader",
+   "expect": [
+    "Lasagneplader Fuldkorn"
+   ]
+  },
+  {
+   "ingredient": "lentils",
+   "expect": [
+    "Lentilles Lidl"
+   ]
+  },
+  {
+   "ingredient": "linser",
+   "expect": [
+    "Lentilles Lidl"
+   ]
+  },
+  {
+   "ingredient": "couscous",
+   "expect": [
+    "perle couscous"
+   ]
+  },
+  {
+   "ingredient": "israeli couscous",
+   "expect": [
+    "perle couscous"
+   ]
+  },
+  {
+   "ingredient": "perlecouscous",
+   "expect": [
+    "perle couscous"
+   ]
+  },
+  {
+   "ingredient": "rugmel",
+   "expect": [
+    "Groft Rugmel"
+   ]
+  },
+  {
+   "ingredient": "groft rugmel",
+   "expect": [
+    "Groft Rugmel"
+   ]
+  },
+  {
+   "ingredient": "speltmel",
+   "expect": [
+    "Fint speltmel"
+   ]
+  },
+  {
+   "ingredient": "fuldkornshvedemel",
+   "expect": [
+    "Weizenmehl Vollkorn"
+   ]
+  },
+  {
+   "ingredient": "whole wheat flour",
+   "expect": [
+    "Weizenmehl Vollkorn"
+   ]
+  },
+  {
+   "ingredient": "brown sugar",
+   "expect": [
+    "Brun Farin",
+    "Puddersukker"
+   ]
+  },
+  {
+   "ingredient": "brun farin",
+   "expect": [
+    "Brun Farin",
+    "Puddersukker"
+   ]
+  },
+  {
+   "ingredient": "puddersukker",
+   "expect": [
+    "Puddersukker",
+    "Brun Farin"
+   ]
+  },
+  {
+   "ingredient": "vaniljesukker",
+   "expect": [
+    "Vanilje sukker"
+   ]
+  },
+  {
+   "ingredient": "vanilla sugar",
+   "expect": [
+    "Vanilje sukker"
+   ]
+  },
+  {
+   "ingredient": "honning",
+   "expect": [
+    "Dansk honning",
+    "Hverdagshonning"
+   ]
+  },
+  {
+   "ingredient": "honey",
+   "expect": [
+    "Dansk honning",
+    "Hverdagshonning"
+   ]
+  },
+  {
+   "ingredient": "sorte oliven",
+   "expect": [
+    "sorte oliven"
+   ]
+  },
+  {
+   "ingredient": "black olives",
+   "expect": [
+    "sorte oliven"
+   ]
+  },
+  {
+   "ingredient": "oliven",
+   "expect": [
+    "sorte oliven",
+    "grønne oliven",
+    "Halkidiki oliven m. hvidløg og peberfrugt"
+   ]
+  },
+  {
+   "ingredient": "olives",
+   "expect": [
+    "sorte oliven",
+    "grønne oliven",
+    "Halkidiki oliven m. hvidløg og peberfrugt"
+   ]
+  },
+  {
+   "ingredient": "green olives",
+   "expect": [
+    "grønne oliven",
+    "Halkidiki oliven m. hvidløg og peberfrugt"
+   ]
+  },
+  {
+   "ingredient": "grønne oliven",
+   "expect": [
+    "grønne oliven",
+    "Halkidiki oliven m. hvidløg og peberfrugt"
+   ]
+  },
+  {
+   "ingredient": "pesto",
+   "expect": [
+    "Grøn Pesto",
+    "Pesto Rosso"
+   ]
+  },
+  {
+   "ingredient": "basil pesto",
+   "expect": [
+    "Grøn Pesto"
+   ]
+  },
+  {
+   "ingredient": "grøn pesto",
+   "expect": [
+    "Grøn Pesto"
+   ]
+  },
+  {
+   "ingredient": "rød pesto",
+   "expect": [
+    "Pesto Rosso"
+   ]
+  },
+  {
+   "ingredient": "sennep",
+   "expect": [
+    "Arffmanns Sennep",
+    "Sennep"
+   ]
+  },
+  {
+   "ingredient": "mustard",
+   "expect": [
+    "Arffmanns Sennep",
+    "Sennep"
+   ]
+  },
+  {
+   "ingredient": "eddike",
+   "expect": [
+    "Lagereddike 5% klar"
+   ]
+  },
+  {
+   "ingredient": "lagereddike",
+   "expect": [
+    "Lagereddike 5% klar"
+   ]
+  },
+  {
+   "ingredient": "tahini",
+   "expect": [
+    "Tahini"
+   ]
+  },
+  {
+   "ingredient": "tahin",
+   "expect": [
+    "Tahini"
+   ]
+  },
+  {
+   "ingredient": "lys tahin",
+   "expect": [
+    "Tahini"
+   ]
+  },
+  {
+   "ingredient": "sesame tahini",
+   "expect": [
+    "Tahini"
+   ]
+  },
+  {
+   "ingredient": "c. tahini",
+   "expect": [
+    "Tahini"
+   ]
+  },
+  {
+   "ingredient": "tahinpasta",
+   "expect": [
+    "Tahini"
+   ]
+  },
+  {
+   "ingredient": "natron",
+   "expect": [
+    "natron",
+    "Bagepulver (Natron)"
+   ]
+  },
+  {
+   "ingredient": "baking soda",
+   "expect": [
+    "natron",
+    "Bagepulver (Natron)"
+   ]
+  },
+  {
+   "ingredient": "bagepulver",
+   "expect": [
+    "Bagepulver",
+    "Bakepulver 140 g",
+    "Bagepulver (Natron)"
+   ]
+  },
+  {
+   "ingredient": "baking powder",
+   "expect": [
+    "Bagepulver",
+    "Bakepulver 140 g",
+    "Bagepulver (Natron)"
+   ]
+  },
+  {
+   "ingredient": "nori",
+   "expect": [
+    "Sushi Nori 11g Blue Dragon"
+   ]
+  },
+  {
+   "ingredient": "nori sheets",
+   "expect": [
+    "Sushi Nori 11g Blue Dragon"
+   ]
+  },
+  {
+   "ingredient": "sheets sushi nori",
+   "expect": [
+    "Sushi Nori 11g Blue Dragon"
+   ]
+  },
+  {
+   "ingredient": "tun i vand",
+   "expect": [
+    "Tun i vand"
+   ]
+  },
+  {
+   "ingredient": "tuna",
+   "expect": [
+    "Tun i vand",
+    "Elvira Tun i tomat"
+   ]
+  },
+  {
+   "ingredient": "tun",
+   "expect": [
+    "Tun i vand",
+    "Elvira Tun i tomat"
+   ]
+  },
+  {
+   "ingredient": "peanuts",
+   "expect": [
+    "Alesto peanuts XXI"
+   ]
+  },
+  {
+   "ingredient": "jordnødder",
+   "expect": [
+    "Alesto peanuts XXI"
+   ]
+  },
+  {
+   "ingredient": "peanut butter",
+   "expect": [
+    "Økologisk peanut butter smooth"
+   ]
+  },
+  {
+   "ingredient": "peanutbutter",
+   "expect": [
+    "Økologisk peanut butter smooth"
+   ]
+  },
+  {
+   "ingredient": "smooth peanut butter",
+   "expect": [
+    "Økologisk peanut butter smooth"
+   ]
+  },
+  {
+   "ingredient": "jordnøddesmør",
+   "expect": [
+    "Økologisk peanut butter smooth"
+   ]
+  },
+  {
+   "ingredient": "rødbeder",
+   "expect": [
+    "Rødbeder"
+   ]
+  },
+  {
+   "ingredient": "rødbede",
+   "expect": [
+    "Rødbeder"
+   ]
+  },
+  {
+   "ingredient": "okra",
+   "expect": [
+    "Okra"
+   ]
+  },
+  {
+   "ingredient": "solsikkekerner",
+   "expect": [
+    "Solsikkekerner Øko"
+   ]
+  },
+  {
+   "ingredient": "sunflower seeds",
+   "expect": [
+    "Solsikkekerner Øko"
+   ]
+  },
+  {
+   "ingredient": "tørrede abrikoser",
+   "expect": [
+    "tørrede abrikoser"
+   ]
+  },
+  {
+   "ingredient": "dried apricots",
+   "expect": [
+    "tørrede abrikoser"
+   ]
+  },
+  {
+   "ingredient": "dates",
+   "expect": [
+    "Juicy Dates"
+   ]
+  },
+  {
+   "ingredient": "dadler",
+   "expect": [
+    "Juicy Dates"
+   ]
+  },
+  {
+   "ingredient": "dadel",
+   "expect": [
+    "Juicy Dates"
+   ]
+  },
+  {
+   "ingredient": "skyr",
+   "expect": [
+    "Skyr 0,2%"
+   ]
+  },
+  {
+   "ingredient": "yoghurt naturel",
+   "expect": [
+    "Sødmælksyoghurt"
+   ]
+  },
+  {
+   "ingredient": "plain yoghurt",
+   "expect": [
+    "Sødmælksyoghurt"
+   ]
+  },
+  {
+   "ingredient": "yoghurt",
+   "expect": [
+    "Sødmælksyoghurt"
+   ]
+  },
+  {
+   "ingredient": "mozzarella",
+   "expect": [
+    "Revet mozzarella"
+   ]
+  },
+  {
+   "ingredient": "shredded mozzarella",
+   "expect": [
+    "Revet mozzarella"
+   ]
+  },
+  {
+   "ingredient": "c. shredded mozzarella",
+   "expect": [
+    "Revet mozzarella"
+   ]
+  },
+  {
+   "ingredient": "revet mozzarellaost",
+   "expect": [
+    "Revet mozzarella"
+   ]
+  },
+  {
+   "ingredient": "revet mozzarella",
+   "expect": [
+    "Revet mozzarella"
+   ]
+  },
+  {
+   "ingredient": "brie",
+   "expect": [
+    "Brie"
+   ]
+  },
+  {
+   "ingredient": "gochujang",
+   "expect": [
+    "Gochujang Sauce"
+   ]
+  },
+  {
+   "ingredient": "gochujang paste",
+   "expect": [
+    "Gochujang Sauce"
+   ]
+  },
+  {
+   "ingredient": "gochugaru",
+   "expect": [
+    "Gochugaru Fine 고추가루"
+   ]
+  },
+  {
+   "ingredient": "rød karrypasta",
+   "expect": [
+    "rød karrypasta"
+   ]
+  },
+  {
+   "ingredient": "red curry paste",
+   "expect": [
+    "rød karrypasta"
+   ]
+  },
+  {
+   "ingredient": "rispapir",
+   "expect": [
+    "Rispapir",
+    "Reis Papier"
+   ]
+  },
+  {
+   "ingredient": "rice paper",
+   "expect": [
+    "Rispapir",
+    "Reis Papier"
+   ]
+  },
+  {
+   "ingredient": "perlespelt",
+   "expect": [
+    "Salling ØKO Perlespelt øko"
+   ]
+  },
+  {
+   "ingredient": "ribsgele",
+   "expect": [
+    "Ribsgele"
+   ]
+  },
+  {
+   "ingredient": "pickled onions",
+   "expect": [
+    "Pickled Onions"
+   ]
+  },
+  {
+   "ingredient": "kokosmel",
+   "expect": [
+    "Kokosmel"
+   ]
+  },
+  {
+   "ingredient": "kartoffelmel",
+   "expect": [
+    "Kartoffelmel"
+   ]
+  },
+  {
+   "ingredient": "ananas",
+   "expect": [
+    "Ananas I Skiver"
+   ]
+  },
+  {
+   "ingredient": "mørk chokolade",
+   "expect": [
+    "Dark chocolate 50% Cocoa",
+    "Dark Chocolate - 85% Cocoa",
+    "70 % Mørk Chokolade Med Orange"
+   ]
+  },
+  {
+   "ingredient": "dark chocolate",
+   "expect": [
+    "Dark chocolate 50% Cocoa",
+    "Dark Chocolate - 85% Cocoa",
+    "70 % Mørk Chokolade Med Orange"
+   ]
+  },
+  {
+   "ingredient": "hvid chokolade",
+   "expect": [
+    "Hvid chokolade"
+   ]
+  },
+  {
+   "ingredient": "white chocolate",
+   "expect": [
+    "Hvid chokolade"
+   ]
+  },
+  {
+   "ingredient": "pepperoni",
+   "expect": [
+    "Pepperoni"
+   ]
+  },
+  {
+   "ingredient": "æble",
+   "expect": [
+    "Æbler, grønne"
+   ]
+  },
+  {
+   "ingredient": "æbler",
+   "expect": [
+    "Æbler, grønne"
+   ]
+  },
+  {
+   "ingredient": "apple",
+   "expect": [
+    "Æbler, grønne"
+   ]
+  },
+  {
+   "ingredient": "grønne æbler",
+   "expect": [
+    "Æbler, grønne"
+   ]
+  },
+  {
+   "ingredient": "sumak",
+   "expect": [
+    "Sumak"
+   ]
+  },
+  {
+   "ingredient": "sumac",
+   "expect": [
+    "Sumak"
+   ]
+  },
+  {
+   "ingredient": "baked beans",
+   "expect": [
+    "Harvest Best Baked Beans In Tomato Sauce"
+   ]
+  },
+  {
+   "ingredient": "jackfruit",
+   "expect": [
+    "Green jackfruit in brine (jacquier very en saumure)"
+   ]
+  },
+  {
+   "ingredient": "salt",
+   "expect": [
+    "Salt Coarse"
+   ]
+  },
+  {
+   "ingredient": "groft salt",
+   "expect": [
+    "Salt Coarse"
+   ]
+  },
+  {
+   "ingredient": "brie cheese",
+   "expect": [
+    "Brie"
+   ]
+  },
+  {
+   "ingredient": "cevapcici",
+   "expect": [
+    "Cevapcici"
+   ]
+  },
+  {
+   "ingredient": "tofu mariniert",
+   "expect": [
+    "Tofu mariniert"
+   ]
+  },
+  {
+   "ingredient": "sesamolie",
+   "expect": []
+  },
+  {
+   "ingredient": "sesame oil",
+   "expect": []
+  },
+  {
+   "ingredient": "toasted sesame oil",
+   "expect": []
+  },
+  {
+   "ingredient": "rapsolie",
+   "expect": []
+  },
+  {
+   "ingredient": "avocado oil",
+   "expect": []
+  },
+  {
+   "ingredient": "peanut oil",
+   "expect": []
+  },
+  {
+   "ingredient": "grovvalset havregryn",
+   "expect": []
+  },
+  {
+   "ingredient": "koncentreret tomatpuré",
+   "expect": []
+  },
+  {
+   "ingredient": "tomato paste",
+   "expect": []
+  },
+  {
+   "ingredient": "soltørrede tomater i olie",
+   "expect": []
+  },
+  {
+   "ingredient": "tomatketchup",
+   "expect": []
+  },
+  {
+   "ingredient": "kidneybønner",
+   "expect": []
+  },
+  {
+   "ingredient": "sorte bønner",
+   "expect": []
+  },
+  {
+   "ingredient": "black beans",
+   "expect": []
+  },
+  {
+   "ingredient": "grønne bønner",
+   "expect": []
+  },
+  {
+   "ingredient": "edamamebønner",
+   "expect": []
+  },
+  {
+   "ingredient": "can black beans",
+   "expect": []
+  },
+  {
+   "ingredient": "basmati ris",
+   "expect": []
+  },
+  {
+   "ingredient": "basmatiris",
+   "expect": []
+  },
+  {
+   "ingredient": "udon noodles",
+   "expect": []
+  },
+  {
+   "ingredient": "pasta penne",
+   "expect": []
+  },
+  {
+   "ingredient": "hvedemel",
+   "expect": []
+  },
+  {
+   "ingredient": "all-purpose flour",
+   "expect": []
+  },
+  {
+   "ingredient": "sukker",
+   "expect": []
+  },
+  {
+   "ingredient": "sugar",
+   "expect": []
+  },
+  {
+   "ingredient": "granulated sugar",
+   "expect": []
+  },
+  {
+   "ingredient": "flormelis",
+   "expect": []
+  },
+  {
+   "ingredient": "powdered sugar",
+   "expect": []
+  },
+  {
+   "ingredient": "perlesukker",
+   "expect": []
+  },
+  {
+   "ingredient": "kokossukker",
+   "expect": []
+  },
+  {
+   "ingredient": "coconut sugar",
+   "expect": []
+  },
+  {
+   "ingredient": "vaniljestang",
+   "expect": []
+  },
+  {
+   "ingredient": "dijon sennep",
+   "expect": []
+  },
+  {
+   "ingredient": "dijon mustard",
+   "expect": []
+  },
+  {
+   "ingredient": "grov sennep",
+   "expect": []
+  },
+  {
+   "ingredient": "sennepsfrø",
+   "expect": []
+  },
+  {
+   "ingredient": "æblecidereddike",
+   "expect": []
+  },
+  {
+   "ingredient": "apple cider vinegar",
+   "expect": []
+  },
+  {
+   "ingredient": "riseddike",
+   "expect": []
+  },
+  {
+   "ingredient": "rice vinegar",
+   "expect": []
+  },
+  {
+   "ingredient": "balsamico eddike",
+   "expect": []
+  },
+  {
+   "ingredient": "hvidvinseddike",
+   "expect": []
+  },
+  {
+   "ingredient": "tun steak",
+   "expect": []
+  },
+  {
+   "ingredient": "røget makrel",
+   "expect": []
+  },
+  {
+   "ingredient": "smør",
+   "expect": []
+  },
+  {
+   "ingredient": "butter",
+   "expect": []
+  },
+  {
+   "ingredient": "unsalted butter",
+   "expect": []
+  },
+  {
+   "ingredient": "usødet kakao",
+   "expect": []
+  },
+  {
+   "ingredient": "kakaopulver",
+   "expect": []
+  },
+  {
+   "ingredient": "abrikosmarmelade",
+   "expect": []
+  },
+  {
+   "ingredient": "græsk yoghurt 10 %",
+   "expect": []
+  },
+  {
+   "ingredient": "greek yogurt",
+   "expect": []
+  },
+  {
+   "ingredient": "vegansk yoghurt",
+   "expect": []
+  },
+  {
+   "ingredient": "gul karrypasta",
+   "expect": []
+  },
+  {
+   "ingredient": "firm tofu",
+   "expect": []
+  },
+  {
+   "ingredient": "ribs",
+   "expect": []
+  },
+  {
+   "ingredient": "løg",
+   "expect": []
+  },
+  {
+   "ingredient": "onion",
+   "expect": []
+  },
+  {
+   "ingredient": "rødløg",
+   "expect": []
+  },
+  {
+   "ingredient": "red onion",
+   "expect": []
+  },
+  {
+   "ingredient": "hvidløg",
+   "expect": []
+  },
+  {
+   "ingredient": "garlic",
+   "expect": []
+  },
+  {
+   "ingredient": "garlic powder",
+   "expect": []
+  },
+  {
+   "ingredient": "garlic cloves",
+   "expect": []
+  },
+  {
+   "ingredient": "forårsløg",
+   "expect": []
+  },
+  {
+   "ingredient": "purløg",
+   "expect": []
+  },
+  {
+   "ingredient": "skalotteløg",
+   "expect": []
+  },
+  {
+   "ingredient": "majsstivelse",
+   "expect": []
+  },
+  {
+   "ingredient": "ananasjuice",
+   "expect": []
+  },
+  {
+   "ingredient": "mælkechokolade",
+   "expect": []
+  },
+  {
+   "ingredient": "milk chocolate",
+   "expect": []
+  },
+  {
+   "ingredient": "tamari",
+   "expect": []
+  },
+  {
+   "ingredient": "chili",
+   "expect": []
+  },
+  {
+   "ingredient": "rød chili",
+   "expect": []
+  },
+  {
+   "ingredient": "chili powder",
+   "expect": []
+  },
+  {
+   "ingredient": "granatæble",
+   "expect": []
+  },
+  {
+   "ingredient": "æblemost",
+   "expect": []
+  },
+  {
+   "ingredient": "mandelmælk",
+   "expect": []
+  },
+  {
+   "ingredient": "havremælk",
+   "expect": []
+  },
+  {
+   "ingredient": "kærnemælk",
+   "expect": []
+  },
+  {
+   "ingredient": "sødmælk",
+   "expect": []
+  },
+  {
+   "ingredient": "vand",
+   "expect": []
+  },
+  {
+   "ingredient": "maple syrup",
+   "expect": []
+  },
+  {
+   "ingredient": "ahornsirup",
+   "expect": []
+  },
+  {
+   "ingredient": "glukosesirup",
+   "expect": []
+  },
+  {
+   "ingredient": "sesamfrø",
+   "expect": []
+  },
+  {
+   "ingredient": "ansjoser",
+   "expect": []
+  },
+  {
+   "ingredient": "kyllingebryst",
+   "expect": []
+  },
+  {
+   "ingredient": "chicken",
+   "expect": []
+  },
+  {
+   "ingredient": "chicken breast",
+   "expect": []
+  },
+  {
+   "ingredient": "bacon",
+   "expect": []
+  },
+  {
+   "ingredient": "sour cream",
+   "expect": []
+  },
+  {
+   "ingredient": "creme fraiche",
+   "expect": []
+  },
+  {
+   "ingredient": "cremefraiche 18 %",
+   "expect": []
+  },
+  {
+   "ingredient": "tomato sauce",
+   "expect": []
+  },
+  {
+   "ingredient": "ketchup",
+   "expect": []
+  },
+  {
+   "ingredient": "mayonnaise",
+   "expect": []
+  },
+  {
+   "ingredient": "lime",
+   "expect": []
+  },
+  {
+   "ingredient": "citron",
+   "expect": []
+  },
+  {
+   "ingredient": "soy sauce",
+   "expect": []
+  },
+  {
+   "ingredient": "soja",
+   "expect": []
+  },
+  {
+   "ingredient": "ingefær",
+   "expect": []
+  },
+  {
+   "ingredient": "pickled ginger",
+   "expect": []
+  },
+  {
+   "ingredient": "parmesan",
+   "expect": []
+  },
+  {
+   "ingredient": "feta",
+   "expect": []
+  },
+  {
+   "ingredient": "cheddar ost",
+   "expect": []
+  },
+  {
+   "ingredient": "ost",
+   "expect": []
+  },
+  {
+   "ingredient": "peber",
+   "expect": []
+  },
+  {
+   "ingredient": "rød peberfrugt",
+   "expect": []
+  },
+  {
+   "ingredient": "black pepper",
+   "expect": []
+  },
+  {
+   "ingredient": "gær",
+   "expect": []
+  },
+  {
+   "ingredient": "kanel",
+   "expect": []
+  },
+  {
+   "ingredient": "persille",
+   "expect": []
+  },
+  {
+   "ingredient": "kokosvand",
+   "expect": []
+  },
+  {
+   "ingredient": "kokos",
+   "expect": []
+  },
+  {
+   "ingredient": "kokosflager",
+   "expect": []
+  },
+  {
+   "ingredient": "coconut flakes",
+   "expect": []
+  },
+  {
+   "ingredient": "æg",
+   "expect": []
+  },
+  {
+   "ingredient": "eggs",
+   "expect": []
+  },
+  {
+   "ingredient": "large eggs",
+   "expect": []
+  },
+  {
+   "ingredient": "chokoladeknapper",
+   "expect": []
+  },
+  {
+   "ingredient": "date syrup",
+   "expect": []
+  },
+  {
+   "ingredient": "dadelsirup",
+   "expect": []
+  },
+  {
+   "ingredient": "hummus",
+   "expect": []
+  },
+  {
+   "ingredient": "pistaciekerner",
+   "expect": []
+  },
+  {
+   "ingredient": "chorizo",
+   "expect": []
+  },
+  {
+   "ingredient": "salami",
+   "expect": []
+  },
+  {
+   "ingredient": "rugbrød",
+   "expect": []
+  },
+  {
+   "ingredient": "brød",
+   "expect": []
+  },
+  {
+   "ingredient": "naan",
+   "expect": []
+  },
+  {
+   "ingredient": "tortillas",
+   "expect": []
+  },
+  {
+   "ingredient": "honningkagefordej",
+   "expect": []
+  },
+  {
+   "ingredient": "vaniljeis",
+   "expect": []
+  },
+  {
+   "ingredient": "vanilla extract",
+   "expect": []
+  },
+  {
+   "ingredient": "sesame seeds",
+   "expect": []
+  },
+  {
+   "ingredient": "risotto ris",
+   "expect": []
+  },
+  {
+   "ingredient": "grødris",
+   "expect": []
+  },
+  {
+   "ingredient": "rismel",
+   "expect": []
+  },
+  {
+   "ingredient": "mandelmel",
+   "expect": []
+  },
+  {
+   "ingredient": "boghvedemel",
+   "expect": []
+  },
+  {
+   "ingredient": "kikærtemel",
+   "expect": []
+  },
+  {
+   "ingredient": "kikærter",
+   "expect": []
+  },
+  {
+   "ingredient": "pastavand",
+   "expect": []
+  },
+  {
+   "ingredient": "bouillon",
+   "expect": []
+  },
+  {
+   "ingredient": "grøntsagsbouillon",
+   "expect": []
+  },
+  {
+   "ingredient": "chicken broth",
+   "expect": []
+  },
+  {
+   "ingredient": "marcipan",
+   "expect": []
+  },
+  {
+   "ingredient": "jordbærsyltetøj",
+   "expect": []
+  },
+  {
+   "ingredient": "tyttebær",
+   "expect": []
+  },
+  {
+   "ingredient": "lemon juice",
+   "expect": []
+  },
+  {
+   "ingredient": "citronsaft",
+   "expect": []
+  },
+  {
+   "ingredient": "rice cakes",
+   "expect": []
+  },
+  {
+   "ingredient": "riskiks",
+   "expect": [
+    "Riskiks med havsalt"
+   ]
+  }
+ ],
+ "staples": [
+  "salt og friskkværnet peber",
+  "kosher salt",
+  "flagesalt",
+  "water or broth",
+  "salt",
+  "peber",
+  "vand",
+  "water",
+  "salt and pepper",
+  "friskkværnet peber",
+  "freshly ground black pepper",
+  "sea salt",
+  "black pepper",
+  "salt & pepper",
+  "isvand",
+  "kogende vand",
+  "koldt vand",
+  "groft salt",
+  "fine sea salt",
+  "ground black pepper",
+  "salt og peber",
+  "ground pepper",
+  "havsalt",
+  "flaky sea salt",
+  "fine salt",
+  "lunkent vand",
+  "salt to taste",
+  "kosher salt and freshly ground black pepper",
+  "sort peber",
+  "hvid peber",
+  "finkornet salt"
+ ],
+ "not_staples": [
+  "saltede peanuts",
+  "pistaciekerner uden salt",
+  "rød peberfrugt",
+  "hjortetaksalt",
+  "danskvand",
+  "kokosvand",
+  "rosenvand",
+  "peberrod",
+  "salted butter",
+  "sukkersirup",
+  "salted caramel",
+  "bell pepper",
+  "peberfrugt",
+  "sesamolie",
+  "salat",
+  "saltede mandler",
+  "peberkager",
+  "peppermint",
+  "vandmelon",
+  "røget salt"
+ ]
+}

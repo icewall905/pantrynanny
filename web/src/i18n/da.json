@@ -402,7 +402,14 @@
     "rearm": "Scan genaktivering (ms)",
     "rearmHint": "Hvor længe en stregkode skal være væk før den tælles igen",
     "passwordMin": "Mindst 8 tegn",
-    "tab_ai": "AI"
+    "tab_ai": "AI",
+    "staples": "Altid i huset",
+    "staplesHint": "Bruges af opskrifter: regnes aldrig som manglende og kommer aldrig på indkøbslisten (medmindre I har dem som vare).",
+    "staplesAdd": "Tilføj (fx salt)",
+    "staplesReset": "Nulstil til standard",
+    "staplesRemove": "Fjern {{name}}",
+    "defaultExpiryDays": "Standard holdbarhed (dage)",
+    "defaultExpiryDaysHint": "Foreslås efter scanning. Tom = ingen."
   },
   "opError": {
     "invalid_quantity": "Ugyldigt antal",
@@ -593,7 +600,19 @@
     "fMethod": "Fremgangsmåde",
     "fMethodHint": "Lav en tom linje mellem trinene.",
     "fTags": "Mærker",
-    "fTagsPh": "aftensmad, hurtig, vegetar"
+    "fTagsPh": "aftensmad, hurtig, vegetar",
+    "course": "Ret",
+    "courseAuto": "Automatisk",
+    "allCourses": "Alle retter",
+    "course_breakfast": "Morgenmad",
+    "course_lunch": "Frokost",
+    "course_dinner": "Aftensmad",
+    "course_side": "Tilbehør",
+    "course_dessert": "Dessert",
+    "course_baking": "Bagværk",
+    "course_drink": "Drikke",
+    "course_snack": "Snack",
+    "course_condiment": "Dressing & sauce"
   },
   "plan": {
     "title": "Madplan",
@@ -639,5 +658,20 @@
     "undone": "Fortrudt",
     "undoFailed": "Kunne ikke fortryde",
     "more": "Vis ældre"
+  },
+  "fixUp": {
+    "title": "Ryd op i lageret",
+    "subtitle": "Giv mange varer placering og holdbarhed på én gang",
+    "link": "Ryd op",
+    "noExpiry": "Uden holdbarhed",
+    "selectAll": "Vælg alle ({{count}})",
+    "selectNone": "Fravælg alle",
+    "moveTo": "Flyt til",
+    "setExpiry": "Sæt holdbarhed",
+    "setDate": "Sæt dato",
+    "done_one": "{{count}} parti opdateret",
+    "done_other": "{{count}} partier opdateret",
+    "empty": "Intet at rydde op",
+    "emptyHint": "Ingen varer på lager passer til filtrene."
   }
 }

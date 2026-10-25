@@ -113,7 +113,8 @@ async def _resolve_location(
     *,
     fallback_if_deleted: bool = True,
 ) -> Location:
-    """Pick the location for an op: requested -> product default -> household default.
+    """Pick the location for an op: requested -> product default -> category default ->
+    household default.
 
     The chosen row is locked FOR SHARE so a concurrent location delete waits for this op.
     A requested location that was soft-deleted after the op was queued (offline device) falls
@@ -139,6 +140,12 @@ async def _resolve_location(
         loc = await fetch(product.default_location_id)
         if loc:
             return loc
+    if product.category_id:
+        cat_loc = await session.scalar(
+            select(Category.default_location_id).where(Category.id == product.category_id)
+        )
+        if cat_loc and (loc := await fetch(cat_loc)):
+            return loc
     stmt = (
         select(Location)
         .where(Location.household_id == household_id, Location.deleted_at.is_(None))
@@ -152,11 +159,20 @@ async def _resolve_location(
     return loc
 
 
-def _learn_location(product: Product, location_id: uuid.UUID | None) -> None:
-    """Remember where this product lives, so the next scan without a location goes there."""
-    if location_id is not None and product.default_location_id != location_id:
+async def _learn_location(
+    session: AsyncSession, product: Product, location_id: uuid.UUID | None
+) -> None:
+    """Remember where this product lives, so the next scan without a location goes there, and
+    where things of its category last went (offered for products without a place yet)."""
+    if location_id is None:
+        return
+    if product.default_location_id != location_id:
         product.default_location_id = location_id
         product.version += 1
+    if product.category_id is not None:
+        cat = await session.get(Category, product.category_id)
+        if cat is not None and cat.default_location_id != location_id:
+            cat.default_location_id = location_id
 
 
 async def _find_or_create_batch(
@@ -475,7 +491,12 @@ async def apply_op(
             raise OpRejected("cannot_undo_undo", "An undo cannot be undone")
         if original.undone:
             raise OpRejected("already_undone", "Operation was already undone")
+        placed = _Effect([])
+        if original.type == "add":
+            # stock that was placed (expiry/location set after the scan) is taken back first
+            placed = await _undo_placements(session, hh, original, allow_neg)
         effect = await _reverse(session, original, allow_neg)
+        effect = _Effect(placed.lines + effect.lines, placed.clamped or effect.clamped)
         if original.type == "move":
             delta = sum((d for _, d in effect.lines if d > 0), ZERO)  # amount actually moved back
         else:
@@ -485,7 +506,7 @@ async def apply_op(
         undoes_id = original.id
         original.undone = True
         if original.type == "move" and product.default_location_id == original.to_location_id:
-            _learn_location(product, original.location_id)  # the move is taken back
+            await _learn_location(session, product, original.location_id)  # the move is taken back
     elif op.type == "move":
         assert qty is not None and op.to_location_id is not None
         dest = await _resolve_location(
@@ -500,12 +521,14 @@ async def apply_op(
         first_src = next((b.location_id for b, d in effect.lines if d < 0), src_id)
         location_id, to_location_id = first_src, dest.id
         if delta > 0:
-            _learn_location(product, dest.id)  # moved it: that is where it belongs now
+            # moved it: that is where it belongs now
+            await _learn_location(session, product, dest.id)
     else:
         loc = await _resolve_location(session, hh, op.location_id, product)
         location_id = loc.id
         if op.type == "add" and op.location_id == loc.id and product.default_location_id is None:
-            _learn_location(product, loc.id)  # first time it was put somewhere on purpose
+            # first time it was put somewhere on purpose
+            await _learn_location(session, product, loc.id)
         assert qty is not None
         signed = qty if op.type == "add" else (-qty if op.type == "remove" else qty)
         if signed > 0:
@@ -582,6 +605,214 @@ async def process_op(
             # placeholder was created concurrently. Re-run: the dedupe check will catch the former.
             continue
     return OpResult(op.client_op_id, "rejected", "Operation conflicted repeatedly", "conflict")
+
+
+# --------------------------------------------------------------------------- placing stock
+
+PLACE_REASON = "place:"  # + the add's client_op_id
+FIXUP_REASON = "fix-up"
+
+
+async def _rehome(
+    session: AsyncSession,
+    principal: Principal,
+    product: Product,
+    src: StockBatch,
+    qty: Decimal,
+    location_id: uuid.UUID,
+    expires_at: date | None,
+    client_op_id: uuid.UUID,
+    reason: str,
+) -> StockTransaction | None:
+    """Move `qty` out of batch `src` into the batch for (location, expiry), recorded as a
+    "move" so history shows it and undo takes it back."""
+    target = await _find_or_create_batch(session, product, location_id, expires_at, src.opened_at)
+    if target.id == src.id:
+        return None
+    take = min(qty, max(src.quantity, ZERO))
+    if take <= 0:
+        return None
+    if target.quantity + take > MAX_BATCH_QTY:
+        raise OpRejected("invalid_quantity", "Resulting stock quantity is too large")
+    src.quantity = src.quantity - take
+    target.quantity = target.quantity + take
+    txn = StockTransaction(
+        household_id=principal.household_id,
+        client_op_id=client_op_id,
+        type="move",
+        quantity_delta=take,
+        product_id=product.id,
+        batch_id=src.id,
+        location_id=src.location_id,
+        to_location_id=target.location_id,
+        user_id=principal.user_id,
+        session_id=principal.session_id,
+        device_name=principal.device_name,
+        reason=reason,
+        occurred_at=datetime.now(UTC),
+        lines=[],
+    )
+    session.add(txn)
+    await session.flush()
+    session.add(StockTransactionLine(transaction_id=txn.id, batch_id=src.id, seq=0, delta=-take))
+    session.add(StockTransactionLine(transaction_id=txn.id, batch_id=target.id, seq=1, delta=take))
+    if target.location_id != src.location_id:
+        await _learn_location(session, product, target.location_id)
+    await session.flush()
+    return txn
+
+
+async def _undo_placements(
+    session: AsyncSession, household_id: uuid.UUID, add: StockTransaction, allow_neg: bool
+) -> _Effect:
+    rows = (
+        (
+            await session.execute(
+                select(StockTransaction)
+                .where(
+                    StockTransaction.household_id == household_id,
+                    StockTransaction.reason == f"{PLACE_REASON}{add.client_op_id}",
+                    StockTransaction.undone.is_(False),
+                )
+                .order_by(StockTransaction.created_at.desc(), StockTransaction.id.desc())
+                .with_for_update()
+            )
+        )
+        .scalars()
+        .all()
+    )
+    lines: list[tuple[StockBatch, Decimal]] = []
+    clamped = False
+    for t in rows:
+        e = await _reverse(session, t, allow_neg)
+        t.undone = True
+        lines += e.lines
+        clamped = clamped or e.clamped
+    return _Effect(lines, clamped)
+
+
+async def place_added(
+    session: AsyncSession,
+    principal: Principal,
+    *,
+    client_op_id: uuid.UUID,
+    add_client_op_id: uuid.UUID,
+    fields: dict,
+) -> OpResult:
+    """Set the expiry and/or location of what one "add" just put in stock (the one-tap chips
+    after a scan). `fields` holds `expires_at` and/or `location_id` as sent; anything left out
+    stays as it was. Idempotent by `client_op_id`; undoing the add takes this back too."""
+    hh = principal.household_id
+    existing = await _find_txn(session, hh, client_op_id)
+    if existing:
+        return await _duplicate_result(session, existing)
+    add = await _find_txn(session, hh, add_client_op_id, lock=True)
+    if add is None or add.type != "add" or not add.lines:
+        raise OpRejected("not_found", "No stock was added by that operation")
+    if add.undone:
+        raise OpRejected("already_undone", "That operation was undone")
+    product = await session.get(Product, add.product_id, with_for_update=True)
+    assert product is not None
+    # a second tap (expiry, then location) moves the stock from where the last one put it
+    last = (
+        await session.execute(
+            select(StockTransaction)
+            .where(
+                StockTransaction.household_id == hh,
+                StockTransaction.reason == f"{PLACE_REASON}{add_client_op_id}",
+                StockTransaction.undone.is_(False),
+            )
+            .order_by(StockTransaction.created_at.desc(), StockTransaction.id.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if last is not None and len(last.lines) == 2:
+        src, qty = await _locked_batch(session, last.lines[1].batch_id), last.lines[1].delta
+    else:
+        src, qty = await _locked_batch(session, add.lines[0].batch_id), add.quantity_delta
+    loc_id = src.location_id
+    if fields.get("location_id") is not None:
+        loc = await _resolve_location(
+            session, hh, fields["location_id"], product, fallback_if_deleted=False
+        )
+        loc_id = loc.id
+    expires = fields.get("expires_at", src.expires_at)
+    txn = await _rehome(
+        session,
+        principal,
+        product,
+        src,
+        qty,
+        loc_id,
+        expires,
+        client_op_id,
+        f"{PLACE_REASON}{add_client_op_id}",
+    )
+    if fields.get("location_id") is not None:
+        await _learn_location(session, product, loc_id)  # chosen on purpose
+    return OpResult(
+        client_op_id=client_op_id,
+        status="applied",
+        transaction_id=txn.id if txn else None,
+        product=product,
+        total_quantity=await product_total(session, product.id),
+    )
+
+
+async def fix_up_batches(
+    session: AsyncSession, principal: Principal, batch_ids: list[uuid.UUID], fields: dict
+) -> tuple[int, int]:
+    """Set location and/or expiry on many batches at once (the bulk "fix up" screen).
+    Each batch that changes is moved whole into the batch for its new (location, expiry), one
+    "move" per batch. Returns (changed, unchanged)."""
+    hh = principal.household_id
+    loc_id: uuid.UUID | None = None
+    if fields.get("location_id") is not None:
+        loc_row = (
+            await session.execute(
+                select(Location).where(
+                    Location.id == fields["location_id"],
+                    Location.household_id == hh,
+                    Location.deleted_at.is_(None),
+                )
+            )
+        ).scalar_one_or_none()
+        if loc_row is None:
+            raise OpRejected("location_not_found", "Unknown location")
+        loc_id = loc_row.id
+    batches = (
+        (
+            await session.execute(
+                select(StockBatch)
+                .where(StockBatch.id.in_(batch_ids), StockBatch.household_id == hh)
+                .order_by(StockBatch.id)
+                .with_for_update()
+                .execution_options(populate_existing=True)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    changed = 0
+    for b in batches:
+        product = await session.get(Product, b.product_id)
+        assert product is not None
+        expires = fields.get("expires_at", b.expires_at)
+        txn = await _rehome(
+            session,
+            principal,
+            product,
+            b,
+            b.quantity,
+            loc_id or b.location_id,
+            expires,
+            uuid.uuid4(),
+            FIXUP_REASON,
+        )
+        changed += txn is not None
+        if loc_id is not None:
+            await _learn_location(session, product, loc_id)
+    return changed, len(batch_ids) - changed
 
 
 # --------------------------------------------------------------------------- queries

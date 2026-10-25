@@ -153,6 +153,11 @@ class Principal:
     username: str | None
     display_name: str | None
     device_name: str | None
+    scope: str = "full"  # full | read
+
+    @property
+    def read_only(self) -> bool:
+        return self.scope == "read"
 
     @property
     def is_kiosk(self) -> bool:
@@ -248,9 +253,12 @@ async def get_principal(
         username=user.username if user else None,
         display_name=user.display_name if user else None,
         device_name=sess.device_name,
+        scope=sess.scope,
     )
     if principal.is_kiosk and not kiosk_allowed(request.method, request.url.path):
         raise forbidden("Not allowed for kiosk devices", "kiosk_forbidden")
+    if principal.read_only and unsafe and request.url.path != "/api/auth/logout":
+        raise forbidden("This token can only read", "read_only_token")
 
     if ts - sess.last_used_at >= TOUCH_INTERVAL:
         await _touch_session(sm, sess.id, sess.ttl_seconds)
@@ -272,6 +280,7 @@ async def create_session(
     ttl_seconds: int,
     device_name: str | None = None,
     platform: str | None = None,
+    scope: str = "full",
 ) -> str:
     """Create a session row and return the *plain* token (only its hash is stored)."""
     token = new_token()
@@ -284,6 +293,7 @@ async def create_session(
             kind=kind,
             device_name=device_name,
             platform=platform,
+            scope=scope,
             ttl_seconds=ttl_seconds,
             created_at=ts,
             last_used_at=ts,

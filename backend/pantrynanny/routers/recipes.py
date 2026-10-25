@@ -1,5 +1,6 @@
 import uuid
 from datetime import date, datetime
+from typing import Literal
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Header, Query, Request, Response
@@ -7,14 +8,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_session
 from ..errors import AppError
+from ..recipes.course import classify
 from ..recipes.fetch import fetch_page
 from ..recipes.jsonld import extract
 from ..recipes.parse import parse_line
 from ..schemas.recipes import (
     Availability,
+    Course,
     ImportIn,
     ParsedLine,
     ParseIn,
+    RecipeBrief,
     RecipeDraftOut,
     RecipeIn,
     RecipeOut,
@@ -38,49 +42,82 @@ async def _soon_days(session: AsyncSession, household_id: uuid.UUID) -> int:
     return (await get_household_settings(session, household_id)).expiry_soon_days
 
 
-@router.get("/recipes", response_model=list[RecipeSummary])
+Include = Literal["full", "summary"]
+
+
+def _filters(
+    course: list[Course] | None = Query(default=None, description="Only these courses"),
+    exclude_course: list[Course] | None = Query(default=None, description="Leave these out"),
+    tag: list[str] | None = Query(default=None, max_length=20, description="Has every tag"),
+    min_ingredients: int | None = Query(
+        default=None, ge=0, le=100, description="At least this many required, non-staple lines"
+    ),
+) -> dict:
+    return {
+        "courses": course,
+        "exclude_courses": exclude_course,
+        "tags": tag,
+        "min_ingredients": min_ingredients,
+    }
+
+
+def _rows(pairs, include: str) -> list:
+    if include == "summary":
+        return [svc.brief(r, a) for r, a in pairs]
+    return [RecipeSummary(recipe=svc.recipe_out(r), availability=a) for r, a in pairs]
+
+
+@router.get("/recipes", response_model=list[RecipeSummary] | list[RecipeBrief])
 async def list_recipes(
     request: Request,
     q: str | None = Query(default=None, max_length=200),
+    include: Include = "full",
+    filters: dict = Depends(_filters),
     principal: Principal = Depends(get_principal),
     session: AsyncSession = Depends(get_session),
 ):
-    recipes = await svc.list_recipes(session, principal.household_id, q)
+    """All saved recipes (by title) with what is in the house. `include=summary` returns one
+    flat row per recipe without instructions or ingredient objects."""
+    recipes = await svc.list_recipes(session, principal.household_id, q, tags=filters["tags"])
+    recipes = svc.filter_course(recipes, filters["courses"], filters["exclude_courses"])
     products = await svc.pantry(session, principal.household_id)
     soon, today = await _soon_days(session, principal.household_id), _today(request)
-    return [
-        RecipeSummary(
-            recipe=svc.recipe_out(r),
-            availability=svc.availability(r, products, today=today, soon_days=soon),
-        )
-        for r in recipes
-    ]
+    pairs = [(r, svc.availability(r, products, today=today, soon_days=soon)) for r in recipes]
+    if filters["min_ingredients"] is not None:
+        pairs = [(r, a) for r, a in pairs if a.required >= filters["min_ingredients"]]
+    return _rows(pairs, include)
 
 
-@router.get("/recipes/suggest", response_model=list[RecipeSummary])
+@router.get("/recipes/suggest", response_model=list[RecipeSummary] | list[RecipeBrief])
 async def what_can_we_cook(
     request: Request,
     max_minutes: int | None = Query(default=None, ge=1, le=10_000),
     servings: int | None = Query(default=None, ge=1, le=100),
     max_missing: int = Query(default=1, ge=0, le=100),
     limit: int = Query(default=20, ge=1, le=100),
+    include: Include = "full",
+    filters: dict = Depends(_filters),
     principal: Principal = Depends(get_principal),
     session: AsyncSession = Depends(get_session),
 ):
     """Saved recipes ranked by what is in the house right now (deterministic, no AI). Only
     recipes missing at most `max_missing` required ingredients (default: one shopping trip
-    item) are suggested."""
-    recipes = await svc.list_recipes(session, principal.household_id)
+    item) are suggested; see services.recipes.rank for the order."""
+    recipes = await svc.list_recipes(session, principal.household_id, tags=filters["tags"])
+    recipes = svc.filter_course(recipes, filters["courses"], filters["exclude_courses"])
     products = await svc.pantry(session, principal.household_id)
     soon, today = await _soon_days(session, principal.household_id), _today(request)
     pairs = [
         (r, svc.availability(r, products, servings=servings, today=today, soon_days=soon))
         for r in recipes
     ]
-    return [
-        RecipeSummary(recipe=svc.recipe_out(r), availability=a)
-        for r, a in svc.rank(pairs, max_minutes=max_minutes, max_missing=max_missing)[:limit]
-    ]
+    ranked = svc.rank(
+        pairs,
+        max_minutes=max_minutes,
+        max_missing=max_missing,
+        min_ingredients=filters["min_ingredients"],
+    )
+    return _rows(ranked[:limit], include)
 
 
 @router.post("/recipes/parse", response_model=list[ParsedLine])
@@ -111,7 +148,8 @@ async def import_url(
             "no_recipe_found",
             "No recipe data was found on that page. You can still type or paste it in.",
         )
-    return RecipeDraftOut(**draft.__dict__, source_url=final_url)
+    course = classify(draft.title, draft.tags, [parse_line(x).name for x in draft.ingredients])
+    return RecipeDraftOut(**draft.__dict__, source_url=final_url, course=course)
 
 
 @router.post("/recipes", response_model=RecipeOut, status_code=201)

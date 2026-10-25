@@ -1,5 +1,6 @@
-"""Extract a schema.org Recipe from a web page's JSON-LD. The page is untrusted input: only plain
-text is kept (tags stripped, lengths capped), nothing from it is ever executed or rendered as HTML.
+"""Extract a schema.org Recipe from a web page's JSON-LD (or, failing that, its microdata). The
+page is untrusted input: only plain text is kept (tags stripped, lengths capped), nothing from it
+is ever executed or rendered as HTML.
 """
 
 import html
@@ -114,6 +115,92 @@ def _image(v: object) -> str | None:
     return s if s.startswith(("https://", "http://")) else None
 
 
+def times(prep: int | None, cook: int | None, total: int | None) -> tuple[int | None, int | None]:
+    """(prep, cook) so that prep + cook is the total time when the page says more in total
+    ("Tid i alt 60 min"): the rest is counted as cooking."""
+    if total and (prep or 0) + (cook or 0) < total:
+        cook = total - (prep or 0)
+    return prep, cook
+
+
+MICRO_RECIPE = re.compile(r"itemtype\s*=\s*[\"']https?://schema\.org/Recipe[\"']", re.I)
+MICRO_ATTR = re.compile(r"<(\w+)\b([^>]*\bitemprop\s*=\s*[\"']([A-Za-z]+)[\"'][^>]*)>", re.I)
+MICRO_CONTENT = re.compile(r"\b(?:content|datetime)\s*=\s*[\"']([^\"']*)[\"']", re.I)
+
+
+def _element_html(page: str, tag: str, start: int, limit: int = 60_000) -> str:
+    """Inner HTML of the element whose start tag ends at `start` (nesting of `tag` counted)."""
+    depth, pos = 1, start
+    pat = re.compile(rf"<(/?){tag}\b[^>]*>", re.I)
+    for m in pat.finditer(page, start, min(len(page), start + limit)):
+        depth += -1 if m.group(1) else 1
+        if depth == 0:
+            return page[start : m.start()]
+        pos = m.end()
+    return page[start:pos]
+
+
+def _microdata(page: str) -> RecipeDraft | None:
+    """schema.org Recipe as microdata (itemprop attributes), e.g. valdemarsro.dk."""
+    m = MICRO_RECIPE.search(page)
+    if not m:
+        return None
+    props: dict[str, list[tuple[str, str]]] = {}  # prop -> [(tag, inner html or content)]
+    for e in MICRO_ATTR.finditer(page, m.end()):
+        tag, attrs, prop = e.group(1).lower(), e.group(2), e.group(3)
+        if len(props.get(prop, [])) >= MAX_INGREDIENTS:
+            continue
+        c = MICRO_CONTENT.search(attrs)
+        if c and tag in ("meta", "time", "link") or (c and prop.endswith("Time")):
+            value = c.group(1)
+        elif tag in ("meta", "img", "link"):
+            value = ""
+        else:
+            value = _element_html(page, tag, e.end())
+        props.setdefault(prop, []).append((tag, value))
+
+    def first(prop: str, limit: int = 200) -> str:
+        return next((t for _, v in props.get(prop, []) if (t := text(v, limit))), "")
+
+    title = (
+        next((text(v, 200) for tag, v in props.get("name", []) if tag in ("h1", "h2", "h3")), "")
+        or first("headline")
+        or first("name")
+    )
+    ingredients = [s for s in (text(v, 300) for _, v in props.get("recipeIngredient", [])) if s]
+    if not ingredients:
+        ingredients = [s for s in (text(v, 300) for _, v in props.get("ingredients", [])) if s]
+    if not title or not ingredients:
+        return None
+    steps: list[str] = []
+    for _, v in props.get("recipeInstructions", []):
+        steps += _steps(re.sub(r"</(?:li|p|div|h\d)>", "\n", v, flags=re.I))
+    tags = [text(t, 40) for t in first("keywords", 400).split(",")] + [
+        text(v, 40) for _, v in props.get("recipeCategory", [])
+    ]
+    prep, cook = times(
+        minutes(first("prepTime", 40)),
+        minutes(first("cookTime", 40)),
+        minutes(first("totalTime", 40)),
+    )
+    img = re.search(r"<img\b[^>]*\bitemprop\s*=\s*[\"']image[\"'][^>]*>", page[m.end() :], re.I)
+    src = re.search(r"\bsrc\s*=\s*[\"']([^\"']+)", img.group(0)) if img else None
+    image = src.group(1) if src else None
+    site = SITE_RE.search(page)
+    return RecipeDraft(
+        title=title,
+        description=first("description", 1000) or None,
+        servings=servings(first("recipeYield", 100)),
+        prep_min=prep,
+        cook_min=cook,
+        ingredients=ingredients[:MAX_INGREDIENTS],
+        instructions=steps[:MAX_STEPS],
+        tags=list(dict.fromkeys(t for t in tags if t))[:12],
+        image_url=_image(image),
+        source_name=text(site.group(1), 100) if site else None,
+    )
+
+
 def extract(page: str) -> RecipeDraft | None:
     page = page[:3_000_000]
     for block in SCRIPT_RE.findall(page):
@@ -139,9 +226,11 @@ def extract(page: str) -> RecipeDraft | None:
             for extra in ("recipeCategory", "recipeCuisine"):
                 v = node.get(extra)
                 tags += [text(v, 40)] if isinstance(v, str) else [text(x, 40) for x in v or []]
-            prep, cook = minutes(node.get("prepTime")), minutes(node.get("cookTime"))
-            if prep is None and cook is None:
-                cook = minutes(node.get("totalTime"))
+            prep, cook = times(
+                minutes(node.get("prepTime")),
+                minutes(node.get("cookTime")),
+                minutes(node.get("totalTime")),
+            )
             site = SITE_RE.search(page)
             return RecipeDraft(
                 title=title,
@@ -155,4 +244,4 @@ def extract(page: str) -> RecipeDraft | None:
                 image_url=_image(node.get("image")),
                 source_name=text(site.group(1), 100) if site else None,
             )
-    return None
+    return _microdata(page)

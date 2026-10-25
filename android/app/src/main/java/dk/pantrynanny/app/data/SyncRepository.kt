@@ -6,12 +6,19 @@ import dk.pantrynanny.app.data.local.PendingOpEntity
 import dk.pantrynanny.app.data.remote.ApiClient
 import dk.pantrynanny.app.data.remote.ApiResult
 import dk.pantrynanny.app.data.remote.OpResultDto
+import dk.pantrynanny.app.data.remote.ProductDto
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 enum class SyncOutcome { SUCCESS, RETRY, AUTH_FAILED, FAILED, NOT_LOGGED_IN }
+
+/** An "add" op the server has applied: [locationId] is what the op asked for (null = server's choice). */
+data class AppliedAdd(val clientOpId: String, val product: ProductDto, val locationId: String?)
 
 /**
  * Upload pending ops in order (batches of up to [BATCH_SIZE]), then pull server state
@@ -38,6 +45,10 @@ class SyncRepository(
     private val _lastError = MutableStateFlow<String?>(null)
     /** Non-null when the last sync attempt failed (server unreachable, etc.). */
     val lastError: StateFlow<String?> = _lastError
+
+    private val _appliedAdds = MutableSharedFlow<AppliedAdd>(extraBufferCapacity = 16)
+    /** Adds confirmed by the server (emitted after the local cache is updated); drives the scanner's place chips. */
+    val appliedAdds: SharedFlow<AppliedAdd> = _appliedAdds.asSharedFlow()
 
     suspend fun syncNow(forcePull: Boolean = false): SyncOutcome = mutex.withLock {
         if (tokens.token() == null) return@withLock SyncOutcome.NOT_LOGGED_IN
@@ -122,6 +133,7 @@ class SyncRepository(
     /** Returns true when an applied op came back without a product although it targeted one (then we pull). */
     private suspend fun applyResults(batch: List<PendingOpEntity>, byId: Map<String, OpResultDto>): Boolean {
         var needPull = false
+        val adds = mutableListOf<AppliedAdd>()
         db.withTransaction {
             for (op in batch) {
                 val res = byId[op.clientOpId] ?: continue
@@ -130,6 +142,7 @@ class SyncRepository(
                     if (product != null) {
                         cache.applyProduct(product, res.totalQuantity)
                         db.historyDao().attachProduct(op.clientOpId, product.id, product.name)
+                        if (op.type == "add") adds += AppliedAdd(op.clientOpId, product, op.locationId)
                     } else if (op.productId != null) {
                         needPull = true
                     }
@@ -139,6 +152,7 @@ class SyncRepository(
                 }
             }
         }
+        adds.forEach { _appliedAdds.tryEmit(it) }
         return needPull
     }
 

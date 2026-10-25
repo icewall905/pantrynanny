@@ -10,7 +10,7 @@ Use a dedicated member account (for example `homeassistant`) and request a devic
 ```bash
 curl -s https://pantry.example.com/api/auth/token \
   -H 'Content-Type: application/json' \
-  -d '{"username":"homeassistant","password":"...","device_name":"Home Assistant","platform":"homeassistant"}'
+  -d '{"username":"homeassistant","password":"...","device_name":"Home Assistant","platform":"homeassistant","scope":"read"}'
 ```
 
 Store the returned `token` in HA's `secrets.yaml`:
@@ -19,9 +19,9 @@ Store the returned `token` in HA's `secrets.yaml`:
 pantrynanny_bearer: "Bearer <token>"
 ```
 
-**Note:** this is a full member token (there is no scoped read-only token yet), so anyone with
-access to the HA secrets can act as that member. Use a dedicated account and revoke it if HA is
-compromised; a scoped read-only token may follow later.
+`"scope": "read"` makes it a **read-only token**: it can only read (GET), so anyone with access to
+the HA secrets can look but not change anything. Leave it out for a full member token. Either way,
+use a dedicated account and revoke the token if HA is compromised.
 
 Tokens last 365 days and slide with use. Revoke them under Admin -> Devices.
 

@@ -1,7 +1,7 @@
 import { memo, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { CalendarPlus, FolderInput, LayoutList, Layers, Package, Plus, Search, ShoppingBasket, Trash2, X } from 'lucide-react'
+import { CalendarPlus, FolderInput, LayoutList, Layers, Package, Plus, Search, ShoppingBasket, Trash2, Wand2, X } from 'lucide-react'
 import { useCategories, useInventory, useLocations, type InventoryParams } from '../api/queries'
 import type { InventoryItem, Location } from '../api/types'
 import { useSettings } from '../auth/AuthProvider'
@@ -158,9 +158,14 @@ export default function InventoryPage() {
       <PageHeader
         title={t('nav.inventory')}
         actions={
+          <>
+          <Link to="/fix-up" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-surface px-4 text-sm font-semibold text-ink-900 ring-1 ring-cream-200 hover:bg-cream-200/70" data-testid="inventory-fixup">
+            <Wand2 className="size-4" /> {t('fixUp.link')}
+          </Link>
           <Link to="/products/new" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-leaf-600 px-4 text-sm font-semibold text-white hover:bg-leaf-800">
             <Plus className="size-4" /> {t('product.new')}
           </Link>
+          </>
         }
       />
       <div className="sticky top-12 z-10 -mx-4 mb-4 space-y-2 bg-cream-100/95 px-4 pb-2 pt-1 backdrop-blur lg:top-0 lg:mx-0 lg:px-0">

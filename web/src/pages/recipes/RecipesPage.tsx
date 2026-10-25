@@ -3,8 +3,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { BookOpen, Clock, Link2, Plus, Sparkles } from 'lucide-react'
-import { get, post } from '../../api/client'
-import { totalMinutes, type RecipeDraft, type RecipeSummary } from '../../api/recipes'
+import { get, post, qs } from '../../api/client'
+import { COURSES, totalMinutes, type Course, type RecipeDraft, type RecipeSummary } from '../../api/recipes'
 import { Badge, Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListSkeleton, Modal, PageHeader, Tabs } from '../../components/ui'
 import { useToast } from '../../components/Toast'
 import { ApiError } from '../../api/client'
@@ -17,11 +17,12 @@ export default function RecipesPage() {
   const { t } = useTranslation()
   const [tab, setTab] = useState<Tab>('cook')
   const [maxMin, setMaxMin] = useState<number | null>(null)
+  const [course, setCourse] = useState<Course | null>(null)
   const [q, setQ] = useState('')
   const [importOpen, setImportOpen] = useState(false)
   const suggest = useQuery({
-    queryKey: ['recipes', 'suggest', maxMin],
-    queryFn: () => get<RecipeSummary[]>(`/recipes/suggest${maxMin ? `?max_minutes=${maxMin}` : ''}`),
+    queryKey: ['recipes', 'suggest', maxMin, course],
+    queryFn: () => get<RecipeSummary[]>(`/recipes/suggest${qs({ max_minutes: maxMin, course })}`),
     enabled: tab === 'cook',
   })
   const all = useQuery({
@@ -61,6 +62,20 @@ export default function RecipesPage() {
               {m ? t('recipes.maxMin', { n: m }) : t('recipes.anyTime')}
             </Chip>
           ))}
+          <select
+            aria-label={t('recipes.course')}
+            value={course ?? ''}
+            onChange={(e) => setCourse((e.target.value || null) as Course | null)}
+            className={cn('min-h-10 rounded-full px-4 text-sm font-medium ring-1', course ? 'bg-leaf-600 text-white ring-leaf-600' : 'bg-surface text-ink-700 ring-cream-200')}
+            data-testid="recipe-course-filter"
+          >
+            <option value="">{t('recipes.allCourses')}</option>
+            {COURSES.map((c) => (
+              <option key={c} value={c}>
+                {t(`recipes.course_${c}`)}
+              </option>
+            ))}
+          </select>
         </div>
       ) : (
         <Input className="mb-4" placeholder={t('recipes.search')} value={q} onChange={(e) => setQ(e.target.value)} aria-label={t('recipes.search')} />
@@ -107,6 +122,7 @@ function RecipeCard({ s }: { s: RecipeSummary }) {
                 </span>
               )}
               <span>{t('recipes.servings', { count: r.servings })}</span>
+              {r.course && <Badge tone="info">{t(`recipes.course_${r.course}`)}</Badge>}
             </div>
           </div>
           <Badge tone={ready ? 'good' : a.coverage >= 0.6 ? 'warn' : 'neutral'}>

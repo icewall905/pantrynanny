@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..errors import AppError, conflict, not_found
 from ..models import Product, ProductAlias, Recipe, RecipeIngredient
+from ..recipes.course import classify
 from ..recipes.match import (
     Pantry,
     ProductCandidate,
@@ -27,14 +28,39 @@ from ..schemas.recipes import (
     IngredientAvailability,
     IngredientOut,
     MatchedProduct,
+    RecipeBrief,
     RecipeIn,
     RecipeOut,
 )
 from ..schemas.shopping import ShoppingCreate
+from .households import get_household_settings
 from .inventory import batches_for, build_view
 from .shopping import add_item, has_open_named
 
 ZERO = Decimal(0)
+# what some importers saved instead of the ingredient list
+UNPARSED = {"could not detect ingredients"}
+
+
+def minutes(r: Recipe) -> int | None:
+    if r.prep_min is None and r.cook_min is None:
+        return None
+    return (r.prep_min or 0) + (r.cook_min or 0)
+
+
+_COURSE_CACHE: dict[tuple[uuid.UUID, int], str | None] = {}
+
+
+def course_of(r: Recipe) -> str | None:
+    """The stored course, or (for recipes saved before courses existed) the classifier's guess."""
+    if r.course:
+        return r.course
+    key = (r.id, r.version)
+    if key not in _COURSE_CACHE:
+        if len(_COURSE_CACHE) > 20_000:
+            _COURSE_CACHE.clear()
+        _COURSE_CACHE[key] = classify(r.title, list(r.tags or []), [i.name for i in r.ingredients])
+    return _COURSE_CACHE[key]
 
 
 def recipe_out(r: Recipe) -> RecipeOut:
@@ -48,6 +74,8 @@ def recipe_out(r: Recipe) -> RecipeOut:
         cook_min=r.cook_min,
         instructions=list(r.instructions or []),
         tags=list(r.tags or []),
+        course=course_of(r),  # type: ignore[arg-type]
+        minutes=minutes(r),
         source_url=r.source_url,
         source_name=r.source_name,
         image_url=r.image_url,
@@ -86,8 +114,13 @@ async def get_recipe(session: AsyncSession, household_id: uuid.UUID, rid: uuid.U
 
 
 async def list_recipes(
-    session: AsyncSession, household_id: uuid.UUID, q: str | None = None
+    session: AsyncSession,
+    household_id: uuid.UUID,
+    q: str | None = None,
+    *,
+    tags: list[str] | None = None,
 ) -> list[Recipe]:
+    """Ordered by title, then id (stable for machine clients)."""
     stmt = select(Recipe).where(Recipe.household_id == household_id, Recipe.deleted_at.is_(None))
     if q:
         like = f"%{q.strip().lower()}%"
@@ -97,7 +130,21 @@ async def list_recipes(
                 func.lower(func.array_to_string(Recipe.tags, " ")).like(like),
             )
         )
-    return list((await session.execute(stmt.order_by(Recipe.title))).scalars().all())
+    recipes = list((await session.execute(stmt.order_by(Recipe.title, Recipe.id))).scalars().all())
+    if tags:  # every tag must be there (case-insensitive)
+        want = {t.strip().lower() for t in tags if t.strip()}
+        recipes = [r for r in recipes if want <= {t.lower() for t in r.tags or []}]
+    return recipes
+
+
+def filter_course(
+    recipes: list[Recipe], courses: list[str] | None, exclude: list[str] | None
+) -> list[Recipe]:
+    if courses:
+        recipes = [r for r in recipes if course_of(r) in courses]
+    if exclude:
+        recipes = [r for r in recipes if course_of(r) not in exclude]
+    return recipes
 
 
 async def _assert_products(session: AsyncSession, household_id: uuid.UUID, ids: set[uuid.UUID]):
@@ -147,6 +194,8 @@ async def create_recipe(
         **body.model_dump(exclude={"ingredients"}),
         ingredients=_ingredients(body, household_id),
     )
+    if r.course is None:
+        r.course = classify(r.title, r.tags, [i.name for i in r.ingredients])
     session.add(r)
     await session.flush()
     return await get_recipe(session, household_id, r.id)
@@ -166,6 +215,8 @@ async def update_recipe(
         session, household_id, {i.product_id for i in body.ingredients if i.product_id}
     )
     for k, v in body.model_dump(exclude={"ingredients"}).items():
+        if k == "course" and "course" not in body.model_fields_set:
+            continue  # clients that do not know about courses keep the stored one
         setattr(r, k, v)
     r.ingredients = _ingredients(body, household_id)
     r.version += 1
@@ -184,6 +235,7 @@ async def delete_recipe(session: AsyncSession, household_id: uuid.UUID, rid: uui
 
 
 async def pantry(session: AsyncSession, household_id: uuid.UUID) -> Pantry:
+    """The household's products with stock, plus its staples list."""
     products = list(
         (
             await session.execute(
@@ -223,7 +275,8 @@ async def pantry(session: AsyncSession, household_id: uuid.UUID) -> Pantry:
                 image_url=f"/api/media/{p.image_path}" if p.image_path else None,
             )
         )
-    return Pantry(out)
+    settings = await get_household_settings(session, household_id)
+    return Pantry(out, staples=settings.staples)
 
 
 def availability(
@@ -241,6 +294,7 @@ def availability(
     items: list[IngredientAvailability] = []
     have = missing = required = 0
     expiring: list[str] = []
+    staple = products.is_staple if isinstance(products, Pantry) else is_staple
     for ing in r.ingredients:
         linked = ing.product_id is not None and ing.product_id in by_id
         p = by_id[ing.product_id] if linked else best_match(ing.name, products)
@@ -256,7 +310,9 @@ def availability(
                     enough = have_base[1] >= need_base[1]
         in_stock = bool(p and p.total > 0)
         is_soon = bool(in_stock and p and p.next_expiry and p.next_expiry <= soon)
-        if is_staple(ing.name) and not linked:
+        if p is None and staple(ing.name):
+            # only when the household does not keep it as a product: a stocked-out product
+            # is reported as missing like any other
             status = "staple"
         elif ing.optional:
             status = "have" if in_stock else "optional"
@@ -307,27 +363,79 @@ def rank(
     *,
     max_minutes: int | None = None,
     max_missing: int | None = None,
+    min_ingredients: int | None = None,
+    courses: list[str] | None = None,
+    exclude_courses: list[str] | None = None,
 ) -> list[tuple[Recipe, Availability]]:
-    """Cookable now first, then most of it in the house, then what uses up expiring food."""
+    """Order recipes for "what can we cook now".
+
+    Filters: total time, required ingredients still missing, at least `min_ingredients`
+    required (non-staple, non-optional) ingredients, and course. A recipe with nothing to check
+    (every line a staple or optional) is never "cookable".
+
+    Sort, most important first:
+    1. fewest missing ingredients ("cookable now" first, then one shopping item, ...);
+    2. smoothed coverage have / (required + 2). The +2 is a prior of two unknown ingredients,
+       so a short list has to earn its place: 2 of 2 scores 0.50, 5 of 5 scores 0.71 and 8 of 9
+       scores 0.73. A two-line "chocolate-dipped apricots" no longer beats a real dish just
+       for being short, while among dishes of similar size more of it in the house still wins;
+    3. more expiring food used up; 4. more ingredients in the house (a fuller dish);
+    5. quicker; 6. title, then id, so the order is stable.
+    """
     out = []
     for r, a in pairs:
-        total = (r.prep_min or 0) + (r.cook_min or 0)
+        total = minutes(r)
         if max_minutes is not None and total and total > max_minutes:
             continue
         if max_missing is not None and (a.missing > max_missing or not a.required):
             continue  # nothing to check is not "cookable" (e.g. every line marked optional)
+        if any(i.name.strip().lower() in UNPARSED for i in r.ingredients):
+            continue  # an import that failed to read the ingredient list
+        if min_ingredients is not None and a.required < min_ingredients:
+            continue
+        if courses and course_of(r) not in courses:
+            continue
+        if exclude_courses and course_of(r) in exclude_courses:
+            continue
         out.append((r, a))
     out.sort(
         key=lambda x: (
-            x[1].missing > 0,
-            -x[1].coverage,
-            -len(x[1].uses_expiring),
             x[1].missing,
-            (x[0].prep_min or 0) + (x[0].cook_min or 0),
+            -round(x[1].have / (x[1].required + 2), 6),
+            -len(x[1].uses_expiring),
+            -x[1].have,
+            minutes(x[0]) or 0,
             x[0].title.lower(),
+            str(x[0].id),
         )
     )
     return out
+
+
+def brief(r: Recipe, a: Availability) -> RecipeBrief:
+    names = {"missing": [], "low": [], "staple": []}  # type: dict[str, list[str]]
+    for it in a.items:
+        if it.status in names:
+            names[it.status].append(it.ingredient.name)
+    return RecipeBrief(
+        id=r.id,
+        title=r.title,
+        course=course_of(r),  # type: ignore[arg-type]
+        tags=list(r.tags or []),
+        servings=a.servings,
+        prep_min=r.prep_min,
+        cook_min=r.cook_min,
+        minutes=minutes(r),
+        source_url=r.source_url,
+        coverage=a.coverage,
+        have=a.have,
+        required=a.required,
+        missing=a.missing,
+        missing_names=names["missing"],
+        low_names=names["low"],
+        staple_names=names["staple"],
+        uses_expiring=a.uses_expiring,
+    )
 
 
 async def add_missing_to_shopping(

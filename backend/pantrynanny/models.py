@@ -107,6 +107,8 @@ class HouseholdSettings(Base):
         Integer, default=10, server_default=text("10")
     )
     scan_rearm_ms: Mapped[int] = mapped_column(Integer, default=600, server_default=text("600"))
+    # "always in the house" for recipes; NULL = the built-in default list
+    staples: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
     updated_at: Mapped[datetime] = _ts()
 
 
@@ -130,6 +132,7 @@ class Session(Base):
     user_id: Mapped[uuid.UUID | None] = _fk("users.id", nullable=True, ondelete="CASCADE")
     household_id: Mapped[uuid.UUID] = _fk("households.id", ondelete="CASCADE")
     kind: Mapped[str] = mapped_column(String(16))  # browser | device | kiosk
+    scope: Mapped[str] = mapped_column(String(8), default="full", server_default="full")  # | read
     device_name: Mapped[str | None] = mapped_column(Text)
     platform: Mapped[str | None] = mapped_column(Text)
     ttl_seconds: Mapped[int] = mapped_column(Integer)
@@ -184,6 +187,11 @@ class Category(Base):
     icon: Mapped[str | None] = mapped_column(Text)
     color: Mapped[str | None] = mapped_column(Text)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    # offered after a scan: "+N days" for new stock, and the last place this kind of thing went
+    default_expiry_days: Mapped[int | None] = mapped_column(Integer)
+    default_location_id: Mapped[uuid.UUID | None] = _fk(
+        "locations.id", nullable=True, ondelete="SET NULL"
+    )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = _ts()
     updated_at: Mapped[datetime] = _updated()
@@ -493,6 +501,10 @@ class Recipe(Base):
         ARRAY(Text), default=list, server_default=text("'{}'")
     )
     tags: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list, server_default=text("'{}'"))
+    # breakfast | lunch | dinner | side | dessert | baking | drink | snack | condiment
+    course: Mapped[str | None] = mapped_column(String(16))
+    # when the source page was last re-read for missing times/course (resumable backfill)
+    source_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     source_url: Mapped[str | None] = mapped_column(Text)
     source_name: Mapped[str | None] = mapped_column(Text)
     image_url: Mapped[str | None] = mapped_column(Text)

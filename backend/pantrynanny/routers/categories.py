@@ -6,11 +6,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_session
 from ..errors import AppError, not_found
-from ..models import Category, Product
+from ..models import Category, Location, Product
 from ..schemas.catalogue import CategoryIn, CategoryOut, CategoryPatch
 from ..security import Principal, get_principal, now, require_admin
 
 router = APIRouter(tags=["categories"])
+
+
+async def assert_location(session: AsyncSession, household_id: uuid.UUID, loc_id: uuid.UUID):
+    found = await session.scalar(
+        select(Location.id).where(
+            Location.id == loc_id,
+            Location.household_id == household_id,
+            Location.deleted_at.is_(None),
+        )
+    )
+    if found is None:
+        raise AppError(422, "location_not_found", "Unknown location")
 
 
 async def _get(session: AsyncSession, household_id: uuid.UUID, cat_id: uuid.UUID) -> Category:
@@ -66,7 +78,16 @@ async def patch_category(
     sent = body.model_fields_set
     if "name" in sent and body.name is None:
         raise AppError(422, "validation_error", "name cannot be null")
-    for field in ("name", "icon", "color", "sort_order"):
+    if body.default_location_id is not None:
+        await assert_location(session, principal.household_id, body.default_location_id)
+    for field in (
+        "name",
+        "icon",
+        "color",
+        "sort_order",
+        "default_expiry_days",
+        "default_location_id",
+    ):
         if field in sent:
             setattr(cat, field, getattr(body, field))
     await session.commit()

@@ -115,6 +115,7 @@ async def issue_token(
         ttl_seconds=TTL_DEVICE,
         device_name=body.device_name,
         platform=body.platform,
+        scope=body.scope,
     )
     me = await build_me(session, user.household_id, user, False)
     await session.commit()
@@ -179,4 +180,6 @@ async def me(
     principal: Principal = Depends(get_principal), session: AsyncSession = Depends(get_session)
 ):
     user = await session.get(User, principal.user_id) if principal.user_id else None
-    return await build_me(session, principal.household_id, user, principal.is_kiosk)
+    me = await build_me(session, principal.household_id, user, principal.is_kiosk)
+    me.read_only = principal.read_only
+    return me

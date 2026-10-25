@@ -143,5 +143,22 @@
     "identify_other": "Name {{count}} unknown items",
     "continue": "Keep scanning",
     "done": "Done"
+  },
+  "place": {
+    "expiry": "Best before",
+    "location": "Location",
+    "chip": {
+      "d3": "+3 d",
+      "w1": "+1 w",
+      "m1": "+1 mo",
+      "m6": "+6 mo",
+      "none": "none",
+      "days_one": "+{{count}} d",
+      "days_other": "+{{count}} d"
+    },
+    "expirySet": "Best before {{date}}",
+    "expiryCleared": "No expiry",
+    "moved": "Moved to {{name}}",
+    "failed": "Could not save – try again"
   }
 }

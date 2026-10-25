@@ -25,6 +25,29 @@ class BatchPatch(BaseModel):
     opened_at: date | None = None
 
 
+class PlaceIn(BaseModel):
+    """Set expiry and/or location for what one "add" put in stock (one tap after a scan).
+    Leave a field out to keep it; `expires_at: null` clears the expiry."""
+
+    client_op_id: UUID
+    add_client_op_id: UUID
+    expires_at: date | None = None
+    location_id: UUID | None = None
+
+
+class BatchFixUpIn(BaseModel):
+    """Set location and/or expiry on many batches at once. Leave a field out to keep it."""
+
+    batch_ids: list[UUID] = Field(min_length=1, max_length=500)
+    location_id: UUID | None = None
+    expires_at: date | None = None
+
+
+class BatchFixUpOut(BaseModel):
+    changed: int
+    unchanged: int
+
+
 class TransactionOut(BaseModel):
     id: UUID
     client_op_id: UUID

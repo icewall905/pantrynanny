@@ -2,8 +2,9 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
+from ..recipes.match import DEFAULT_STAPLES
 from .common import ORM, Role
 
 
@@ -14,6 +15,15 @@ class SettingsOut(ORM):
     auto_shopping_low_stock: bool
     remove_mode_timeout_min: int
     scan_rearm_ms: int
+    # "always in the house" for recipes (never missing, never on the shopping list) unless the
+    # household keeps it as a product; default_staples is what `staples: null` resets to
+    staples: list[str] = Field(default_factory=lambda: list(DEFAULT_STAPLES))
+    default_staples: list[str] = Field(default_factory=lambda: list(DEFAULT_STAPLES))
+
+    @field_validator("staples", mode="before")
+    @classmethod
+    def _staples(cls, v: list[str] | None) -> list[str]:
+        return list(DEFAULT_STAPLES) if v is None else v
 
 
 class SettingsPatch(BaseModel):
@@ -23,6 +33,16 @@ class SettingsPatch(BaseModel):
     auto_shopping_low_stock: bool | None = None
     remove_mode_timeout_min: int | None = Field(default=None, ge=1, le=240)
     scan_rearm_ms: int | None = Field(default=None, ge=250, le=3000)
+    staples: list[str] | None = Field(default=None, max_length=300)  # null = back to defaults
+
+    @field_validator("staples")
+    @classmethod
+    def _staples(cls, v: list[str] | None) -> list[str] | None:
+        if v is None:
+            return None
+        if any(len(x) > 80 for x in v):
+            raise ValueError("each staple must be at most 80 characters")
+        return list(dict.fromkeys(x.strip().lower() for x in v if x.strip()))
 
 
 class UserOut(ORM):
@@ -62,6 +82,7 @@ class MeOut(BaseModel):
     household: HouseholdOut
     kiosk: bool
     settings: SettingsOut
+    read_only: bool = False  # a read-only device token
 
 
 class LoginIn(BaseModel):
@@ -75,6 +96,8 @@ class TokenIn(BaseModel):
     password: str = Field(min_length=1, max_length=200)
     device_name: str = Field(min_length=1, max_length=100)
     platform: str | None = Field(default=None, max_length=40)
+    # "read": the token can only read (GET/HEAD); for scripts and assistants
+    scope: Literal["full", "read"] = "full"
 
 
 class TokenOut(BaseModel):
@@ -106,3 +129,4 @@ class DeviceOut(BaseModel):
     last_used_at: datetime
     expires_at: datetime
     current: bool
+    scope: str = "full"  # full | read

@@ -6,6 +6,20 @@ import androidx.lifecycle.viewModelScope
 import dk.pantrynanny.app.AppContainer
 import dk.pantrynanny.app.R
 import dk.pantrynanny.app.data.AppSettings
+import dk.pantrynanny.app.data.AppliedAdd
+import dk.pantrynanny.app.data.local.LocationEntity
+import dk.pantrynanny.app.data.remote.ApiResult
+import dk.pantrynanny.app.data.remote.CategoryDto
+import dk.pantrynanny.app.data.remote.OpResultDto
+import dk.pantrynanny.app.domain.ExpiryChip
+import dk.pantrynanny.app.domain.PlaceLocation
+import dk.pantrynanny.app.domain.Placement
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import java.time.LocalDate
+import java.util.UUID
 import dk.pantrynanny.app.data.UndoResult
 import dk.pantrynanny.app.data.local.HistoryRow
 import dk.pantrynanny.app.domain.BarcodeNormalizer
@@ -44,6 +58,21 @@ private const val REGISTER_WAIT_MS = 10_000L
 private const val ALREADY_COUNTED_MS = 2_500L
 private const val MAX_WATCHERS = 10
 private const val RECHECK_MS = 20_000L
+/** The place chips disappear this long after they appeared (or after the last tap). */
+private const val PLACE_CHIPS_MS = 15_000L
+private const val CATEGORIES_TTL_MS = 5 * 60_000L
+
+/** One-tap expiry/location chips for the add the server just applied (the last card). */
+data class PlacementUi(
+    val addOpId: String,
+    val expiryChips: List<ExpiryChip>,
+    /** The category's default expiry (highlighted), if any. */
+    val suggested: ExpiryChip?,
+    /** The expiry tapped so far (null = untouched). */
+    val chosenExpiry: ExpiryChip? = null,
+    val locations: List<LocationEntity>,
+    val currentLocationId: String?,
+)
 
 data class SyncStatusUi(
     val pending: Int = 0,
@@ -64,6 +93,8 @@ data class ScannerUiState(
     val otherFormats: Boolean = false,
     /** What the last-scanned card shows (neutral while the product is being looked up). */
     val lastPhase: CardPhase = CardPhase.KNOWN,
+    /** Expiry/location chips for the last card (only once its add is applied by the server). */
+    val placement: PlacementUi? = null,
 )
 
 class ScannerViewModel(private val c: AppContainer) : ViewModel() {
@@ -107,6 +138,15 @@ class ScannerViewModel(private val c: AppContainer) : ViewModel() {
     private val _openForRegister = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val openForRegister: SharedFlow<String> = _openForRegister.asSharedFlow()
 
+    private val _placement = MutableStateFlow<PlacementUi?>(null)
+    private var placementJob: Job? = null
+    private val locations: StateFlow<List<LocationEntity>> =
+        c.db.locationDao().observeAll().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    @Volatile
+    private var categories: Map<String, CategoryDto> = emptyMap()
+    @Volatile
+    private var categoriesAtMs = 0L
+
     private val status = combine(
         c.db.pendingOpDao().observePendingCount(),
         c.db.pendingOpDao().observeRejected().map { it.size },
@@ -129,6 +169,9 @@ class ScannerViewModel(private val c: AppContainer) : ViewModel() {
         .combine(settings.map { it.otherBarcodeTypes }) { s, other -> s.copy(otherFormats = other) }
         .combine(_track) { s, track ->
             s.copy(lastPhase = s.last?.let { CardLookup.phase(it.entry.clientOpId, it.prodStatus, track) } ?: CardPhase.KNOWN)
+        }.combine(_placement) { s, p ->
+            val last = s.last?.entry
+            s.copy(placement = p?.takeIf { last != null && last.clientOpId == it.addOpId && !last.undone })
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ScannerUiState())
 
     init {
@@ -146,6 +189,11 @@ class ScannerViewModel(private val c: AppContainer) : ViewModel() {
         viewModelScope.launch {
             settings.collect { dedup.rearmMs = it.effectiveRearmMs.toLong() }
         }
+        viewModelScope.launch {
+            c.syncRepository.appliedAdds.collect(::onAddApplied)
+        }
+        // Warm the category defaults so the first chips can already highlight the category's expiry.
+        viewModelScope.launch { refreshCategories() }
         viewModelScope.launch {
             while (isActive) {
                 delay(15_000)
@@ -185,6 +233,7 @@ class ScannerViewModel(private val c: AppContainer) : ViewModel() {
         if (!dedup.onDecoded(raw)) return
 
         revertRemoveIfIdle(clearDedup = false)
+        clearPlacement()
         val mode = _mode.value
         touch()
         val s = settings.value
@@ -332,6 +381,7 @@ class ScannerViewModel(private val c: AppContainer) : ViewModel() {
     /** +1/+2/+5 on the last-scanned card: extra op for the same product/barcode with the card's own op type. */
     fun addExtra(row: HistoryRow, quantity: Int) {
         touch()
+        clearPlacement()
         val loc = settings.value.defaultLocationId
         viewModelScope.launch(Dispatchers.IO) {
             val extra = c.scanRepository.addExtra(
@@ -346,6 +396,7 @@ class ScannerViewModel(private val c: AppContainer) : ViewModel() {
     }
 
     fun undo() {
+        clearPlacement()
         viewModelScope.launch(Dispatchers.IO) {
             val outcome = c.scanRepository.undoLast()
             outcome.undoneClientOpId?.let(guard::onUndone)
@@ -355,6 +406,116 @@ class ScannerViewModel(private val c: AppContainer) : ViewModel() {
                 UndoResult.QUEUED -> {
                     _events.tryEmit(UiMessage(R.string.snack_undone))
                     c.requestSync()
+                }
+            }
+        }
+    }
+
+    // ---- Place chips (expiry / location right after an applied add) ------------------------
+
+    private fun onAddApplied(add: AppliedAdd) {
+        // Only for the card on screen; a late result for an older scan never brings chips back.
+        if (currentOpId.value != add.clientOpId) return
+        if (_placement.value?.addOpId == add.clientOpId) return
+        val catId = add.product.categoryId
+        val cat = catId?.let { categories[it] }
+        val locs = locations.value
+        _placement.value = PlacementUi(
+            addOpId = add.clientOpId,
+            expiryChips = Placement.chips(cat?.defaultExpiryDays),
+            suggested = Placement.categoryChip(cat?.defaultExpiryDays),
+            locations = locs,
+            currentLocationId = Placement.currentLocation(
+                add.locationId, add.product.defaultLocationId, cat?.defaultLocationId,
+                locs.map { PlaceLocation(it.id, it.isDefault, it.sortOrder) },
+            ),
+        )
+        armPlacementTimeout()
+        if (catId != null && (cat == null || SystemClock.elapsedRealtime() - categoriesAtMs > CATEGORIES_TTL_MS)) {
+            viewModelScope.launch {
+                refreshCategories()
+                val fresh = categories[catId] ?: return@launch
+                _placement.update { p ->
+                    if (p?.addOpId != add.clientOpId) return@update p
+                    p.copy(
+                        expiryChips = Placement.chips(fresh.defaultExpiryDays),
+                        suggested = Placement.categoryChip(fresh.defaultExpiryDays),
+                        currentLocationId = if (add.locationId == null && add.product.defaultLocationId == null) {
+                            Placement.currentLocation(
+                                null, null, fresh.defaultLocationId,
+                                p.locations.map { PlaceLocation(it.id, it.isDefault, it.sortOrder) },
+                            )
+                        } else p.currentLocationId,
+                    )
+                }
+            }
+        }
+    }
+
+    private suspend fun refreshCategories() {
+        val r = c.api.get("api/categories", ListSerializer(CategoryDto.serializer()))
+        if (r is ApiResult.Ok) {
+            categories = r.value.associateBy { it.id }
+            categoriesAtMs = SystemClock.elapsedRealtime()
+        }
+    }
+
+    private fun armPlacementTimeout() {
+        placementJob?.cancel()
+        placementJob = viewModelScope.launch {
+            delay(PLACE_CHIPS_MS)
+            _placement.value = null
+        }
+    }
+
+    private fun clearPlacement() {
+        placementJob?.cancel()
+        _placement.value = null
+    }
+
+    /** Tap on an expiry chip: today (device local date) + the chip, or no expiry. */
+    fun placeExpiry(chip: ExpiryChip) {
+        val p = _placement.value ?: return
+        val date = Placement.expiryDate(chip, LocalDate.now())
+        _placement.value = p.copy(chosenExpiry = chip)
+        place(p, buildJsonObject { put("expires_at", date?.let { JsonPrimitive(it.toString()) } ?: JsonNull) }) {
+            // Only undo this tap's own value: a later tap that changed it again stays.
+            if (chosenExpiry == chip) copy(chosenExpiry = p.chosenExpiry) else this
+        }
+    }
+
+    /** Tap on a location chip: move what this add put in stock there. */
+    fun placeLocation(locationId: String) {
+        val p = _placement.value ?: return
+        if (p.currentLocationId == locationId) return
+        _placement.value = p.copy(currentLocationId = locationId)
+        place(p, buildJsonObject { put("location_id", JsonPrimitive(locationId)) }) {
+            if (currentLocationId == locationId) copy(currentLocationId = p.currentLocationId) else this
+        }
+    }
+
+    /** POST /inventory/place for [p]'s add with [fields]; on failure [revert] the optimistic chip and say so. */
+    private fun place(p: PlacementUi, fields: kotlinx.serialization.json.JsonObject, revert: PlacementUi.() -> PlacementUi) {
+        touch()
+        armPlacementTimeout()
+        val body = buildJsonObject {
+            put("client_op_id", JsonPrimitive(UUID.randomUUID().toString()))
+            put("add_client_op_id", JsonPrimitive(p.addOpId))
+            fields.forEach { (k, v) -> put(k, v) }
+        }
+        viewModelScope.launch {
+            when (val r = c.api.post("api/inventory/place", body, OpResultDto.serializer())) {
+                is ApiResult.Ok -> {
+                    r.value.product?.let { c.cache.applyProduct(it, r.value.totalQuantity) }
+                    c.requestSync()
+                }
+                is ApiResult.NetworkError -> {
+                    _placement.update { if (it?.addOpId == p.addOpId) it.revert() else it }
+                    _events.tryEmit(UiMessage(R.string.edit_offline))
+                }
+                is ApiResult.HttpError -> {
+                    _placement.update { if (it?.addOpId == p.addOpId) it.revert() else it }
+                    _events.tryEmit(UiMessage(R.string.place_failed))
                 }
             }
         }

@@ -57,11 +57,29 @@ async def _run(args: argparse.Namespace) -> None:
     engine = make_engine(get_settings())
     sm = make_sessionmaker(engine)
     try:
+        if args.command == "backfill-recipes":
+            await _backfill(sm, args)
+            return
         async with sm() as session:
             await _dispatch(session, args)
             await session.commit()
     finally:
         await engine.dispose()
+
+
+async def _backfill(sm, args: argparse.Namespace) -> None:
+    from .services import recipe_backfill
+
+    async with sm() as session:
+        hh = await _household(session, args.household)
+        print(f"{await recipe_backfill.remaining(session, hh.id)} recipes lack time or course")
+    st = await recipe_backfill.run(
+        sm, hh.id, recipe_backfill.BackfillStatus(), delay_s=args.delay, limit=args.limit
+    )
+    print(
+        f"checked {st.checked}: times filled {st.times_filled}, courses filled "
+        f"{st.courses_filled}, failed {st.failed}; {st.remaining} left"
+    )
 
 
 async def _dispatch(session: AsyncSession, args: argparse.Namespace) -> None:
@@ -148,6 +166,11 @@ async def _dispatch(session: AsyncSession, args: argparse.Namespace) -> None:
             )
         )
         print(f"Kiosk pairing code (valid 15 minutes, single use): {code}")
+    elif cmd == "classify-recipes":
+        from .services.recipe_backfill import classify_all
+
+        hh = await _household(session, args.household)
+        print(f"stored a course for {await classify_all(session, hh.id)} recipes")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -182,6 +205,21 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("create-kiosk-code", help="Print a 15 minute kiosk pairing code")
     s.add_argument("--name", required=True, help="device label, e.g. 'Kitchen iPad'")
+    s.add_argument("--household")
+
+    s = sub.add_parser(
+        "backfill-recipes",
+        help="Re-read recipe pages to fill in missing cooking time and course (resumable)",
+    )
+    s.add_argument("--limit", type=int, help="at most this many recipes in this run")
+    s.add_argument("--delay", type=float, default=2.0, help="seconds between page fetches")
+    s.add_argument("--household")
+
+    s = sub.add_parser(
+        "classify-recipes",
+        help="Store the keyword classifier's course for recipes without one (no network; run "
+        "backfill-recipes first so page categories win)",
+    )
     s.add_argument("--household")
     return p
 

@@ -143,5 +143,22 @@
     "identify_other": "Navngiv {{count}} ukendte varer",
     "continue": "Scan videre",
     "done": "Færdig"
+  },
+  "place": {
+    "expiry": "Holdbarhed",
+    "location": "Placering",
+    "chip": {
+      "d3": "+3 d",
+      "w1": "+1 u",
+      "m1": "+1 m",
+      "m6": "+6 m",
+      "none": "ingen",
+      "days_one": "+{{count}} d",
+      "days_other": "+{{count}} d"
+    },
+    "expirySet": "Holdbar til {{date}}",
+    "expiryCleared": "Ingen holdbarhed",
+    "moved": "Flyttet til {{name}}",
+    "failed": "Kunne ikke gemme – prøv igen"
   }
 }

@@ -16,6 +16,10 @@ export interface HouseholdSettings {
   auto_shopping_low_stock: boolean
   remove_mode_timeout_min: number
   scan_rearm_ms: number
+  /** "always in the house" for recipes (lower-case); PATCH `staples: null` resets to defaults (admin) */
+  staples?: string[]
+  /** read-only: what a reset gives */
+  default_staples?: string[]
 }
 
 export interface Me {
@@ -42,6 +46,10 @@ export interface Category {
   color: string | null
   sort_order: number
   deleted_at: ISODateTime | null
+  /** shelf life suggested after a scan (0–3650 days) */
+  default_expiry_days?: number | null
+  /** where its products go by default (also learned by the server) */
+  default_location_id?: UUID | null
 }
 
 export interface Barcode {
@@ -189,6 +197,26 @@ export interface OpResult {
   transaction_id: UUID | null
   product: Product | null
   total_quantity: number | null
+}
+
+/** POST /inventory/place: give what one "add" put in stock an expiry and/or another location. */
+export interface PlaceIn {
+  client_op_id: UUID
+  add_client_op_id: UUID
+  /** left out = kept; null = clear */
+  expires_at?: ISODate | null
+  location_id?: UUID
+}
+
+/** POST /batches/fix-up */
+export interface BatchFixUpIn {
+  batch_ids: UUID[]
+  location_id?: UUID
+  expires_at?: ISODate | null
+}
+export interface BatchFixUpOut {
+  changed: number
+  unchanged: number
 }
 
 export interface SyncOpsResponse {

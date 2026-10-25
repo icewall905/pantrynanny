@@ -25,7 +25,7 @@ async def update_settings(
     row = await get_household_settings(session, principal.household_id)
     for key in body.model_fields_set:
         value = getattr(body, key)
-        if value is not None:
+        if value is not None or key == "staples":
             setattr(row, key, value)
     await session.commit()
     return row

@@ -1,5 +1,8 @@
 import type { ISODate, ISODateTime, UUID } from './types'
 
+export type Course = 'breakfast' | 'lunch' | 'dinner' | 'side' | 'dessert' | 'baking' | 'drink' | 'snack' | 'condiment'
+export const COURSES: Course[] = ['breakfast', 'lunch', 'dinner', 'side', 'dessert', 'baking', 'drink', 'snack', 'condiment']
+
 export interface Ingredient {
   id: UUID
   position: number
@@ -25,6 +28,10 @@ export interface Recipe {
   source_name: string | null
   image_url: string | null
   ingredients: Ingredient[]
+  /** stored course, or the server's guess for older recipes */
+  course?: Course | null
+  /** prep_min + cook_min (null when neither is known) */
+  minutes?: number | null
   created_at: ISODateTime
   updated_at: ISODateTime
 }
@@ -64,6 +71,7 @@ export interface RecipeDraft {
   image_url: string | null
   source_url: string
   source_name: string | null
+  course?: Course | null
 }
 export interface RecipeInput {
   title: string
@@ -76,6 +84,8 @@ export interface RecipeInput {
   source_url: string | null
   source_name: string | null
   image_url: string | null
+  /** left out = kept on update; null = let the server work it out */
+  course?: Course | null
   ingredients: { raw: string; product_id?: UUID | null }[]
 }
 export interface ParsedLine {

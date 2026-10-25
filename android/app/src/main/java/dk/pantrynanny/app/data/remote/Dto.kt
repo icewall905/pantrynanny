@@ -86,6 +86,9 @@ data class CategoryDto(
     val color: String? = null,
     @SerialName("sort_order") val sortOrder: Int = 0,
     @SerialName("deleted_at") val deletedAt: String? = null,
+    /** Offered as "+N d" after a scan (not cached in Room; the scanner reads GET /api/categories). */
+    @SerialName("default_expiry_days") val defaultExpiryDays: Int? = null,
+    @SerialName("default_location_id") val defaultLocationId: String? = null,
 )
 
 @Serializable
