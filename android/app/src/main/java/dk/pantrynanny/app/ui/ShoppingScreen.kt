@@ -60,17 +60,25 @@ data class ShoppingData(val items: List<ShoppingItemDto>, val suggestions: List<
 
 class ShoppingViewModel(c: AppContainer) : RemoteVm<ShoppingData>(c) {
     override suspend fun fetch(): ApiResult<ShoppingData> {
-        val items = when (val r = c.api.get("api/shopping", ListSerializer(ShoppingItemDto.serializer()))) {
+        val items = when (val r = c.shoppingRepository.refresh()) {
             is ApiResult.Ok -> r.value
-            is ApiResult.HttpError -> return r
-            is ApiResult.NetworkError -> return r
+            is ApiResult.HttpError -> {
+                if (r.code != 408 && r.code != 429 && r.code < 500) return r
+                return c.shoppingRepository.cached()?.let { ApiResult.Ok(ShoppingData(it, emptyList())) } ?: r
+            }
+            is ApiResult.NetworkError -> return c.shoppingRepository.cached()?.let {
+                ApiResult.Ok(ShoppingData(it, emptyList()))
+            } ?: r
         }
         val sugg = (c.api.get("api/shopping/suggestions", ListSerializer(InventoryItemDto.serializer())) as? ApiResult.Ok)?.value
         return ApiResult.Ok(ShoppingData(items, sugg.orEmpty()))
     }
 
     init {
-        refresh()
+        viewModelScope.launch {
+            c.shoppingRepository.cached()?.let { showData(ShoppingData(it, emptyList())) }
+            refresh()
+        }
     }
 
     fun addText(name: String) = act(null) {

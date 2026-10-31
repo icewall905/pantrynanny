@@ -16,6 +16,7 @@ import dk.pantrynanny.app.data.NetworkMonitor
 import dk.pantrynanny.app.data.ScanRepository
 import dk.pantrynanny.app.data.SettingsStore
 import dk.pantrynanny.app.data.Snapshots
+import dk.pantrynanny.app.data.ShoppingRepository
 import dk.pantrynanny.app.data.SyncRepository
 import dk.pantrynanny.app.data.TokenStore
 import dk.pantrynanny.app.data.local.AppDatabase
@@ -53,7 +54,8 @@ class AppContainer(val app: Application) {
     val api = ApiClient(settings, tokens, imageCacheDir = java.io.File(app.cacheDir, "images"))
     val images = ImageRepository(api)
     val cache = CacheWriter(db)
-    val syncRepository = SyncRepository(db, api, settings, tokens, cache)
+    val shoppingRepository = ShoppingRepository(api, java.io.File(app.filesDir, "shopping.json"))
+    val syncRepository = SyncRepository(db, api, settings, tokens, cache, shoppingRepository)
     val scanRepository = ScanRepository(db)
     val barcodeLookup = BarcodeLookup(api, cache, scanRepository)
 
@@ -85,7 +87,10 @@ class AppContainer(val app: Application) {
         // App-wide foreground/background (not tied to the scanner screen being composed).
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStop(owner: LifecycleOwner) = scanGuard.onBackgrounded()
-            override fun onStart(owner: LifecycleOwner) = scanGuard.onForegrounded()
+            override fun onStart(owner: LifecycleOwner) {
+                scanGuard.onForegrounded()
+                requestSync()
+            }
         })
         scheduler.schedulePeriodic()
         network.start { if (tokens.token() != null) requestSync() }
@@ -126,6 +131,7 @@ class AppContainer(val app: Application) {
         syncRepository.exclusive {
             settings.setCursor(null)
             settings.setCacheOwner(null)
+            shoppingRepository.clear()
             withContext(Dispatchers.IO) { db.clearAllTables() }
         }
     }

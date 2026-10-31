@@ -17,7 +17,14 @@ The app opens in the scanner (quick scans in and out). The bottom bar has five t
 | **Mere** | Overview (numbers, use first, running low, products to name), activity timeline, assistant (suggested actions run only when tapped), settings, and a link to the web app for statistics, export and admin. |
 
 Stock changes (scans, take out, count, move, cooking, putting shopping away) go through the
-offline op queue. Lists such as shopping, recipes and the meal plan read and write the server
+offline op queue. The shopping list is saved in app-private storage after each successful refresh. The existing
+network-connected WorkManager job refreshes it in the background roughly every 15 minutes;
+login, app foregrounding and connectivity changes also trigger sync. Android may defer background
+work for battery saving, and force-stopping the app prevents it until the app is opened again.
+The shopping screen immediately displays the saved list, including after an app restart without
+internet, and retains it when the server is unreachable. A successful empty list replaces the old
+list; failed requests do not. Logout, cache clearing and account changes remove the saved list.
+Shopping edits still require a connection. Recipes and the meal plan read and write the server
 directly, and show "Ingen forbindelse" when it can't be reached.
 
 * Package: `dk.pantrynanny.app`, min SDK 26 (Android 8.0), compile/target SDK 37
@@ -170,7 +177,7 @@ app/src/test/             JVM unit tests (testDebugUnitTest)
 
 ## Known limitations
 
-* Product edits (PATCH with `If-Match`), shopping list, recipes, meal plan, details and the assistant need a
+* Product edits (PATCH with `If-Match`), shopping edits, recipes, meal plan, details and the assistant need a
   connection; stock changes are queued offline.
 * No on-device verification has been done by the authors of this scaffold beyond CI: please test the
   scanner on a real device (camera, autofocus, torch, beep/vibration) before relying on it.

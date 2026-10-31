@@ -32,6 +32,7 @@ class SyncRepository(
     private val settings: SettingsStore,
     private val tokens: TokenStore,
     private val cache: CacheWriter,
+    private val shopping: ShoppingRepository,
 ) {
     private val mutex = Mutex()
     private var forcePullNext = false // guarded by mutex
@@ -54,7 +55,14 @@ class SyncRepository(
         if (tokens.token() == null) return@withLock SyncOutcome.NOT_LOGGED_IN
         _syncing.value = true
         try {
-            doSync(forcePull)
+            // Refresh shopping even if inventory uploads fail: it has an independent endpoint.
+            val shoppingResult = shopping.refresh()
+            val inventoryResult = doSync(forcePull)
+            if (inventoryResult != SyncOutcome.SUCCESS) inventoryResult
+            else when (shoppingResult) {
+                is ApiResult.Ok -> SyncOutcome.SUCCESS
+                else -> mapError(shoppingResult)
+            }
         } finally {
             _syncing.value = false
         }

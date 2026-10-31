@@ -29,6 +29,8 @@ abstract class RemoteVm<T>(protected val c: AppContainer) : ViewModel() {
     private val _messages = MutableSharedFlow<UiMessage>(extraBufferCapacity = 8)
     val messages: SharedFlow<UiMessage> = _messages.asSharedFlow()
 
+    protected fun showData(data: T) { _state.value = Load.Ok(data) }
+
     protected abstract suspend fun fetch(): ApiResult<T>
 
     /** Reload; keeps showing the old data while it loads unless [spinner] is set. */
