@@ -58,6 +58,8 @@ import dk.pantrynanny.app.data.remote.RecipeSummaryDto
 import dk.pantrynanny.app.data.remote.ShoppingFromDto
 import dk.pantrynanny.app.domain.QuantityMath
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -83,12 +85,33 @@ class RecipesViewModel(c: AppContainer) : RemoteVm<List<RecipeSummaryDto>>(c) {
     var maxMinutes: Int? = null
         private set
 
-    override suspend fun fetch(): ApiResult<List<RecipeSummaryDto>> =
-        c.api.get(
-            "api/recipes/suggest",
+    private val _query = MutableStateFlow("")
+    val query: StateFlow<String> = _query.asStateFlow()
+
+    private var searchJob: Job? = null
+
+    fun setQuery(q: String) {
+        _query.value = q
+        searchJob?.cancel()
+        if (q.isBlank()) {
+            refresh(spinner = true)
+            return
+        }
+        searchJob = viewModelScope.launch {
+            delay(300)
+            if (_query.value == q) refresh()
+        }
+    }
+
+    override suspend fun fetch(): ApiResult<List<RecipeSummaryDto>> {
+        val q = _query.value
+        return c.api.get(
+            if (q.isBlank()) "api/recipes/suggest" else "api/recipes",
             ListSerializer(RecipeSummaryDto.serializer()),
-            maxMinutes?.let { mapOf("max_minutes" to it.toString()) } ?: emptyMap(),
+            if (q.isBlank()) maxMinutes?.let { mapOf("max_minutes" to it.toString()) } ?: emptyMap()
+            else mapOf("q" to q.trim()),
         )
+    }
 
     fun setMax(m: Int?) {
         maxMinutes = m
@@ -111,6 +134,7 @@ fun RecipesScreen(
 ) {
     val vm: RecipesViewModel = viewModel(factory = viewModelFactory { initializer { RecipesViewModel(container) } })
     val load by vm.state.collectAsStateWithLifecycle()
+    val query by vm.query.collectAsStateWithLifecycle()
     CollectMessages(vm.messages, snackbar)
     LaunchedEffect(Unit) { vm.refresh() }
     Column(Modifier.fillMaxSize()) {
@@ -118,17 +142,31 @@ fun RecipesScreen(
             IconButton(onClick = onNew) { Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.recipe_new)) }
         }
         FoodTabs(onRecipes = true, onSelectRecipes = {}, onSelectPlan = onPlan)
-        Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf<Int?>(null, 30, 60).forEach { m ->
-                FilterChip(
-                    selected = vm.maxMinutes == m,
-                    onClick = { vm.setMax(m) },
-                    label = { Text(if (m == null) stringResource(R.string.any_time) else stringResource(R.string.max_minutes, m.toString())) },
-                )
+        OutlinedTextField(
+            value = query,
+            onValueChange = vm::setQuery,
+            label = { Text(stringResource(R.string.recipes_search_hint)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+        )
+        if (query.isBlank()) {
+            Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf<Int?>(null, 30, 60).forEach { m ->
+                    FilterChip(
+                        selected = vm.maxMinutes == m,
+                        onClick = { vm.setMax(m) },
+                        label = { Text(if (m == null) stringResource(R.string.any_time) else stringResource(R.string.max_minutes, m.toString())) },
+                    )
+                }
             }
         }
         LoadBox(load, onRetry = { vm.refresh(spinner = true) }) { list ->
-            if (list.isEmpty()) EmptyText(stringResource(R.string.recipes_empty))
+            if (list.isEmpty()) {
+                EmptyText(
+                    if (query.isNotBlank()) stringResource(R.string.recipes_search_empty, query.trim())
+                    else stringResource(R.string.recipes_empty),
+                )
+            }
             LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(list, key = { it.recipe.id }) { s -> RecipeCard(s, onClick = { onOpen(s.recipe.id) }) }
             }

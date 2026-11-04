@@ -221,6 +221,8 @@
     <string name="recipe_edit">Ret opskrift</string>
     <string name="recipe_new">Ny opskrift</string>
     <string name="recipes_empty">Ingen opskrifter endnu. Tryk + for at skrive eller hente en.</string>
+    <string name="recipes_search_empty">Ingen opskrifter matcher %1$s</string>
+    <string name="recipes_search_hint">Søg i opskrifter</string>
     <string name="recipes_subtitle">Hvad kan vi lave?</string>
     <string name="refresh">Opdater</string>
     <string name="runout_line">Holder ca. %1$s dage mere i jeres tempo</string>
