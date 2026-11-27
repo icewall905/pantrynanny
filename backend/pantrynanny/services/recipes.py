@@ -32,10 +32,9 @@ from ..schemas.recipes import (
     RecipeIn,
     RecipeOut,
 )
-from ..schemas.shopping import ShoppingCreate
 from .households import get_household_settings
 from .inventory import batches_for, build_view
-from .shopping import add_item, has_open_named
+from .shopping import add_need, shopping_amount
 
 ZERO = Decimal(0)
 # what some importers saved instead of the ingredient list
@@ -462,19 +461,36 @@ async def add_missing_to_shopping(
                 continue
         elif it.status not in ("missing", "low"):
             continue
-        if it.status == "staple" or (
-            not it.product and await has_open_named(session, household_id, ing.name)
-        ):
+        if it.status == "staple":
             skipped.append(ing.name)
             continue
-        # whole packages: 0.2 l of a 1 l carton still means buying one carton
-        qty = max(Decimal(1), (it.need or Decimal(1)).to_integral_value(ROUND_UP))
-        body = (
-            ShoppingCreate(product_id=it.product.id, quantity=qty)
-            if it.product
-            else ShoppingCreate(name=ing.name[:200], quantity=Decimal(1))
-        )
-        body.note = f"{r.title}"[:500]
-        await add_item(session, household_id, body)
-        added.append(it.product.name if it.product else ing.name)
+        if it.product:
+            # whole packages: 0.2 l of a 1 l carton still means buying one carton
+            qty = max(Decimal(1), (it.need or Decimal(1)).to_integral_value(ROUND_UP))
+            _, how = await add_need(
+                session,
+                household_id,
+                name=it.product.name,
+                product_id=it.product.id,
+                amount=(qty, it.product.stock_unit),
+                note=r.title[:500],
+            )
+        else:
+            # the recipe's own amount (for the requested servings), merged with what is listed
+            qty = (
+                ing.quantity * Decimal(a.servings) / Decimal(r.servings or 1)
+                if ing.quantity is not None
+                else None
+            )
+            _, how = await add_need(
+                session,
+                household_id,
+                name=ing.name,
+                amount=shopping_amount(qty, ing.unit),
+                note=r.title[:500],
+            )
+        if how == "already":
+            skipped.append(it.product.name if it.product else ing.name)
+        else:
+            added.append(it.product.name if it.product else ing.name)
     return added, skipped

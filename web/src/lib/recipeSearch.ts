@@ -42,6 +42,10 @@ export function categoriesOf(list: RecipeSummary[]): string[] {
 export const inCategory = (s: RecipeSummary, cat: string | null) =>
   !cat || (s.recipe.categories ?? []).some((c) => c.toLowerCase() === cat.toLowerCase())
 
+/** Tagged anti-inflammatory (Mealie's "Anti-Inflammatory"; spelling and dashes do not matter). */
+export const isAntiInflammatory = (s: RecipeSummary) =>
+  s.recipe.tags.some((t) => fold(t).replace(/[^a-z]/g, '') === 'antiinflammatory' || fold(t).replace(/[^a-z]/g, '') === 'antiinflammatorisk')
+
 export const PAGE_SIZE = 24;
 
 /** Clamp `page` (0-based) and slice. */

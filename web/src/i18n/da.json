@@ -542,6 +542,7 @@
     "emptyHint": "Skriv jeres egne, eller hent en fra en opskriftsside.",
     "category": "Kategori",
     "allCategories": "Alle kategorier",
+    "antiInflammatory": "Antiinflammatorisk",
     "cookSearch": "Filtrér på navn, tag eller ingrediens",
     "findEmpty": "Intet passer på “{{q}}”",
     "pages": "Sider",

@@ -18,6 +18,13 @@ class RecipeFilterTest {
     }
 
     @Test
+    fun antiInflammatoryTag() {
+        assertTrue(RecipeFilter.isAntiInflammatory(listOf("Winter Recipe", "Anti-Inflammatory")))
+        assertTrue(RecipeFilter.isAntiInflammatory(listOf("antiinflammatorisk")))
+        assertFalse(RecipeFilter.isAntiInflammatory(listOf("Winter Recipe")))
+    }
+
+    @Test
     fun pages() {
         val xs = (0 until 45).toList()
         assertEquals(3, RecipeFilter.pageCount(45))

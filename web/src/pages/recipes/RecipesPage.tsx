@@ -1,5 +1,5 @@
 import { useDeferredValue, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { BookOpen, ChevronLeft, ChevronRight, Clock, Link2, Plus, Sparkles } from 'lucide-react'
@@ -9,20 +9,56 @@ import { Badge, Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListSk
 import { useToast } from '../../components/Toast'
 import { ApiError } from '../../api/client'
 import { cn } from '../../lib/format'
-import { categoriesOf, inCategory, matchesRecipe, pageOf } from '../../lib/recipeSearch'
+import { categoriesOf, inCategory, isAntiInflammatory, matchesRecipe, pageOf } from '../../lib/recipeSearch'
 
 type Tab = 'cook' | 'all'
 const TIMES = [null, 30, 60] as const
 
 export default function RecipesPage() {
   const { t } = useTranslation()
-  const [tab, setTab] = useState<Tab>('cook')
-  const [maxMin, setMaxMin] = useState<number | null>(null)
-  const [course, setCourse] = useState<Course | null>(null)
-  const [q, setQ] = useState('')
-  const [find, setFind] = useState('')
-  const [category, setCategory] = useState<string | null>(null)
-  const [pageAt, setPageAt] = useState({ key: '', page: 0 })
+  // Filters and page live in the URL, so coming back from a recipe lands where you were.
+  const [sp, setSp] = useSearchParams()
+  const put = (key: string, value: string | null, keepPage = false) =>
+    setSp(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        if (value) next.set(key, value)
+        else next.delete(key)
+        if (!keepPage) next.delete('page') // any filter change starts over on page 1
+        return next
+      },
+      { replace: true },
+    )
+  const tab: Tab = sp.get('tab') === 'all' ? 'all' : 'cook'
+  const setTab = (v: Tab) => put('tab', v === 'all' ? 'all' : null)
+  const maxMin = Number(sp.get('max')) || null
+  const setMaxMin = (v: number | null) => put('max', v ? String(v) : null)
+  const course = (COURSES as string[]).includes(sp.get('course') ?? '') ? (sp.get('course') as Course) : null
+  const setCourse = (v: Course | null) => put('course', v)
+  const q = sp.get('q') ?? ''
+  const setQ = (v: string) => put('q', v || null)
+  const find = sp.get('find') ?? ''
+  const setFind = (v: string) => put('find', v || null)
+  const category = sp.get('cat')
+  const setCategory = (v: string | null) => put('cat', v)
+  const pageParam = Math.max(0, (Number(sp.get('page')) || 1) - 1)
+  // remembered on this device: a standing diet choice, not a one-off filter
+  const [antiInfl, setAntiInflState] = useState(() => {
+    try {
+      return localStorage.getItem('pn.recipes.antiInflammatory') === '1'
+    } catch {
+      return false
+    }
+  })
+  const setAntiInfl = (v: boolean) => {
+    setAntiInflState(v)
+    try {
+      localStorage.setItem('pn.recipes.antiInflammatory', v ? '1' : '0')
+    } catch {
+      /* private mode: just not remembered */
+    }
+    put('page', null)
+  }
   const findLive = useDeferredValue(find)
   const [importOpen, setImportOpen] = useState(false)
   const suggest = useQuery({
@@ -41,13 +77,11 @@ export default function RecipesPage() {
   const shown = useMemo(
     () =>
       data.data?.filter(
-        (s) => inCategory(s, cat) && (tab !== 'cook' || matchesRecipe(s, findLive, s.recipe.course ? [t(`recipes.course_${s.recipe.course}`)] : [])),
+        (s) => inCategory(s, cat) && (!antiInfl || isAntiInflammatory(s)) && (tab !== 'cook' || matchesRecipe(s, findLive, s.recipe.course ? [t(`recipes.course_${s.recipe.course}`)] : [])),
       ),
-    [tab, data.data, findLive, cat, t],
+    [tab, data.data, findLive, cat, antiInfl, t],
   )
-  // any filter change starts over on page 1
-  const filterKey = [tab, maxMin, course, cat, findLive, q].join('|')
-  const paged = pageOf(shown ?? [], pageAt.key === filterKey ? pageAt.page : 0)
+  const paged = pageOf(shown ?? [], pageParam)
   return (
     <>
       <PageHeader
@@ -104,12 +138,18 @@ export default function RecipesPage() {
             ))}
           </select>
             <CategorySelect categories={categories} value={cat} onChange={setCategory} />
+            <Chip active={antiInfl} onClick={() => setAntiInfl(!antiInfl)}>
+              {t('recipes.antiInflammatory')}
+            </Chip>
           </div>
         </>
       ) : (
         <div className="mb-4 flex flex-wrap gap-2">
           <Input className="min-w-0 flex-1" placeholder={t('recipes.search')} value={q} onChange={(e) => setQ(e.target.value)} aria-label={t('recipes.search')} />
           <CategorySelect categories={categories} value={cat} onChange={setCategory} />
+          <Chip active={antiInfl} onClick={() => setAntiInfl(!antiInfl)}>
+            {t('recipes.antiInflammatory')}
+          </Chip>
         </div>
       )}
       {data.isError ? (
@@ -138,7 +178,7 @@ export default function RecipesPage() {
             pages={paged.pages}
             total={shown?.length ?? 0}
             onPage={(p) => {
-              setPageAt({ key: filterKey, page: p })
+              put('page', p > 0 ? String(p + 1) : null, true)
               window.scrollTo({ top: 0 })
             }}
           />

@@ -76,3 +76,11 @@ describe('categories', () => {
     expect(matchesRecipe(a, 'lunch')).toBe(true)
   })
 })
+
+describe('isAntiInflammatory', () => {
+  it('matches the tag however it is written', async () => {
+    const { isAntiInflammatory } = await import('./recipeSearch')
+    for (const tag of ['Anti-Inflammatory', 'anti inflammatory', 'Antiinflammatorisk']) expect(isAntiInflammatory(s('X', [tag], []))).toBe(true)
+    expect(isAntiInflammatory(s('X', ['Winter Recipe'], []))).toBe(false)
+  })
+})

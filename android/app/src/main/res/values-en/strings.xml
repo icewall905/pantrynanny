@@ -220,6 +220,7 @@
     <string name="recipe_delete_q">Delete this recipe?</string>
     <string name="recipe_edit">Edit recipe</string>
     <string name="recipe_new">New recipe</string>
+    <string name="anti_inflammatory">Anti-inflammatory</string>
     <string name="all_categories">All</string>
     <string name="page_prev">Previous</string>
     <string name="page_next">Next</string>

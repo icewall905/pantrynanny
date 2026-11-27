@@ -367,8 +367,15 @@ async def test_meal_plan_never_touches_stock_and_shops_for_the_week(env):
     r = await c.post("/api/meal-plan/shopping", json={"start": monday.isoformat()}, headers=h)
     # two omelets need 6 eggs, 4 in stock -> buy 2; cream is missing entirely
     assert sorted(r.json()["added"]) == ["fløde", "Æg"]
-    shop = {s["name"]: s["quantity"] for s in (await c.get("/api/shopping", headers=h)).json()}
-    assert shop == {"Æg": 2, "fløde": 1}
+    shop = {
+        s["name"]: (s["quantity"], s["unit"])
+        for s in (await c.get("/api/shopping", headers=h)).json()
+    }
+    assert shop == {"Æg": (2, "pcs"), "fløde": (2, "dl")}  # the recipe's amount, summed over meals
+    # asking again changes nothing
+    r = await c.post("/api/meal-plan/shopping", json={"start": monday.isoformat()}, headers=h)
+    assert r.json()["added"] == [] and sorted(r.json()["skipped"]) == ["fløde", "Æg"]
+    assert len((await c.get("/api/shopping", headers=h)).json()) == 2
 
     first = plan[0]["id"]
     r = await c.patch(f"/api/meal-plan/{first}", json={"cooked": True}, headers=h)
@@ -377,3 +384,52 @@ async def test_meal_plan_never_touches_stock_and_shops_for_the_week(env):
     assert (
         await c.post("/api/meal-plan", json={"day": monday.isoformat()}, headers=h)
     ).status_code == 422
+
+
+async def test_recipe_needs_merge_into_existing_list_items(env):
+    from decimal import Decimal
+
+    from pantrynanny.services.shopping import shopping_amount, sum_amounts
+
+    assert shopping_amount(Decimal(3), "tbsp") == (Decimal(45), "ml")
+    assert shopping_amount(Decimal(1200), "g") == (Decimal("1.2"), "kg")
+    assert shopping_amount(Decimal(2), "clove") == (Decimal(2), "pcs")
+    assert shopping_amount(Decimal(1), "pinch") is None and shopping_amount(None, "g") is None
+    assert sum_amounts([(Decimal(100), "g"), None, (Decimal(1), "kg"), (Decimal(2), "dl")]) == [
+        (Decimal(1100), "g"),
+        (Decimal(2), "dl"),
+    ]
+
+    c, h = env.client, env.member
+    # already listed by hand: cream in ml, sugar without a unit
+    await c.post("/api/shopping", json={"name": "Fløde", "quantity": 300, "unit": "ml"}, headers=h)
+    await c.post("/api/shopping", json={"name": "rosiner"}, headers=h)
+    rec = (
+        await c.post(
+            "/api/recipes",
+            json={
+                "title": "Creme",
+                "servings": 2,
+                "ingredients": [
+                    {"raw": "2 dl fløde"},
+                    {"raw": "100 g rosiner"},
+                    {"raw": "1 l mælk"},
+                ],
+            },
+            headers=h,
+        )
+    ).json()
+    r = await c.post(f"/api/recipes/{rec['id']}/shopping", json={"servings": 4}, headers=h)
+    assert sorted(r.json()["added"]) == ["fløde", "mælk", "rosiner"]
+    shop = {s["name"].lower(): s for s in (await c.get("/api/shopping", headers=h)).json()}
+    assert len(shop) == 3  # nothing listed twice
+    assert (shop["fløde"]["quantity"], shop["fløde"]["unit"]) == (700, "ml")  # 300 ml + 4 dl
+    assert (
+        shop["rosiner"]["quantity"] == 1 and "+200 g" in shop["rosiner"]["note"]
+    )  # units do not mix
+    assert (shop["mælk"]["quantity"], shop["mælk"]["unit"]) == (2, "l")
+    assert "Creme" in shop["fløde"]["note"]
+    # the same recipe again: already counted
+    r = await c.post(f"/api/recipes/{rec['id']}/shopping", json={"servings": 4}, headers=h)
+    assert r.json()["added"] == []
+    assert (await c.get("/api/shopping", headers=h)).json()[0]["quantity"] in (700, 1)

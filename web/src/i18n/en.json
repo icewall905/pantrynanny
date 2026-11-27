@@ -542,6 +542,7 @@
     "emptyHint": "Add your own or import one from a recipe website.",
     "category": "Category",
     "allCategories": "All categories",
+    "antiInflammatory": "Anti-inflammatory",
     "cookSearch": "Filter by name, tag or ingredient",
     "findEmpty": "Nothing matches “{{q}}”",
     "pages": "Pages",

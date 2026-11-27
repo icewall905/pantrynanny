@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Check, ChevronLeft, ChevronRight, Plus, ShoppingBasket, Trash2 } from 'lucide-react'
@@ -24,7 +24,21 @@ export default function MealPlanPage() {
   const { t, i18n } = useTranslation()
   const qc = useQueryClient()
   const toast = useToast()
-  const [start, setStart] = useState(() => monday(new Date()))
+  // the week lives in the URL (?week=YYYY-MM-DD), so coming back from a recipe lands on the same week
+  const [sp, setSp] = useSearchParams()
+  const [thisWeek] = useState(() => monday(new Date()))
+  const fromUrl = /^\d{4}-\d{2}-\d{2}$/.test(sp.get('week') ?? '') ? new Date(`${sp.get('week')}T00:00:00`) : null
+  const start = fromUrl && !Number.isNaN(fromUrl.getTime()) ? monday(fromUrl) : thisWeek
+  const setStart = (d: Date) =>
+    setSp(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        if (iso(d) === iso(thisWeek)) next.delete('week')
+        else next.set('week', iso(d))
+        return next
+      },
+      { replace: true },
+    )
   const [adding, setAdding] = useState<string | null>(null)
   const startIso = iso(start)
   const plan = useQuery({ queryKey: ['meal-plan', startIso], queryFn: () => get<Meal[]>(`/meal-plan?start=${startIso}&days=7`) })

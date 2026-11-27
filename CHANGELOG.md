@@ -13,6 +13,15 @@
   `/recipes` and `/recipes/suggest`.
 - Recipe cards show the photo and categories; a category picker sits next to the other filters (web) or as chips
   (Android).
+- **Anti-inflammatory toggle** on the recipe lists (web and Android), remembered per device: only recipes tagged
+  Anti-Inflammatory (Mealie's tag) are shown.
+- **Shopping from a recipe or the meal plan adds amounts and merges**: a line without a linked product now goes on
+  the list with the recipe's amount for the planned servings (3 spsk → 45 ml, 2 × 1 dl over the week → 2 dl) instead
+  of "1". Something already on the list (same product or same name) gets the amount added, converted when units mix
+  (300 ml + 4 dl = 700 ml); when they do not (200 g onto "1"), the extra is noted. The recipe names go in the note,
+  and asking again for the same recipe changes nothing.
+- **Back keeps your place**: the meal plan's week and the recipe lists' tab, filters and page are kept in the address
+  (web), and the Android recipe page survives the refresh on coming back.
 
 ## 2026-10-25 – recipes and stock data good enough for a diet coach
 

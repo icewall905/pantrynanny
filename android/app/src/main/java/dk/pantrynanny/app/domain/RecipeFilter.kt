@@ -18,6 +18,10 @@ object RecipeFilter {
         return words.all { hay.contains(it) }
     }
 
+    /** Tagged anti-inflammatory (Mealie's "Anti-Inflammatory"; spelling and dashes do not matter). */
+    fun isAntiInflammatory(tags: List<String>): Boolean =
+        tags.any { fold(it).replace(Regex("[^a-z]"), "") in setOf("antiinflammatory", "antiinflammatorisk") }
+
     fun pageCount(size: Int, pageSize: Int = PAGE_SIZE) = maxOf(1, (size + pageSize - 1) / pageSize)
 
     /** The 0-based [page] (clamped) of [items]. */

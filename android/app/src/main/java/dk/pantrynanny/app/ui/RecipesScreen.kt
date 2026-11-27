@@ -39,10 +39,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -53,6 +55,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import android.content.Context
 import dk.pantrynanny.app.AppContainer
 import dk.pantrynanny.app.R
 import dk.pantrynanny.app.data.remote.ApiResult
@@ -184,17 +187,31 @@ fun RecipesScreen(
                     .distinctBy { it.lowercase() }.sortedBy { it.lowercase() }
             }
             var picked by rememberSaveable { mutableStateOf<String?>(null) }
+            // remembered on this device: a standing diet choice, not a one-off filter
+            val prefs = LocalContext.current.getSharedPreferences("recipes", Context.MODE_PRIVATE)
+            var antiInfl by remember { mutableStateOf(prefs.getBoolean("anti_inflammatory", false)) }
             val cat = picked?.takeIf { p -> categories.any { it.equals(p, ignoreCase = true) } }
             fun keep(s: RecipeSummaryDto) =
                 (cat == null || s.recipe.categories.any { it.equals(cat, ignoreCase = true) }) &&
+                    (!antiInfl || RecipeFilter.isAntiInflammatory(s.recipe.tags)) &&
                     RecipeFilter.matches(query, s.searchFields())
-            val shown = remember(data, query, cat) { data.cookable.filter(::keep) }
-            val others = remember(data, query, cat) { data.others.filter(::keep) }
-            if (categories.isNotEmpty()) {
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
+            val shown = remember(data, query, cat, antiInfl) { data.cookable.filter(::keep) }
+            val others = remember(data, query, cat, antiInfl) { data.others.filter(::keep) }
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                item(key = "anti") {
+                    FilterChip(
+                        selected = antiInfl,
+                        onClick = {
+                            antiInfl = !antiInfl
+                            prefs.edit().putBoolean("anti_inflammatory", antiInfl).apply()
+                        },
+                        label = { Text(stringResource(R.string.anti_inflammatory)) },
+                    )
+                }
+                if (categories.isNotEmpty()) {
                     item {
                         FilterChip(selected = cat == null, onClick = { picked = null }, label = { Text(stringResource(R.string.all_categories)) })
                     }
@@ -207,10 +224,16 @@ fun RecipesScreen(
                     }
                 }
             }
-            var page by remember(shown) { mutableStateOf(0) }
+            // Saveable and keyed on the filters only: a refresh on coming back keeps the page.
+            var page by rememberSaveable(query, cat, antiInfl, vm.maxMinutes) { mutableStateOf(0) }
             val pages = RecipeFilter.pageCount(shown.size)
+            if (page > pages - 1) page = pages - 1
             val listState = rememberLazyListState()
-            LaunchedEffect(page) { listState.scrollToItem(0) }
+            val scope = rememberCoroutineScope()
+            fun goTo(p: Int) {
+                page = p
+                scope.launch { listState.scrollToItem(0) }
+            }
             if (shown.isEmpty() && others.isEmpty()) {
                 EmptyText(
                     if (query.isNotBlank()) stringResource(R.string.recipes_search_empty, query.trim())
@@ -226,14 +249,14 @@ fun RecipesScreen(
                 if (shown.isNotEmpty()) {
                     item(key = "pager") {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            TextButton(onClick = { page-- }, enabled = page > 0) { Text(stringResource(R.string.page_prev)) }
+                            TextButton(onClick = { goTo(page - 1) }, enabled = page > 0) { Text(stringResource(R.string.page_prev)) }
                             Text(
                                 stringResource(R.string.page_of, (page + 1).toString(), pages.toString(), shown.size.toString()),
                                 style = MaterialTheme.typography.bodySmall,
                                 modifier = Modifier.weight(1f),
                                 textAlign = TextAlign.Center,
                             )
-                            TextButton(onClick = { page++ }, enabled = page < pages - 1) { Text(stringResource(R.string.page_next)) }
+                            TextButton(onClick = { goTo(page + 1) }, enabled = page < pages - 1) { Text(stringResource(R.string.page_next)) }
                         }
                     }
                 }

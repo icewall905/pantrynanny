@@ -13,10 +13,9 @@ from ..db import get_session
 from ..errors import AppError, not_found
 from ..models import MealPlanEntry, Recipe
 from ..schemas.recipes import MealIn, MealOut, MealPatch, PlanShoppingIn, ShoppingFromOut
-from ..schemas.shopping import ShoppingCreate
 from ..security import Principal, get_principal
 from ..services import recipes as rsvc
-from ..services.shopping import add_item, has_open_named
+from ..services.shopping import add_need, shopping_amount, sum_amounts
 
 router = APIRouter(tags=["meal-plan"])
 
@@ -166,7 +165,7 @@ async def plan_to_shopping(
     recipes = await _recipes(session, hh, {e.recipe_id for e in entries})
     products = await rsvc.pantry(session, hh)
     by_product: dict = {}
-    by_name: dict[str, str] = {}
+    by_name: list[tuple[str, tuple | None, str]] = []  # (name, amount, recipe title)
     for e in entries:
         r = recipes.get(e.recipe_id)
         if not r or r.deleted_at:
@@ -177,25 +176,46 @@ async def plan_to_shopping(
                 continue
             if it.product:
                 need = it.need if it.need is not None else Decimal(1)
-                cur = by_product.setdefault(it.product.id, [it.product, Decimal(0), r.title])
+                cur = by_product.setdefault(it.product.id, [it.product, Decimal(0), []])
                 cur[1] += need
+                cur[2].append(r.title)
             elif it.status == "missing":
-                by_name.setdefault(it.ingredient.name.lower(), it.ingredient.name)
+                ing = it.ingredient
+                qty = (
+                    ing.quantity * Decimal(a.servings) / Decimal(r.servings or 1)
+                    if ing.quantity is not None
+                    else None
+                )
+                by_name.append((ing.name, shopping_amount(qty, ing.unit), r.title))
     added: list[str] = []
     skipped: list[str] = []
-    for pid, (p, need, title) in by_product.items():
+    for pid, (p, need, titles) in by_product.items():
         short = need - p.total_quantity
         if short <= 0:
             skipped.append(p.name)
             continue
         qty = max(Decimal(1), short.to_integral_value(rounding="ROUND_UP"))
-        await add_item(session, hh, ShoppingCreate(product_id=pid, quantity=qty, note=title[:500]))
-        added.append(p.name)
-    for name in by_name.values():
-        if await has_open_named(session, hh, name):
-            skipped.append(name)
-            continue
-        await add_item(session, hh, ShoppingCreate(name=name[:200], quantity=Decimal(1)))
-        added.append(name)
+        _, how = await add_need(
+            session,
+            hh,
+            name=p.name,
+            product_id=pid,
+            amount=(qty, p.stock_unit),
+            note=", ".join(dict.fromkeys(titles))[:500],
+        )
+        (skipped if how == "already" else added).append(p.name)
+    # same-named lines (also across recipes) become one item with the amounts summed
+    grouped: dict[str, list] = {}
+    for name, amount, title in by_name:
+        g = grouped.setdefault(name.lower(), [name, [], []])
+        g[1].append(amount)
+        g[2].append(title)
+    for name, amounts, titles in grouped.values():
+        note = ", ".join(dict.fromkeys(titles))[:500]
+        hows = [
+            (await add_need(session, hh, name=name, amount=amt, note=note))[1]
+            for amt in sum_amounts(amounts)
+        ]
+        (skipped if hows and all(h == "already" for h in hows) else added).append(name)
     await session.commit()
     return ShoppingFromOut(added=added, skipped=skipped)
