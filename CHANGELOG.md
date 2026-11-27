@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-11-27 – every cookable recipe, live search, Mealie photos and categories
+
+- **"What can we cook?" shows every match**, not the first 20: `GET /recipes/suggest` returns all matches unless
+  `limit` is given, and takes `q`. Web pages 24 cards at a time, Android 20, with a page count.
+- **Live filter** on "What can we cook?" (web and Android): every word must appear in the title, tags, categories,
+  course, ingredients, description, source or what it uses up; `#tag` works too. On Android, other saved recipes
+  that match (but miss more) are listed below.
+- **Mealie import** (`pantrynanny-admin import-mealie`, [docs/mealie-import.md](docs/mealie-import.md)): re-runnable,
+  matches recipes from an earlier import, copies photos into PantryNanny's own storage, and brings categories and
+  tags. Recipes have a new `categories` list (migration 0012, also `external_id`), filter `category=` on
+  `/recipes` and `/recipes/suggest`.
+- Recipe cards show the photo and categories; a category picker sits next to the other filters (web) or as chips
+  (Android).
+
 ## 2026-10-25 – recipes and stock data good enough for a diet coach
 
 - **Matching recipe lines to products** (measured with the new `scripts/match_eval.py` on a hand-checked golden set

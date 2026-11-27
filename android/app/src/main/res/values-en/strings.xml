@@ -220,9 +220,14 @@
     <string name="recipe_delete_q">Delete this recipe?</string>
     <string name="recipe_edit">Edit recipe</string>
     <string name="recipe_new">New recipe</string>
+    <string name="all_categories">All</string>
+    <string name="page_prev">Previous</string>
+    <string name="page_next">Next</string>
+    <string name="page_of">Page %1$s of %2$s · %3$s recipes</string>
+    <string name="recipes_other_matches">Other recipes (missing more)</string>
     <string name="recipes_empty">No recipes yet. Tap + to write or import one.</string>
     <string name="recipes_search_empty">No recipes matching %1$s</string>
-    <string name="recipes_search_hint">Search recipes</string>
+    <string name="recipes_search_hint">Search: name, tag, ingredient</string>
     <string name="recipes_subtitle">What can we cook?</string>
     <string name="refresh">Refresh</string>
     <string name="runout_line">Lasts about %1$s more days at your pace</string>

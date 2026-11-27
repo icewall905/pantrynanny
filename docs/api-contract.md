@@ -293,7 +293,7 @@ None of them change stock except through the normal ops in §3 (`POST /sync/ops`
 | `GET/POST /recipes`, `GET/PUT/DELETE /recipes/{id}` | Recipe CRUD. Ingredients are sent as raw lines and parsed server-side. `PUT` accepts `If-Match`. |
 | `POST /recipes/parse {lines}` | Preview how ingredient lines are understood. |
 | `POST /recipes/import {url}` | Read a schema.org Recipe (JSON-LD, else microdata) from a public page. Returns a draft (now with `course`); nothing is saved. See below. |
-| `GET /recipes/suggest?max_minutes&servings&max_missing&limit` | "What can we cook": saved recipes ranked by availability. Filters and `include=summary`: §8.1. |
+| `GET /recipes/suggest?max_minutes&servings&max_missing&limit&q` | "What can we cook": saved recipes ranked by availability; all of them unless `limit` is given, `q` = title/tag contains. Filters and `include=summary`: §8.1. |
 | `GET /recipes/{id}/availability?servings` | Per ingredient: `have`/`low`/`missing`/`staple`/`optional`, matched product, `need` in the product's stock unit. |
 | `POST /recipes/{id}/shopping {servings?, ingredient_ids?}` | Add missing ingredients to the shopping list (no duplicate free-text items). |
 | `GET /meal-plan?start&days`, `POST /meal-plan`, `PATCH/DELETE /meal-plan/{id}` | Meal plan. `PATCH {cooked}` only stamps the entry. Planning never changes stock. |
@@ -330,11 +330,17 @@ update that leaves it out keeps the stored value.
 | `course` (repeatable) | Only these courses, e.g. `course=lunch&course=dinner`. |
 | `exclude_course` (repeatable) | Leave these out. |
 | `tag` (repeatable) | Has every tag (case-insensitive). |
+| `category` (repeatable) | In any of these categories (case-insensitive). |
 | `min_ingredients` | At least this many required ingredients (not staple, not optional). |
 | `include=summary` | One flat row per recipe instead of `{recipe, availability}` (below). Default `full`. |
-| `q` (`/recipes` only) | Title/tag search, as before. |
+| `q` | Title/tag/category contains. |
+| `limit` (`/suggest` only) | At most this many; default: every match (clients page the list). |
 
-`include=summary` rows: `{id, title, course, tags, servings, prep_min, cook_min, minutes, source_url, coverage,
+`categories` (recipe and summary rows): free-form labels such as Mealie's ("Dinner", "School Lunch"), separate from
+tags and from `course`. An update that leaves `categories` out keeps them. `image_url` is an http(s) URL or one of
+our stored photos, `/api/media/<hex>.webp` (e.g. copied in by the Mealie import).
+
+`include=summary` rows: `{id, title, course, tags, categories, servings, prep_min, cook_min, minutes, source_url, coverage,
 have, required, missing, missing_names, low_names, staple_names, uses_expiring}` — no instructions or ingredient
 objects. Lists are ordered deterministically: `/recipes` by title then id, `/suggest` as below.
 

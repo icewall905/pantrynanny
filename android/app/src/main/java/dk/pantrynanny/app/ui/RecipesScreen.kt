@@ -7,9 +7,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -35,11 +39,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -57,6 +63,7 @@ import dk.pantrynanny.app.data.remote.RecipeDto
 import dk.pantrynanny.app.data.remote.RecipeSummaryDto
 import dk.pantrynanny.app.data.remote.ShoppingFromDto
 import dk.pantrynanny.app.domain.QuantityMath
+import dk.pantrynanny.app.domain.RecipeFilter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -81,7 +88,10 @@ fun FoodTabs(onRecipes: Boolean, onSelectRecipes: () -> Unit, onSelectPlan: () -
     }
 }
 
-class RecipesViewModel(c: AppContainer) : RemoteVm<List<RecipeSummaryDto>>(c) {
+/** Cookable recipes (all of them, ranked) plus, while searching, other saved recipes that match. */
+data class RecipesData(val cookable: List<RecipeSummaryDto>, val others: List<RecipeSummaryDto> = emptyList())
+
+class RecipesViewModel(c: AppContainer) : RemoteVm<RecipesData>(c) {
     var maxMinutes: Int? = null
         private set
 
@@ -90,27 +100,33 @@ class RecipesViewModel(c: AppContainer) : RemoteVm<List<RecipeSummaryDto>>(c) {
 
     private var searchJob: Job? = null
 
+    /** The cookable list filters live on the phone; other saved recipes come from the server. */
     fun setQuery(q: String) {
+        val wasBlank = _query.value.isBlank()
         _query.value = q
         searchJob?.cancel()
-        if (q.isBlank()) {
-            refresh(spinner = true)
-            return
-        }
+        if (q.isBlank() && wasBlank) return
         searchJob = viewModelScope.launch {
-            delay(300)
+            if (q.isNotBlank()) delay(300)
             if (_query.value == q) refresh()
         }
     }
 
-    override suspend fun fetch(): ApiResult<List<RecipeSummaryDto>> {
-        val q = _query.value
-        return c.api.get(
-            if (q.isBlank()) "api/recipes/suggest" else "api/recipes",
-            ListSerializer(RecipeSummaryDto.serializer()),
-            if (q.isBlank()) maxMinutes?.let { mapOf("max_minutes" to it.toString()) } ?: emptyMap()
-            else mapOf("q" to q.trim()),
-        )
+    override suspend fun fetch(): ApiResult<RecipesData> {
+        val q = _query.value.trim()
+        val ser = ListSerializer(RecipeSummaryDto.serializer())
+        val cookable = when (
+            val r = c.api.get("api/recipes/suggest", ser, maxMinutes?.let { mapOf("max_minutes" to it.toString()) } ?: emptyMap())
+        ) {
+            is ApiResult.Ok -> r.value
+            is ApiResult.HttpError -> return r
+            is ApiResult.NetworkError -> return r
+        }
+        if (q.isEmpty()) return ApiResult.Ok(RecipesData(cookable))
+        val ids = cookable.mapTo(HashSet()) { it.recipe.id }
+        val others = (c.api.get("api/recipes", ser, mapOf("q" to q)) as? ApiResult.Ok)?.value
+            ?.filter { it.recipe.id !in ids }.orEmpty()
+        return ApiResult.Ok(RecipesData(cookable, others))
     }
 
     fun setMax(m: Int?) {
@@ -122,6 +138,10 @@ class RecipesViewModel(c: AppContainer) : RemoteVm<List<RecipeSummaryDto>>(c) {
         refresh()
     }
 }
+
+private fun RecipeSummaryDto.searchFields(): List<String> =
+    listOfNotNull(recipe.title, recipe.description, recipe.sourceName) + recipe.tags + recipe.categories +
+        recipe.ingredients.map { it.name.ifBlank { it.raw } } + availability.usesExpiring
 
 /** "What can we cook?": saved recipes ranked by what is at home. */
 @Composable
@@ -149,26 +169,80 @@ fun RecipesScreen(
             singleLine = true,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
         )
-        if (query.isBlank()) {
-            Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf<Int?>(null, 30, 60).forEach { m ->
-                    FilterChip(
-                        selected = vm.maxMinutes == m,
-                        onClick = { vm.setMax(m) },
-                        label = { Text(if (m == null) stringResource(R.string.any_time) else stringResource(R.string.max_minutes, m.toString())) },
-                    )
-                }
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf<Int?>(null, 30, 60).forEach { m ->
+                FilterChip(
+                    selected = vm.maxMinutes == m,
+                    onClick = { vm.setMax(m) },
+                    label = { Text(if (m == null) stringResource(R.string.any_time) else stringResource(R.string.max_minutes, m.toString())) },
+                )
             }
         }
-        LoadBox(load, onRetry = { vm.refresh(spinner = true) }) { list ->
-            if (list.isEmpty()) {
+        LoadBox(load, onRetry = { vm.refresh(spinner = true) }) { data ->
+            val categories = remember(data) {
+                (data.cookable + data.others).flatMap { it.recipe.categories }
+                    .distinctBy { it.lowercase() }.sortedBy { it.lowercase() }
+            }
+            var picked by rememberSaveable { mutableStateOf<String?>(null) }
+            val cat = picked?.takeIf { p -> categories.any { it.equals(p, ignoreCase = true) } }
+            fun keep(s: RecipeSummaryDto) =
+                (cat == null || s.recipe.categories.any { it.equals(cat, ignoreCase = true) }) &&
+                    RecipeFilter.matches(query, s.searchFields())
+            val shown = remember(data, query, cat) { data.cookable.filter(::keep) }
+            val others = remember(data, query, cat) { data.others.filter(::keep) }
+            if (categories.isNotEmpty()) {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    item {
+                        FilterChip(selected = cat == null, onClick = { picked = null }, label = { Text(stringResource(R.string.all_categories)) })
+                    }
+                    items(categories, key = { "c$it" }) { c ->
+                        FilterChip(
+                            selected = cat.equals(c, ignoreCase = true),
+                            onClick = { picked = if (cat.equals(c, ignoreCase = true)) null else c },
+                            label = { Text(c) },
+                        )
+                    }
+                }
+            }
+            var page by remember(shown) { mutableStateOf(0) }
+            val pages = RecipeFilter.pageCount(shown.size)
+            val listState = rememberLazyListState()
+            LaunchedEffect(page) { listState.scrollToItem(0) }
+            if (shown.isEmpty() && others.isEmpty()) {
                 EmptyText(
                     if (query.isNotBlank()) stringResource(R.string.recipes_search_empty, query.trim())
                     else stringResource(R.string.recipes_empty),
                 )
             }
-            LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(list, key = { it.recipe.id }) { s -> RecipeCard(s, onClick = { onOpen(s.recipe.id) }) }
+            LazyColumn(
+                Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                state = listState,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(RecipeFilter.page(shown, page), key = { it.recipe.id }) { s -> RecipeCard(s, onClick = { onOpen(s.recipe.id) }) }
+                if (shown.isNotEmpty()) {
+                    item(key = "pager") {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            TextButton(onClick = { page-- }, enabled = page > 0) { Text(stringResource(R.string.page_prev)) }
+                            Text(
+                                stringResource(R.string.page_of, (page + 1).toString(), pages.toString(), shown.size.toString()),
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.weight(1f),
+                                textAlign = TextAlign.Center,
+                            )
+                            TextButton(onClick = { page++ }, enabled = page < pages - 1) { Text(stringResource(R.string.page_next)) }
+                        }
+                    }
+                }
+                if (others.isNotEmpty()) {
+                    item(key = "others") {
+                        Text(stringResource(R.string.recipes_other_matches), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp))
+                    }
+                    items(others, key = { "o" + it.recipe.id }) { s -> RecipeCard(s, onClick = { onOpen(s.recipe.id) }) }
+                }
             }
         }
     }
@@ -178,16 +252,21 @@ fun RecipesScreen(
 private fun RecipeCard(s: RecipeSummaryDto, onClick: () -> Unit) {
     val a = s.availability
     SectionCard(onClick = onClick) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(s.recipe.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-            if (a.missing == 0) Pill(stringResource(R.string.all_home), AddColor)
-            else Pill(stringResource(R.string.missing_n, a.missing.toString()), WarnColor)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (s.recipe.imageUrl != null) ProductImage(s.recipe.imageUrl, null, Modifier.size(64.dp))
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(s.recipe.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                    if (a.missing == 0) Pill(stringResource(R.string.all_home), AddColor)
+                    else Pill(stringResource(R.string.missing_n, a.missing.toString()), WarnColor)
+                }
+                val meta = listOfNotNull(
+                    s.recipe.totalMinutes.takeIf { it > 0 }?.let { stringResource(R.string.minutes, it.toString()) },
+                    stringResource(R.string.servings, s.recipe.servings.toString()),
+                ) + s.recipe.categories.take(2)
+                Text(meta.joinToString(" · "), style = MaterialTheme.typography.bodySmall)
+            }
         }
-        val meta = listOfNotNull(
-            s.recipe.totalMinutes.takeIf { it > 0 }?.let { stringResource(R.string.minutes, it.toString()) },
-            stringResource(R.string.servings, s.recipe.servings.toString()),
-        )
-        Text(meta.joinToString(" · "), style = MaterialTheme.typography.bodySmall)
         LinearProgressIndicator(progress = { a.coverage.toFloat() }, modifier = Modifier.fillMaxWidth())
         if (a.usesExpiring.isNotEmpty()) {
             Text(stringResource(R.string.uses_up, a.usesExpiring.joinToString(", ")), color = WarnColor, style = MaterialTheme.typography.bodySmall)

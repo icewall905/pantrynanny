@@ -104,6 +104,7 @@ data class RecipeDto(
     @SerialName("cook_min") val cookMin: Int? = null,
     val instructions: List<String> = emptyList(),
     val tags: List<String> = emptyList(),
+    val categories: List<String> = emptyList(),
     @SerialName("source_url") val sourceUrl: String? = null,
     @SerialName("source_name") val sourceName: String? = null,
     @SerialName("image_url") val imageUrl: String? = null,

@@ -74,6 +74,7 @@ def recipe_out(r: Recipe) -> RecipeOut:
         cook_min=r.cook_min,
         instructions=list(r.instructions or []),
         tags=list(r.tags or []),
+        categories=list(r.categories or []),
         course=course_of(r),  # type: ignore[arg-type]
         minutes=minutes(r),
         source_url=r.source_url,
@@ -119,6 +120,7 @@ async def list_recipes(
     q: str | None = None,
     *,
     tags: list[str] | None = None,
+    categories: list[str] | None = None,
 ) -> list[Recipe]:
     """Ordered by title, then id (stable for machine clients)."""
     stmt = select(Recipe).where(Recipe.household_id == household_id, Recipe.deleted_at.is_(None))
@@ -128,12 +130,16 @@ async def list_recipes(
             or_(
                 func.lower(Recipe.title).like(like),
                 func.lower(func.array_to_string(Recipe.tags, " ")).like(like),
+                func.lower(func.array_to_string(Recipe.categories, " ")).like(like),
             )
         )
     recipes = list((await session.execute(stmt.order_by(Recipe.title, Recipe.id))).scalars().all())
     if tags:  # every tag must be there (case-insensitive)
         want = {t.strip().lower() for t in tags if t.strip()}
         recipes = [r for r in recipes if want <= {t.lower() for t in r.tags or []}]
+    if categories:  # any of them (case-insensitive)
+        cats = {c.strip().lower() for c in categories if c.strip()}
+        recipes = [r for r in recipes if cats & {c.lower() for c in r.categories or []}]
     return recipes
 
 
@@ -215,8 +221,8 @@ async def update_recipe(
         session, household_id, {i.product_id for i in body.ingredients if i.product_id}
     )
     for k, v in body.model_dump(exclude={"ingredients"}).items():
-        if k == "course" and "course" not in body.model_fields_set:
-            continue  # clients that do not know about courses keep the stored one
+        if k in ("course", "categories") and k not in body.model_fields_set:
+            continue  # clients that do not know about these keep the stored value
         setattr(r, k, v)
     r.ingredients = _ingredients(body, household_id)
     r.version += 1
@@ -422,6 +428,7 @@ def brief(r: Recipe, a: Availability) -> RecipeBrief:
         title=r.title,
         course=course_of(r),  # type: ignore[arg-type]
         tags=list(r.tags or []),
+        categories=list(r.categories or []),
         servings=a.servings,
         prep_min=r.prep_min,
         cook_min=r.cook_min,

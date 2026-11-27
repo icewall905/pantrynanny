@@ -290,6 +290,13 @@ async def test_what_can_we_cook_ranks_cookable_and_expiring_first(env):
     assert r.json()[2]["availability"]["missing"] == 1
     r = await c.get("/api/recipes/suggest?max_minutes=60&max_missing=0", headers=h)
     assert [x["recipe"]["title"] for x in r.json()] == ["Spinatomelet", "Omelet"]
+    r = await c.get("/api/recipes/suggest?max_minutes=60&q=omelet", headers=h)
+    assert [x["recipe"]["title"] for x in r.json()] == ["Spinatomelet", "Omelet"]
+    r = await c.get("/api/recipes/suggest?max_minutes=60&limit=1", headers=h)
+    assert [x["recipe"]["title"] for x in r.json()] == ["Spinatomelet"]
+    for i in range(25):  # no hidden cap: every match comes back
+        await mk(f"Æggeret {i:02d}", ["1 æg"])
+    assert len((await c.get("/api/recipes/suggest", headers=h)).json()) == 25 + 4
     assert eggs  # untouched: suggesting never changes stock
     inv = (await c.get(f"/api/inventory/{eggs['id']}", headers=h)).json()
     assert inv["total_quantity"] == 6

@@ -49,6 +49,7 @@ def _filters(
     course: list[Course] | None = Query(default=None, description="Only these courses"),
     exclude_course: list[Course] | None = Query(default=None, description="Leave these out"),
     tag: list[str] | None = Query(default=None, max_length=20, description="Has every tag"),
+    category: list[str] | None = Query(default=None, max_length=20, description="In any of these"),
     min_ingredients: int | None = Query(
         default=None, ge=0, le=100, description="At least this many required, non-staple lines"
     ),
@@ -57,6 +58,7 @@ def _filters(
         "courses": course,
         "exclude_courses": exclude_course,
         "tags": tag,
+        "categories": category,
         "min_ingredients": min_ingredients,
     }
 
@@ -78,7 +80,9 @@ async def list_recipes(
 ):
     """All saved recipes (by title) with what is in the house. `include=summary` returns one
     flat row per recipe without instructions or ingredient objects."""
-    recipes = await svc.list_recipes(session, principal.household_id, q, tags=filters["tags"])
+    recipes = await svc.list_recipes(
+        session, principal.household_id, q, tags=filters["tags"], categories=filters["categories"]
+    )
     recipes = svc.filter_course(recipes, filters["courses"], filters["exclude_courses"])
     products = await svc.pantry(session, principal.household_id)
     soon, today = await _soon_days(session, principal.household_id), _today(request)
@@ -94,7 +98,8 @@ async def what_can_we_cook(
     max_minutes: int | None = Query(default=None, ge=1, le=10_000),
     servings: int | None = Query(default=None, ge=1, le=100),
     max_missing: int = Query(default=1, ge=0, le=100),
-    limit: int = Query(default=20, ge=1, le=100),
+    limit: int | None = Query(default=None, ge=1, le=10_000, description="Default: all"),
+    q: str | None = Query(default=None, max_length=200, description="Title or tag contains"),
     include: Include = "full",
     filters: dict = Depends(_filters),
     principal: Principal = Depends(get_principal),
@@ -102,8 +107,11 @@ async def what_can_we_cook(
 ):
     """Saved recipes ranked by what is in the house right now (deterministic, no AI). Only
     recipes missing at most `max_missing` required ingredients (default: one shopping trip
-    item) are suggested; see services.recipes.rank for the order."""
-    recipes = await svc.list_recipes(session, principal.household_id, tags=filters["tags"])
+    item) are suggested; see services.recipes.rank for the order. Returns every match unless
+    `limit` is given (clients page the list themselves)."""
+    recipes = await svc.list_recipes(
+        session, principal.household_id, q, tags=filters["tags"], categories=filters["categories"]
+    )
     recipes = svc.filter_course(recipes, filters["courses"], filters["exclude_courses"])
     products = await svc.pantry(session, principal.household_id)
     soon, today = await _soon_days(session, principal.household_id), _today(request)
@@ -117,7 +125,7 @@ async def what_can_we_cook(
         max_missing=max_missing,
         min_ingredients=filters["min_ingredients"],
     )
-    return _rows(ranked[:limit], include)
+    return _rows(ranked if limit is None else ranked[:limit], include)
 
 
 @router.post("/recipes/parse", response_model=list[ParsedLine])

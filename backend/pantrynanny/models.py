@@ -501,6 +501,11 @@ class Recipe(Base):
         ARRAY(Text), default=list, server_default=text("'{}'")
     )
     tags: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list, server_default=text("'{}'"))
+    categories: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), default=list, server_default=text("'{}'")
+    )
+    # where an imported recipe came from ("mealie:<uuid>"); unique per household
+    external_id: Mapped[str | None] = mapped_column(Text)
     # breakfast | lunch | dinner | side | dessert | baking | drink | snack | condiment
     course: Mapped[str | None] = mapped_column(String(16))
     # when the source page was last re-read for missing times/course (resumable backfill)

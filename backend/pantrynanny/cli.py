@@ -60,11 +60,60 @@ async def _run(args: argparse.Namespace) -> None:
         if args.command == "backfill-recipes":
             await _backfill(sm, args)
             return
+        if args.command == "import-mealie":
+            await _import_mealie(sm, args)
+            return
         async with sm() as session:
             await _dispatch(session, args)
             await session.commit()
     finally:
         await engine.dispose()
+
+
+async def _import_mealie(sm, args: argparse.Namespace) -> None:
+    import getpass
+    import os
+
+    import httpx
+
+    from .services import mealie_import
+
+    token = os.environ.get("PN_MEALIE_TOKEN", "").strip()
+    if args.token_file:
+        from pathlib import Path
+
+        token = Path(args.token_file).read_text(encoding="utf-8").strip()  # noqa: ASYNC240
+    if not token:
+        token = getpass.getpass("Mealie API token: ").strip()
+    if not token:
+        raise CliError("a Mealie API token is needed (PN_MEALIE_TOKEN, --token-file or prompt)")
+    async with sm() as session:
+        hh = await _household(session, args.household)
+
+    def progress(st: mealie_import.MealieStats) -> None:
+        print(
+            f"  {st.seen} seen: {st.created} new, {st.updated} updated, {st.images} photos",
+            flush=True,
+        )
+
+    async with httpx.AsyncClient(follow_redirects=False) as client:
+        st = await mealie_import.run(
+            sm,
+            hh.id,
+            mealie_import.MealieClient(args.url, token, client),
+            create=not args.no_create,
+            images=not args.no_images,
+            replace_images=args.replace_images,
+            limit=args.limit,
+            progress=progress,
+        )
+    print(
+        f"seen {st.seen}: {st.created} new, {st.updated} updated, {st.unchanged} unchanged, "
+        f"{st.skipped} skipped; photos {st.images} stored, {st.image_failed} unavailable; "
+        f"{st.failed} failed"
+    )
+    if st.last_error:
+        print(f"last error: {st.last_error}")
 
 
 async def _backfill(sm, args: argparse.Namespace) -> None:
@@ -214,6 +263,21 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--limit", type=int, help="at most this many recipes in this run")
     s.add_argument("--delay", type=float, default=2.0, help="seconds between page fetches")
     s.add_argument("--household")
+
+    s = sub.add_parser(
+        "import-mealie",
+        help="Import or re-import recipes from Mealie with categories, tags and photos "
+        "(re-runnable; token from PN_MEALIE_TOKEN, --token-file or a prompt)",
+    )
+    s.add_argument("--url", required=True, help="Mealie base URL, e.g. https://mealie.example.com")
+    s.add_argument("--token-file", help="file holding a Mealie API token")
+    s.add_argument("--household")
+    s.add_argument("--limit", type=int, help="at most this many Mealie recipes in this run")
+    s.add_argument("--no-create", action="store_true", help="only update recipes already here")
+    s.add_argument("--no-images", action="store_true", help="do not copy photos")
+    s.add_argument(
+        "--replace-images", action="store_true", help="re-copy photos even when one is stored"
+    )
 
     s = sub.add_parser(
         "classify-recipes",

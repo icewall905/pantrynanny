@@ -24,6 +24,8 @@ export interface Recipe {
   cook_min: number | null
   instructions: string[]
   tags: string[]
+  /** free-form categories, e.g. from a Mealie import */
+  categories?: string[]
   source_url: string | null
   source_name: string | null
   image_url: string | null

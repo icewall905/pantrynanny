@@ -220,9 +220,14 @@
     <string name="recipe_delete_q">Slet opskriften?</string>
     <string name="recipe_edit">Ret opskrift</string>
     <string name="recipe_new">Ny opskrift</string>
+    <string name="all_categories">Alle</string>
+    <string name="page_prev">Forrige</string>
+    <string name="page_next">Næste</string>
+    <string name="page_of">Side %1$s af %2$s · %3$s opskrifter</string>
+    <string name="recipes_other_matches">Andre opskrifter (mangler mere)</string>
     <string name="recipes_empty">Ingen opskrifter endnu. Tryk + for at skrive eller hente en.</string>
     <string name="recipes_search_empty">Ingen opskrifter matcher %1$s</string>
-    <string name="recipes_search_hint">Søg i opskrifter</string>
+    <string name="recipes_search_hint">Søg: navn, tag, ingrediens</string>
     <string name="recipes_subtitle">Hvad kan vi lave?</string>
     <string name="refresh">Opdater</string>
     <string name="runout_line">Holder ca. %1$s dage mere i jeres tempo</string>

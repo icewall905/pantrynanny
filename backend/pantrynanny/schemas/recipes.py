@@ -1,3 +1,4 @@
+import re
 from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
@@ -21,6 +22,20 @@ def _http_or_none(v: str | None) -> str | None:
     return v
 
 
+_LOCAL_IMAGE = re.compile(r"^/api/media/[0-9a-f]{32}\.webp$")
+
+
+def _image_url(v: str | None) -> str | None:
+    """An http(s) URL, or one of our own stored images (e.g. copied in by an import)."""
+    if v and _LOCAL_IMAGE.match(v):
+        return v
+    return _http_or_none(v)
+
+
+def _labels(v: list[str]) -> list[str]:
+    return list(dict.fromkeys(t.strip()[:40] for t in v if t.strip()))
+
+
 class IngredientIn(BaseModel):
     raw: str = Field(min_length=1, max_length=300)
     product_id: UUID | None = None
@@ -35,6 +50,8 @@ class RecipeIn(BaseModel):
     cook_min: int | None = Field(default=None, ge=0, le=10_000)
     instructions: list[str] = Field(default_factory=list, max_length=80)
     tags: list[str] = Field(default_factory=list, max_length=20)
+    # left out on update: kept as they were (older clients do not know about categories)
+    categories: list[str] = Field(default_factory=list, max_length=20)
     # left out: worked out from the tags/title/ingredients on create, kept as it was on update
     course: Course | None = None
     source_url: str | None = Field(default=None, max_length=1000)
@@ -42,17 +59,15 @@ class RecipeIn(BaseModel):
     image_url: str | None = Field(default=None, max_length=1000)
     ingredients: list[IngredientIn] = Field(default_factory=list, max_length=100)
 
-    _urls = field_validator("source_url", "image_url")(_http_or_none)
+    _urls = field_validator("source_url")(_http_or_none)
+    _image = field_validator("image_url")(_image_url)
 
     @field_validator("instructions")
     @classmethod
     def _steps(cls, v: list[str]) -> list[str]:
         return [s.strip()[:2000] for s in v if s.strip()]
 
-    @field_validator("tags")
-    @classmethod
-    def _tags(cls, v: list[str]) -> list[str]:
-        return list(dict.fromkeys(t.strip()[:40] for t in v if t.strip()))
+    _tags = field_validator("tags", "categories")(_labels)
 
 
 class IngredientOut(BaseModel):
@@ -77,6 +92,7 @@ class RecipeOut(BaseModel):
     cook_min: int | None
     instructions: list[str]
     tags: list[str]
+    categories: list[str] = Field(default_factory=list)
     course: Course | None = None
     minutes: int | None = None  # prep_min + cook_min, None when neither is known
     source_url: str | None
@@ -130,6 +146,7 @@ class RecipeBrief(BaseModel):
     title: str
     course: Course | None
     tags: list[str]
+    categories: list[str] = Field(default_factory=list)
     servings: int
     prep_min: int | None
     cook_min: int | None
