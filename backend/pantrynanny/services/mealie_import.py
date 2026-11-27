@@ -7,6 +7,9 @@ categories, any tags it lacks, missing times/course and, when it has none (or wi
 ``replace_images``), a local copy of Mealie's photo. Photos are re-encoded to WebP and stored
 under PN_UPLOAD_DIR like product photos, so they show even where Mealie is not reachable.
 Ingredients and steps of recipes that are already here are never touched.
+
+Mealie keeps copies of one recipe ("Soup" and "Soup (1)", same source URL) when a page was
+imported twice. Only the first is brought in; the others count as ``duplicates``.
 """
 
 import re
@@ -43,6 +46,7 @@ class MealieStats:
     updated: int = 0
     unchanged: int = 0
     skipped: int = 0  # not here and create=False
+    duplicates: int = 0  # a copy, inside Mealie, of a recipe already linked to another Mealie id
     images: int = 0
     image_failed: int = 0
     failed: int = 0
@@ -217,6 +221,43 @@ async def _find(s: AsyncSession, household_id: uuid.UUID, m: dict) -> Recipe | N
     return None
 
 
+COPY_SUFFIX = re.compile(r"\s*\(\d+\)$")
+
+
+def base_title(title: str) -> str:
+    """Mealie names a second recipe with the same name "Name (1)"."""
+    return COPY_SUFFIX.sub("", title.strip()).strip().lower()
+
+
+async def _copy_of(s: AsyncSession, household_id: uuid.UUID, m: dict) -> Recipe | None:
+    """A recipe linked to another Mealie id that this one is a copy of: same source URL, or
+    "Name (n)" of the same name where at most one side has a source URL."""
+    url, _ = _source(m)
+    name = base_title(m.get("name") or "")
+    near = [Recipe.source_url == url] if url else []
+    if name:  # narrowed in SQL, "(n)" checked below
+        near.append(func.lower(Recipe.title).startswith(name, autoescape=True))
+    if not near:
+        return None
+    rows = (
+        await s.execute(
+            select(Recipe).where(
+                Recipe.household_id == household_id,
+                Recipe.deleted_at.is_(None),
+                Recipe.external_id.like("mealie:%"),
+                Recipe.external_id != external_id(m),
+                or_(*near),
+            )
+        )
+    ).scalars()
+    for r in rows:
+        if url and r.source_url == url:
+            return r
+        if name and base_title(r.title) == name and not (url and r.source_url):
+            return r
+    return None
+
+
 def _merge(r: Recipe, m: dict) -> bool:
     """Fill in what Mealie knows and the recipe lacks. True when something changed."""
     changed = False
@@ -314,6 +355,9 @@ async def _one(
 ) -> None:
     async with sm() as s:
         r = await _find(s, household_id, m)
+        if r is None and await _copy_of(s, household_id, m) is not None:
+            st.duplicates += 1
+            return
         rid = r.id if r is not None else None
         want_image = images and (r is None or _wants_image(r, m, replace_images))
     if rid is None and not create:

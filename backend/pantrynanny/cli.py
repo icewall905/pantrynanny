@@ -109,7 +109,8 @@ async def _import_mealie(sm, args: argparse.Namespace) -> None:
         )
     print(
         f"seen {st.seen}: {st.created} new, {st.updated} updated, {st.unchanged} unchanged, "
-        f"{st.skipped} skipped; photos {st.images} stored, {st.image_failed} unavailable; "
+        f"{st.skipped} skipped, {st.duplicates} Mealie copies left out; "
+        f"photos {st.images} stored, {st.image_failed} unavailable; "
         f"{st.failed} failed"
     )
     if st.last_error:

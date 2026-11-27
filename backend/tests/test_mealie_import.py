@@ -162,3 +162,48 @@ async def test_no_create_and_missing_photo(env, app, tmp_path):
             upload_dir=str(tmp_path),
         )
     assert (st.created, st.images, st.image_failed, st.failed) == (2, 0, 2, 0)
+
+
+async def test_mealie_copies_are_not_imported_twice(env, app, tmp_path):
+    """Mealie holds "Soup" and "Soup (1)" (same page imported twice). An older import kept one
+    recipe; a re-run links one Mealie id to it and must not create the other."""
+    c, h = env.client, env.member
+    await c.post(
+        "/api/recipes",
+        json={"title": "Black Bean Soup (1)", "source_url": SOUP["orgURL"]},
+        headers=h,
+    )
+    copy = {
+        **SOUP,
+        "id": "00000000-0000-4000-8000-000000000003",
+        "slug": "black-bean-soup-1",
+        "name": "Black Bean Soup (1)",
+    }
+    cake2 = {
+        **CAKE,
+        "id": "00000000-0000-4000-8000-000000000004",
+        "slug": "french-apple-cake-1",
+        "name": "French Apple Cake (1)",
+    }
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        if req.url.path == "/api/recipes":
+            return httpx.Response(200, json={"items": [SOUP, copy, CAKE, cake2], "total_pages": 1})
+        if req.url.path.startswith("/api/recipes/"):
+            slug = req.url.path.rsplit("/", 1)[1].removesuffix("-1")
+            return httpx.Response(200, json={**(SOUP if "soup" in slug else CAKE), **DETAIL[slug]})
+        return httpx.Response(404)
+
+    sm = app.state.sessionmaker
+    for _ in range(2):
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            st = await mi.run(
+                sm,
+                env.household_id,
+                mi.MealieClient("http://mealie.test", "tok", client),
+                images=False,
+                upload_dir=str(tmp_path),
+            )
+        assert st.duplicates == 2 and st.created in (0, 1)
+    titles = sorted(r["recipe"]["title"] for r in (await c.get("/api/recipes", headers=h)).json())
+    assert titles == ["Black Bean Soup (1)", "French Apple Cake"]
