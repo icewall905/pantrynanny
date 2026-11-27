@@ -119,7 +119,7 @@ class RecipesViewModel(c: AppContainer) : RemoteVm<RecipesData>(c) {
         val q = _query.value.trim()
         val ser = ListSerializer(RecipeSummaryDto.serializer())
         val cookable = when (
-            val r = c.api.get("api/recipes/suggest", ser, maxMinutes?.let { mapOf("max_minutes" to it.toString()) } ?: emptyMap())
+            val r = c.api.get("api/recipes/suggest", ser, mapOf("show_all" to "true") + (maxMinutes?.let { mapOf("max_minutes" to it.toString()) } ?: emptyMap()))
         ) {
             is ApiResult.Ok -> r.value
             is ApiResult.HttpError -> return r

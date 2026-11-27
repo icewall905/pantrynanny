@@ -98,6 +98,7 @@ async def what_can_we_cook(
     max_minutes: int | None = Query(default=None, ge=1, le=10_000),
     servings: int | None = Query(default=None, ge=1, le=100),
     max_missing: int = Query(default=1, ge=0, le=100),
+    show_all: bool = Query(default=False, description="Every recipe, ignoring max_missing"),
     limit: int | None = Query(default=None, ge=1, le=10_000, description="Default: all"),
     q: str | None = Query(default=None, max_length=200, description="Title or tag contains"),
     include: Include = "full",
@@ -108,7 +109,8 @@ async def what_can_we_cook(
     """Saved recipes ranked by what is in the house right now (deterministic, no AI). Only
     recipes missing at most `max_missing` required ingredients (default: one shopping trip
     item) are suggested; see services.recipes.rank for the order. Returns every match unless
-    `limit` is given (clients page the list themselves)."""
+    `limit` is given (clients page the list themselves). `show_all` keeps every recipe in the
+    same order (most of it in the house first)."""
     recipes = await svc.list_recipes(
         session, principal.household_id, q, tags=filters["tags"], categories=filters["categories"]
     )
@@ -122,7 +124,7 @@ async def what_can_we_cook(
     ranked = svc.rank(
         pairs,
         max_minutes=max_minutes,
-        max_missing=max_missing,
+        max_missing=None if show_all else max_missing,
         min_ingredients=filters["min_ingredients"],
     )
     return _rows(ranked if limit is None else ranked[:limit], include)

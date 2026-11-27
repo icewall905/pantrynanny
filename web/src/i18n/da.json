@@ -241,7 +241,10 @@
     "runOut_one": "I jeres normale tempo holder det ca. {{count}} dag mere",
     "runOut_other": "I jeres normale tempo holder det ca. {{count}} dage mere",
     "offContribute": "Findes ikke i Open Food Facts endnu. Du kan tilføje den dér og hjælpe andre.",
-    "offContributeLink": "Åbn i Open Food Facts"
+    "offContributeLink": "Åbn i Open Food Facts",
+    "monthlyUsage": "Månedligt forbrug",
+    "month": "Måned",
+    "usageHint": "Antal i {{unit}}. Udtag tæller som forbrug; fortrudte scanninger, rettelser og flytninger tæller ikke. Måneder uden scanninger vises ikke."
   },
   "status": {
     "known": "Kendt",
@@ -550,8 +553,8 @@
     "nextPage": "Næste side",
     "pageOf_one": "Side {{page}} af {{pages}} · {{count}} opskrift",
     "pageOf_other": "Side {{page}} af {{pages}} · {{count}} opskrifter",
-    "cookEmpty": "Intet du kan lave lige nu",
-    "cookEmptyHint": "Kun opskrifter, der mangler højst én ingrediens, vises. Se alle opskrifter, eller fyld op.",
+    "cookEmpty": "Ingen opskrifter endnu",
+    "cookEmptyHint": "Alle gemte opskrifter vises her, dem I har mest af først. Importér eller tilføj en for at begynde.",
     "minutes": "{{n}} min",
     "servings_one": "{{count}} person",
     "servings_other": "{{count}} personer",
@@ -622,7 +625,18 @@
     "course_baking": "Bagværk",
     "course_drink": "Drikke",
     "course_snack": "Snack",
-    "course_condiment": "Dressing & sauce"
+    "course_condiment": "Dressing & sauce",
+    "extension": "Browserudvidelse",
+    "extTitle": "Importér opskrifter fra din browser",
+    "extIntro": "Få en knap i browseren, der sender den opskrift, du kigger på, til PantryNanny. Den åbner her udfyldt, klar til at blive tjekket og gemt.",
+    "extDownload": "Hent udvidelse (.zip)",
+    "extChrome": "Chrome, Edge eller Brave: pak zip-filen ud, åbn chrome://extensions, slå Udviklertilstand til, vælg \"Indlæs upakket\" og vælg mappen.",
+    "extFirefox": "Firefox: åbn about:debugging, \"Denne Firefox\", \"Indlæs midlertidig tilføjelse\" og vælg manifest.json fra zip-filen.",
+    "extServer": "Når du bliver spurgt, skriv denne adresse: {{origin}}",
+    "extBookmarklet": "Ingen installation? Brug et bogmærke",
+    "extBookmarkletHint": "Træk den op på bogmærkelinjen, og klik på den på en opskriftsside.",
+    "extBookmarkletName": "→ PantryNanny",
+    "nothingToCheck": "Intet at tjekke"
   },
   "plan": {
     "title": "Madplan",

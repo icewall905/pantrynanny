@@ -290,6 +290,9 @@ async def test_what_can_we_cook_ranks_cookable_and_expiring_first(env):
     assert r.json()[2]["availability"]["missing"] == 1
     r = await c.get("/api/recipes/suggest?max_minutes=60&max_missing=0", headers=h)
     assert [x["recipe"]["title"] for x in r.json()] == ["Spinatomelet", "Omelet"]
+    r = await c.get("/api/recipes/suggest?max_minutes=60&show_all=true", headers=h)
+    titles = [x["recipe"]["title"] for x in r.json()]  # everything; nothing-to-check last
+    assert titles == ["Spinatomelet", "Omelet", "Kage", "Lagkage", "Alt er valgfrit"]
     r = await c.get("/api/recipes/suggest?max_minutes=60&q=omelet", headers=h)
     assert [x["recipe"]["title"] for x in r.json()] == ["Spinatomelet", "Omelet"]
     r = await c.get("/api/recipes/suggest?max_minutes=60&limit=1", headers=h)

@@ -378,7 +378,8 @@ def rank(
     required (non-staple, non-optional) ingredients, and course. A recipe with nothing to check
     (every line a staple or optional) is never "cookable".
 
-    Sort, most important first:
+    Sort, most important first (with `max_missing=None` every recipe is kept; one with
+    nothing to check goes last):
     1. fewest missing ingredients ("cookable now" first, then one shopping item, ...);
     2. smoothed coverage have / (required + 2). The +2 is a prior of two unknown ingredients,
        so a short list has to earn its place: 2 of 2 scores 0.50, 5 of 5 scores 0.71 and 8 of 9
@@ -405,6 +406,7 @@ def rank(
         out.append((r, a))
     out.sort(
         key=lambda x: (
+            not x[1].required,
             x[1].missing,
             -round(x[1].have / (x[1].required + 2), 6),
             -len(x[1].uses_expiring),

@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>PantryNanny recipe import</title>
+    <style>
+      body { font: 14px system-ui, sans-serif; margin: 16px; min-width: 320px; color: #1f2a24; }
+      label { display: block; font-weight: 600; margin-bottom: 6px; }
+      input { width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #ccc; border-radius: 8px; font: inherit; }
+      button { margin-top: 10px; padding: 8px 14px; border: 0; border-radius: 8px; background: #3d7a4f; color: #fff; font: inherit; cursor: pointer; }
+      p { color: #5b6660; }
+      #msg { margin-left: 8px; }
+    </style>
+  </head>
+  <body>
+    <form id="f">
+      <label for="server">PantryNanny address</label>
+      <input id="server" type="url" placeholder="https://pantry.example.org" required />
+      <p>The address you open PantryNanny on. Click the toolbar button (or right-click a page or link) on a recipe to import it.</p>
+      <button type="submit">Save</button><span id="msg"></span>
+    </form>
+    <script src="options.js"></script>
+  </body>
+</html>

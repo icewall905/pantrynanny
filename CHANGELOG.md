@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-11-27 – Mealie-style recipe cards, every recipe in "What can we cook?", browser extension
+
+- **Recipe cards look like Mealie's**: photo on top (description on hover), title, coloured tag chips, time,
+  have/needed count and a ready/missing badge; 1–3 columns by width.
+- **"What can we cook?" lists every saved recipe** (web and Android), most of it in the house first.
+  `GET /recipes/suggest?show_all=true` ignores `max_missing`; recipes with nothing to check sort last.
+- **Browser extension** ([browser-extension/](browser-extension/README.md), Chrome/Edge/Firefox, MV3): toolbar button
+  and right-click menu open `/recipes?import=<page>`, which runs "Import a recipe" at once. The web build packs it to
+  `/downloads/pantrynanny-recipe-import.zip`; Recipes → "Browser extension" links it, plus a bookmarklet.
+
 ## 2026-11-27 – every cookable recipe, live search, Mealie photos and categories
 
 - **"What can we cook?" shows every match**, not the first 20: `GET /recipes/suggest` returns all matches unless

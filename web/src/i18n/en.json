@@ -241,7 +241,10 @@
     "runOut_one": "At your usual pace this lasts about {{count}} more day",
     "runOut_other": "At your usual pace this lasts about {{count}} more days",
     "offContribute": "Not in Open Food Facts yet. You can add it there to help others.",
-    "offContributeLink": "Open in Open Food Facts"
+    "offContributeLink": "Open in Open Food Facts",
+    "monthlyUsage": "Monthly usage",
+    "month": "Month",
+    "usageHint": "Quantities in {{unit}}. Check-outs count as usage; undone scans, stock corrections and moves are excluded. Months with no scans are omitted."
   },
   "status": {
     "known": "Known",
@@ -550,8 +553,8 @@
     "nextPage": "Next page",
     "pageOf_one": "Page {{page}} of {{pages}} · {{count}} recipe",
     "pageOf_other": "Page {{page}} of {{pages}} · {{count}} recipes",
-    "cookEmpty": "Nothing you can make right now",
-    "cookEmptyHint": "Only recipes missing at most one ingredient are shown. See all recipes, or stock up.",
+    "cookEmpty": "No recipes yet",
+    "cookEmptyHint": "Every saved recipe shows here, the ones you have most of first. Import or add one to begin.",
     "minutes": "{{n}} min",
     "servings_one": "{{count}} serving",
     "servings_other": "{{count}} servings",
@@ -622,7 +625,18 @@
     "course_baking": "Baking",
     "course_drink": "Drink",
     "course_snack": "Snack",
-    "course_condiment": "Condiment"
+    "course_condiment": "Condiment",
+    "extension": "Browser extension",
+    "extTitle": "Import recipes from your browser",
+    "extIntro": "Add a button to your browser that sends the recipe page you are on to PantryNanny. It opens here filled in, ready to check and save.",
+    "extDownload": "Download extension (.zip)",
+    "extChrome": "Chrome, Edge or Brave: unzip, open chrome://extensions, turn on Developer mode, choose \"Load unpacked\" and pick the folder.",
+    "extFirefox": "Firefox: open about:debugging, \"This Firefox\", \"Load Temporary Add-on\" and pick manifest.json from the zip.",
+    "extServer": "When asked, enter this address: {{origin}}",
+    "extBookmarklet": "No install? Use a bookmark",
+    "extBookmarkletHint": "Drag this to your bookmarks bar, then click it on any recipe page.",
+    "extBookmarkletName": "→ PantryNanny",
+    "nothingToCheck": "Nothing to check"
   },
   "plan": {
     "title": "Meal plan",

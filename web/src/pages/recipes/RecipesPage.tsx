@@ -1,11 +1,11 @@
-import { useDeferredValue, useMemo, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { BookOpen, ChevronLeft, ChevronRight, Clock, Link2, Plus, Sparkles } from 'lucide-react'
+import { BookOpen, ChevronLeft, ChevronRight, Clock, Download, Link2, Plus, Puzzle, Sparkles } from 'lucide-react'
 import { get, post, qs } from '../../api/client'
 import { COURSES, totalMinutes, type Course, type RecipeDraft, type RecipeSummary } from '../../api/recipes'
-import { Badge, Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListSkeleton, Modal, PageHeader, Tabs } from '../../components/ui'
+import { Badge, Button, Chip, EmptyState, ErrorState, Field, Input, ListSkeleton, Modal, PageHeader, Tabs } from '../../components/ui'
 import { useToast } from '../../components/Toast'
 import { ApiError } from '../../api/client'
 import { cn } from '../../lib/format'
@@ -60,10 +60,17 @@ export default function RecipesPage() {
     put('page', null)
   }
   const findLive = useDeferredValue(find)
-  const [importOpen, setImportOpen] = useState(false)
+  // ?import=<url> comes from the browser extension / bookmarklet: read that recipe right away
+  const [importUrl] = useState(() => sp.get('import'))
+  const [importOpen, setImportOpen] = useState(() => !!importUrl)
+  const [extOpen, setExtOpen] = useState(false)
+  useEffect(() => {
+    if (importUrl) put('import', null, true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const suggest = useQuery({
     queryKey: ['recipes', 'suggest', maxMin, course],
-    queryFn: () => get<RecipeSummary[]>(`/recipes/suggest${qs({ max_minutes: maxMin, course })}`),
+    queryFn: () => get<RecipeSummary[]>(`/recipes/suggest${qs({ show_all: true, max_minutes: maxMin, course })}`),
     enabled: tab === 'cook',
   })
   const all = useQuery({
@@ -89,6 +96,9 @@ export default function RecipesPage() {
         subtitle={t('recipes.subtitle')}
         actions={
           <>
+            <Button onClick={() => setExtOpen(true)} data-testid="recipe-extension">
+              <Puzzle className="size-4" /> {t('recipes.extension')}
+            </Button>
             <Button onClick={() => setImportOpen(true)}>
               <Link2 className="size-4" /> {t('recipes.import')}
             </Button>
@@ -166,7 +176,7 @@ export default function RecipesPage() {
         )
       ) : (
         <>
-          <ul className="grid gap-3 sm:grid-cols-2" data-testid="recipe-list">
+          <ul className="grid grid-cols-1 gap-4 min-[480px]:grid-cols-2 lg:grid-cols-3" data-testid="recipe-list">
             {paged.items.map((s) => (
               <li key={s.recipe.id}>
                 <RecipeCard s={s} />
@@ -184,7 +194,8 @@ export default function RecipesPage() {
           />
         </>
       )}
-      <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} />
+      <ImportDialog open={importOpen} initialUrl={importUrl} onClose={() => setImportOpen(false)} />
+      <ExtensionDialog open={extOpen} onClose={() => setExtOpen(false)} />
     </>
   )
 }
@@ -230,63 +241,85 @@ function RecipeCard({ s }: { s: RecipeSummary }) {
   const { recipe: r, availability: a } = s
   const mins = totalMinutes(r)
   const ready = a.missing === 0
+  const chips = [...(r.course ? [t(`recipes.course_${r.course}`)] : []), ...(r.categories ?? []), ...r.tags].filter((c, i, all) => all.indexOf(c) === i).slice(0, 3)
   return (
-    <Link to={`/recipes/${r.id}`} className="block h-full">
-      <Card className="h-full transition hover:-translate-y-0.5 hover:ring-leaf-500/40">
-        <div className="flex items-start gap-3">
-          {r.image_url ? (
-            <img src={r.image_url} alt="" referrerPolicy="no-referrer" loading="lazy" className="size-16 shrink-0 rounded-2xl bg-cream-100 object-cover" />
-          ) : (
-            <div className="flex size-16 shrink-0 items-center justify-center rounded-2xl bg-cream-100 text-ink-300" aria-hidden>
-              <BookOpen className="size-6" />
-            </div>
-          )}
-          <div className="min-w-0 flex-1">
-            <h2 className="truncate text-lg font-semibold">{r.title}</h2>
-            <div className="mt-0.5 flex flex-wrap items-center gap-x-3 text-sm text-ink-500">
-              {mins > 0 && (
-                <span className="inline-flex items-center gap-1">
-                  <Clock className="size-3.5" /> {t('recipes.minutes', { n: mins })}
-                </span>
-              )}
-              <span>{t('recipes.servings', { count: r.servings })}</span>
-              {r.course && <Badge tone="info">{t(`recipes.course_${r.course}`)}</Badge>}
-              {(r.categories ?? []).slice(0, 2).map((c) => (
-                <Badge key={c}>{c}</Badge>
-              ))}
-            </div>
+    <Link
+      to={`/recipes/${r.id}`}
+      className="group flex h-full flex-col overflow-hidden rounded-[var(--radius-card)] bg-surface shadow-card ring-1 ring-cream-200/70 transition hover:-translate-y-0.5 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-leaf-500"
+      data-testid="recipe-card"
+    >
+      <div className="relative aspect-[16/10] bg-cream-100">
+        {r.image_url ? (
+          <img src={r.image_url} alt="" referrerPolicy="no-referrer" loading="lazy" className="size-full object-cover" />
+        ) : (
+          <div className="flex size-full items-center justify-center text-ink-300" aria-hidden>
+            <BookOpen className="size-10" />
           </div>
-          <Badge tone={ready ? 'good' : a.coverage >= 0.6 ? 'warn' : 'neutral'}>
-            {ready ? t('recipes.ready') : t('recipes.missingN', { count: a.missing })}
-          </Badge>
-        </div>
-        <div className="mt-3 h-2 overflow-hidden rounded-full bg-cream-200" aria-hidden>
-          <div className={cn('h-full rounded-full', ready ? 'bg-leaf-500' : 'bg-honey-400')} style={{ width: `${Math.round(a.coverage * 100)}%` }} />
-        </div>
-        <p className="mt-1.5 text-xs text-ink-500">{t('recipes.coverage', { have: a.have, of: a.required })}</p>
+        )}
+        {r.description && (
+          <div className="absolute inset-0 flex items-center bg-leaf-800/80 p-4 text-sm leading-snug text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" aria-hidden>
+            <p className="line-clamp-5">{r.description}</p>
+          </div>
+        )}
+        {a.required > 0 && (
+          <div className="absolute inset-x-0 bottom-0 h-1 bg-black/20" aria-hidden>
+            <div className={cn('h-full', ready ? 'bg-leaf-500' : 'bg-honey-400')} style={{ width: `${Math.round(a.coverage * 100)}%` }} />
+          </div>
+        )}
+      </div>
+      <div className="flex flex-1 flex-col gap-2 p-3.5">
+        <h2 className="line-clamp-2 text-base font-semibold leading-snug">{r.title}</h2>
+        {chips.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {chips.map((c) => (
+              <span key={c} className="rounded-md bg-leaf-600 px-2 py-0.5 text-xs font-medium text-white">
+                {c}
+              </span>
+            ))}
+          </div>
+        )}
         {a.uses_expiring.length > 0 && (
-          <p className="mt-2 flex items-center gap-1.5 text-sm text-honey-600">
-            <Sparkles className="size-4" /> {t('recipes.usesExpiring', { names: a.uses_expiring.join(', ') })}
+          <p className="flex items-center gap-1.5 text-xs text-honey-600">
+            <Sparkles className="size-3.5 shrink-0" /> <span className="line-clamp-1">{t('recipes.usesExpiring', { names: a.uses_expiring.join(', ') })}</span>
           </p>
         )}
-      </Card>
+        <div className="mt-auto flex items-center gap-3 pt-1 text-xs text-ink-500">
+          {mins > 0 && (
+            <span className="inline-flex items-center gap-1">
+              <Clock className="size-3.5" /> {t('recipes.minutes', { n: mins })}
+            </span>
+          )}
+          {a.required > 0 && <span title={t('recipes.coverage', { have: a.have, of: a.required })}>{a.have}/{a.required}</span>}
+          <Badge className="ml-auto" tone={ready && a.required > 0 ? 'good' : a.coverage >= 0.6 ? 'warn' : 'neutral'}>
+            {a.required === 0 ? t('recipes.nothingToCheck') : ready ? t('recipes.ready') : t('recipes.missingN', { count: a.missing })}
+          </Badge>
+        </div>
+      </div>
     </Link>
   )
 }
 
-function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+function ImportDialog({ open, initialUrl, onClose }: { open: boolean; initialUrl?: string | null; onClose: () => void }) {
   const { t } = useTranslation()
   const nav = useNavigate()
   const toast = useToast()
-  const [url, setUrl] = useState('')
+  const [url, setUrl] = useState(initialUrl ?? '')
   const run = useMutation({
-    mutationFn: () => post<RecipeDraft>('/recipes/import', { url: url.trim() }),
+    mutationFn: (u: string) => post<RecipeDraft>('/recipes/import', { url: u.trim() }),
     onSuccess: (draft) => {
       onClose()
       nav('/recipes/new', { state: { draft } })
     },
     onError: (e) => toast.push(e instanceof ApiError ? e.message : t('recipes.importFailed'), 'error'),
   })
+  const started = useRef(false)
+  useEffect(() => {
+    // sent by the extension: read it at once (the dialog stays open to retry or edit on error)
+    if (!started.current && initialUrl && /^https?:\/\/.+/.test(initialUrl)) {
+      started.current = true
+      run.mutate(initialUrl)
+    }
+  }, [initialUrl, run])
   return (
     <Modal
       open={open}
@@ -295,7 +328,7 @@ function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void })
       footer={
         <>
           <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button variant="primary" loading={run.isPending} disabled={!/^https?:\/\/.+/.test(url.trim())} onClick={() => run.mutate()}>
+          <Button variant="primary" loading={run.isPending} disabled={!/^https?:\/\/.+/.test(url.trim())} onClick={() => run.mutate(url)}>
             {t('recipes.importGo')}
           </Button>
         </>
@@ -304,6 +337,44 @@ function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void })
       <Field label={t('recipes.importUrl')} hint={t('recipes.importHint')}>
         {(id) => <Input id={id} inputMode="url" autoCapitalize="none" placeholder="https://" value={url} onChange={(e) => setUrl(e.target.value)} />}
       </Field>
+    </Modal>
+  )
+}
+
+function ExtensionDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useTranslation()
+  // Bookmarklet: works in any browser (also phones) without installing anything.
+  const bookmarklet = `javascript:void(window.open(${JSON.stringify(`${window.location.origin}/recipes?import=`)}+encodeURIComponent(location.href)))`
+  const ref = useRef<HTMLAnchorElement>(null)
+  useEffect(() => {
+    // React blocks javascript: URLs in href, so set it on the element directly
+    if (open) ref.current?.setAttribute('href', bookmarklet)
+  }, [open, bookmarklet])
+  return (
+    <Modal open={open} onClose={onClose} title={t('recipes.extTitle')} footer={<Button onClick={onClose}>{t('common.close')}</Button>}>
+      <div className="space-y-4 text-sm text-ink-700">
+        <p>{t('recipes.extIntro')}</p>
+        <a
+          href="/downloads/pantrynanny-recipe-import.zip"
+          download
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-leaf-600 px-4 font-semibold text-white hover:bg-leaf-800"
+          data-testid="recipe-extension-download"
+        >
+          <Download className="size-4" /> {t('recipes.extDownload')}
+        </a>
+        <ol className="list-decimal space-y-1 pl-5">
+          <li>{t('recipes.extChrome')}</li>
+          <li>{t('recipes.extFirefox')}</li>
+          <li>{t('recipes.extServer', { origin: window.location.origin })}</li>
+        </ol>
+        <div>
+          <p className="font-semibold">{t('recipes.extBookmarklet')}</p>
+          <p className="mb-2 text-ink-500">{t('recipes.extBookmarkletHint')}</p>
+          <a ref={ref} onClick={(e) => e.preventDefault()} className="inline-flex items-center gap-2 rounded-xl bg-cream-100 px-3 py-2 font-semibold ring-1 ring-cream-200">
+            <Link2 className="size-4" /> {t('recipes.extBookmarkletName')}
+          </a>
+        </div>
+      </div>
     </Modal>
   )
 }
