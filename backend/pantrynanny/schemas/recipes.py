@@ -181,6 +181,14 @@ class RecipeDraftOut(BaseModel):
 
 class ImportIn(BaseModel):
     url: str = Field(min_length=8, max_length=1000)
+    # the recipe's structured data as the browser sees it (browser extension): read instead of
+    # fetching the page, so sites that block servers or build the page in script still work
+    html: str | None = Field(default=None, max_length=2_000_000)
+
+
+class ImportSavedOut(BaseModel):
+    recipe: RecipeOut
+    created: bool  # false: a recipe from this page was already saved
 
 
 class ShoppingFromIn(BaseModel):

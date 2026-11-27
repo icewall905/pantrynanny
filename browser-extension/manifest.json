@@ -2,12 +2,13 @@
   "manifest_version": 3,
   "name": "PantryNanny recipe import",
   "short_name": "PantryNanny",
-  "version": "1.0.0",
-  "description": "Send the recipe page you are looking at to PantryNanny's \"Import a recipe\" reader.",
+  "version": "1.1.0",
+  "description": "Save the recipe page you are looking at to PantryNanny in one click.",
   "icons": { "128": "icon.png" },
-  "action": { "default_title": "Import this recipe to PantryNanny", "default_icon": { "128": "icon.png" } },
+  "action": { "default_title": "Save this recipe to PantryNanny", "default_icon": { "128": "icon.png" } },
   "background": { "service_worker": "background.js", "scripts": ["background.js"] },
-  "permissions": ["storage", "contextMenus"],
-  "options_ui": { "page": "options.html", "open_in_tab": false },
-  "browser_specific_settings": { "gecko": { "id": "recipe-import@pantrynanny.local", "strict_min_version": "121.0" } }
+  "permissions": ["storage", "contextMenus", "activeTab", "scripting", "notifications"],
+  "optional_host_permissions": ["https://*/*", "http://*/*"],
+  "options_ui": { "page": "options.html", "open_in_tab": true },
+  "browser_specific_settings": { "gecko": { "id": "recipe-import@pantrynanny.local", "strict_min_version": "128.0" } }
 }

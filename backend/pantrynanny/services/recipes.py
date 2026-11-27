@@ -113,6 +113,21 @@ async def get_recipe(session: AsyncSession, household_id: uuid.UUID, rid: uuid.U
     return r
 
 
+async def find_by_source(
+    session: AsyncSession, household_id: uuid.UUID, urls: set[str]
+) -> Recipe | None:
+    """The oldest saved recipe imported from one of these addresses."""
+    return (
+        await session.execute(
+            select(Recipe)
+            .where(Recipe.household_id == household_id, Recipe.deleted_at.is_(None))
+            .where(Recipe.source_url.in_([u for u in urls if u]))
+            .order_by(Recipe.created_at, Recipe.id)
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+
+
 async def list_recipes(
     session: AsyncSession,
     household_id: uuid.UUID,

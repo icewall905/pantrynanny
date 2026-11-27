@@ -331,6 +331,29 @@ async def test_import_uses_safe_fetcher_and_returns_a_draft(env, app):
     assert r.status_code == 422 and r.json()["code"] == "import_blocked"
 
 
+async def test_extension_import_saves_once_from_the_browsers_copy(env, app):
+    async def no_fetch(url):
+        raise AssertionError("the page sent along is used; the server does not fetch")
+
+    app.state.recipe_fetcher = no_fetch
+    url = "https://madbloggen.example/pandekager"
+    try:
+        first = await env.client.post(
+            "/api/recipes/import/save", json={"url": url, "html": PAGE}, headers=env.member
+        )
+        again = await env.client.post(
+            "/api/recipes/import/save", json={"url": url, "html": PAGE}, headers=env.member
+        )
+    finally:
+        del app.state.recipe_fetcher
+    assert first.status_code == 200, first.text
+    assert first.json()["created"] is True and again.json()["created"] is False
+    rec = first.json()["recipe"]
+    assert rec["title"] == "Pandekager nemme" and rec["source_url"] == url
+    assert rec["ingredients"] and again.json()["recipe"]["id"] == rec["id"]
+    assert len((await env.client.get("/api/recipes", headers=env.member)).json()) == 1
+
+
 async def test_meal_plan_never_touches_stock_and_shops_for_the_week(env):
     c, h = env.client, env.member
     eggs = await _stock(env, "Æg", 4)

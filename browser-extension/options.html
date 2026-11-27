@@ -4,21 +4,36 @@
     <meta charset="utf-8" />
     <title>PantryNanny recipe import</title>
     <style>
-      body { font: 14px system-ui, sans-serif; margin: 16px; min-width: 320px; color: #1f2a24; }
-      label { display: block; font-weight: 600; margin-bottom: 6px; }
+      body { font: 14px system-ui, sans-serif; margin: 24px auto; max-width: 420px; padding: 0 16px; color: #1f2a24; }
+      h1 { font-size: 18px; }
+      label { display: block; font-weight: 600; margin: 12px 0 4px; }
       input { width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #ccc; border-radius: 8px; font: inherit; }
-      button { margin-top: 10px; padding: 8px 14px; border: 0; border-radius: 8px; background: #3d7a4f; color: #fff; font: inherit; cursor: pointer; }
+      button { margin-top: 14px; padding: 8px 14px; border: 0; border-radius: 8px; background: #3d7a4f; color: #fff; font: inherit; cursor: pointer; }
+      button.secondary { background: #e5e7eb; color: #1f2a24; }
       p { color: #5b6660; }
-      #msg { margin-left: 8px; }
+      #msg { margin-top: 10px; font-weight: 600; }
+      .err { color: #b91c1c; }
+      [hidden] { display: none !important; }
     </style>
   </head>
   <body>
-    <form id="f">
+    <h1>PantryNanny recipe import</h1>
+    <div id="in" hidden>
+      <p>Logged in to <b id="where"></b> as <b id="who"></b>.</p>
+      <p>On a recipe page, click the PantryNanny button in the toolbar (or right-click the page or a link). The recipe is saved and opens in PantryNanny.</p>
+      <button id="logout" class="secondary" type="button">Log out</button>
+    </div>
+    <form id="f" hidden>
       <label for="server">PantryNanny address</label>
       <input id="server" type="url" placeholder="https://pantry.example.org" required />
-      <p>The address you open PantryNanny on. Click the toolbar button (or right-click a page or link) on a recipe to import it.</p>
-      <button type="submit">Save</button><span id="msg"></span>
+      <label for="user">Username</label>
+      <input id="user" autocomplete="username" required />
+      <label for="pass">Password</label>
+      <input id="pass" type="password" autocomplete="current-password" required />
+      <p>Your password is used once to log in and is not stored; the extension keeps a login token (revoke it under Admin → Devices in PantryNanny, or with Log out here).</p>
+      <button type="submit">Log in</button>
     </form>
+    <div id="msg"></div>
     <script src="options.js"></script>
   </body>
 </html>

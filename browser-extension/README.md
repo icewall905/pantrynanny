@@ -1,14 +1,19 @@
 # PantryNanny recipe import (browser extension)
 
-Toolbar button and right-click menu that send the page you are on to PantryNanny's
-"Import a recipe" reader. PantryNanny opens with the recipe filled in for review; nothing is
-saved until you press Save. Works in Chrome/Edge/Brave and Firefox (121+), Manifest V3.
+Toolbar button and right-click menu that save the recipe on the page you are on straight into
+PantryNanny and open it there. The recipe data (schema.org JSON-LD) is read from the page as
+the browser shows it and sent to `POST /api/recipes/import/save`, so sites that block servers
+still work; for a right-clicked link the server reads the page itself. A page that is already
+saved opens the existing recipe instead of saving it twice. Chrome/Edge/Brave and Firefox 128+,
+Manifest V3.
 
-The extension keeps only your PantryNanny address (set on first install, or in its options).
-It uses your normal login in the browser and has no access to page contents.
+Settings (open by themselves after install): PantryNanny address, username and password. The
+password is used once to get a device token (`POST /api/auth/token`) and is not stored; the
+token is revoked with "Log out" or under Admin → Devices. The extension asks for permission
+to reach that one address and reads a page only when you click the button.
 
 The web app's build packs this folder into `web/public/downloads/pantrynanny-recipe-import.zip`
-(`web/scripts/pack-extension.mjs`); the Recipes page links to it.
+(`web/scripts/pack-extension.mjs`); Recipes → "Browser extension" links it.
 
 - **Chrome/Edge/Brave**: unzip, open `chrome://extensions`, turn on Developer mode,
   "Load unpacked", pick the folder.

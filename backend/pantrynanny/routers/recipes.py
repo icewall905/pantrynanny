@@ -4,6 +4,7 @@ from typing import Literal
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Header, Query, Request, Response
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_session
@@ -16,6 +17,7 @@ from ..schemas.recipes import (
     Availability,
     Course,
     ImportIn,
+    ImportSavedOut,
     ParsedLine,
     ParseIn,
     RecipeBrief,
@@ -141,17 +143,12 @@ async def parse(body: ParseIn, principal: Principal = Depends(get_principal)):
     return out
 
 
-@router.post("/recipes/import", response_model=RecipeDraftOut)
-async def import_url(
-    body: ImportIn,
-    request: Request,
-    principal: Principal = Depends(get_principal),
-):
-    """Read a recipe from a public web page (schema.org JSON-LD). Returns a draft to review;
-    nothing is stored until the user saves it."""
-    fetcher = getattr(request.app.state, "recipe_fetcher", None) or fetch_page
-    final_url, page = await fetcher(body.url.strip())
-    draft = extract(page)
+async def _draft(body: ImportIn, request: Request) -> RecipeDraftOut:
+    draft, final_url = (extract(body.html), body.url.strip()) if body.html else (None, "")
+    if draft is None:  # nothing usable sent along: read the page on the server
+        fetcher = getattr(request.app.state, "recipe_fetcher", None) or fetch_page
+        final_url, page = await fetcher(body.url.strip())
+        draft = extract(page)
     if draft is None:
         raise AppError(
             422,
@@ -160,6 +157,60 @@ async def import_url(
         )
     course = classify(draft.title, draft.tags, [parse_line(x).name for x in draft.ingredients])
     return RecipeDraftOut(**draft.__dict__, source_url=final_url, course=course)
+
+
+@router.post("/recipes/import", response_model=RecipeDraftOut)
+async def import_url(
+    body: ImportIn,
+    request: Request,
+    principal: Principal = Depends(get_principal),
+):
+    """Read a recipe from a public web page (schema.org JSON-LD). Returns a draft to review;
+    nothing is stored until the user saves it."""
+    return await _draft(body, request)
+
+
+def _recipe_in(d: RecipeDraftOut) -> RecipeIn:
+    fields = dict(
+        title=d.title[:200],
+        description=(d.description or None) and d.description[:2000],
+        servings=min(max(d.servings or 4, 1), 100),
+        prep_min=d.prep_min,
+        cook_min=d.cook_min,
+        instructions=d.instructions[:80],
+        tags=d.tags[:20],
+        course=d.course,
+        source_url=d.source_url,
+        source_name=d.source_name,
+        image_url=d.image_url,
+        ingredients=[{"raw": x} for x in d.ingredients[:100]],
+    )
+    try:
+        return RecipeIn(**fields)
+    except ValidationError:  # an odd photo address should not lose the recipe
+        return RecipeIn(**{**fields, "image_url": None})
+
+
+@router.post("/recipes/import/save", response_model=ImportSavedOut)
+async def import_and_save(
+    body: ImportIn,
+    request: Request,
+    principal: Principal = Depends(get_principal),
+    session: AsyncSession = Depends(get_session),
+):
+    """Import and save in one step (browser extension). A page that is already saved is not
+    saved again: that recipe comes back with `created: false`."""
+    draft = await _draft(body, request)
+    existing = await svc.find_by_source(
+        session, principal.household_id, {body.url.strip(), draft.source_url}
+    )
+    if existing is not None:
+        return ImportSavedOut(recipe=svc.recipe_out(existing), created=False)
+    r = await svc.create_recipe(
+        session, principal.household_id, _recipe_in(draft), principal.user_id
+    )
+    await session.commit()
+    return ImportSavedOut(recipe=svc.recipe_out(r), created=True)
 
 
 @router.post("/recipes", response_model=RecipeOut, status_code=201)
