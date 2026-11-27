@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-11-27 – recipe photos are stored, not linked
+
+- Saving a recipe with a photo from another website (import, browser extension, typed link) stores a copy under
+  `/api/media/`, fetched with the same private-network protection as page imports. The app only shows its own
+  images (CSP), so linked photos never appeared. A photo that cannot be fetched is dropped.
+- `pantrynanny-admin copy-recipe-photos` copies photos for recipes saved before this.
+- Browser extension 1.1: logs in with username/password (device token), reads the recipe from the page and saves it
+  in one click (`POST /recipes/import/save`; a page already saved opens that recipe).
+- Mealie import leaves out Mealie's own copies ("Name (1)" with the same source page).
+
 ## 2026-11-27 – Mealie-style recipe cards, every recipe in "What can we cook?", browser extension
 
 - **Recipe cards look like Mealie's**: photo on top (description on hover), title, coloured tag chips, time,

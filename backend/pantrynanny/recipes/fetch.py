@@ -1,4 +1,4 @@
-"""Fetch a recipe page without letting the server be used to reach the local network (SSRF).
+"""Fetch a recipe page (or its photo) without letting the server reach the local network (SSRF).
 
 Every hop (redirects included) is resolved first; the request is refused unless *all* addresses
 are public. The connection then goes to the address that was checked (pinned, with SNI/Host set
@@ -46,6 +46,53 @@ async def fetch_page(
     timeout_s: float = 10.0,
 ) -> tuple[str, str]:
     """Return (final_url, html). Raises AppError(422) for anything unsafe or unusable."""
+    final, body, encoding = await _get(
+        url,
+        accept="text/html,application/xhtml+xml",
+        kinds=("html", "json"),
+        not_kind="That link is not a web page.",
+        max_bytes=MAX_BYTES,
+        resolve=resolve,
+        transport=transport,
+        timeout_s=timeout_s,
+    )
+    return final, body.decode(encoding or "utf-8", errors="replace")
+
+
+async def fetch_image(
+    url: str,
+    max_bytes: int,
+    *,
+    resolve: Resolver = system_resolve,
+    transport: httpx.AsyncBaseTransport | None = None,
+    timeout_s: float = 10.0,
+) -> bytes:
+    """A recipe photo, with the same safety rules as pages. Raises AppError(422)."""
+    return (
+        await _get(
+            url,
+            accept="image/avif,image/webp,image/*;q=0.8",
+            kinds=("image/",),
+            not_kind="That link is not an image.",
+            max_bytes=max_bytes,
+            resolve=resolve,
+            transport=transport,
+            timeout_s=timeout_s,
+        )
+    )[1]
+
+
+async def _get(
+    url: str,
+    *,
+    accept: str,
+    kinds: tuple[str, ...],
+    not_kind: str,
+    max_bytes: int,
+    resolve: Resolver,
+    transport: httpx.AsyncBaseTransport | None,
+    timeout_s: float,
+) -> tuple[str, bytes, str | None]:
     async with httpx.AsyncClient(
         transport=transport, timeout=timeout_s, follow_redirects=False, verify=True
     ) as client:
@@ -76,7 +123,7 @@ async def fetch_page(
                 headers={
                     "Host": parts.netloc.rsplit("@", 1)[-1],
                     "User-Agent": UA,
-                    "Accept": "text/html,application/xhtml+xml",
+                    "Accept": accept,
                     "Accept-Language": "da,en;q=0.8",
                 },
                 extensions={"sni_hostname": host} if parts.scheme == "https" else {},
@@ -96,14 +143,14 @@ async def fetch_page(
                         422, "import_failed", f"The website answered {resp.status_code}."
                     )
                 ctype = resp.headers.get("content-type", "")
-                if "html" not in ctype and "json" not in ctype:
-                    raise AppError(422, "import_failed", "That link is not a web page.")
+                if not any(k in ctype for k in kinds):
+                    raise AppError(422, "import_failed", not_kind)
                 body = bytearray()
                 async for chunk in resp.aiter_bytes():
                     body += chunk
-                    if len(body) > MAX_BYTES:
-                        raise AppError(422, "import_failed", "The page is too large.")
-                return url, body.decode(resp.encoding or "utf-8", errors="replace")
+                    if len(body) > max_bytes:
+                        raise AppError(422, "import_failed", "The download is too large.")
+                return url, bytes(body), resp.encoding
             finally:
                 await resp.aclose()
     raise AppError(422, "import_failed", "Too many redirects.")

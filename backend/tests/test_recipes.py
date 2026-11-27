@@ -1,13 +1,15 @@
 """Recipes: parsing, pantry matching, safe URL import, what-can-we-cook, shopping and meal plan."""
 
+import io
 from datetime import date, timedelta
 from decimal import Decimal
 
 import httpx
 import pytest
+from PIL import Image
 
 from pantrynanny.errors import AppError
-from pantrynanny.recipes.fetch import fetch_page
+from pantrynanny.recipes.fetch import fetch_image, fetch_page
 from pantrynanny.recipes.jsonld import extract, minutes
 from pantrynanny.recipes.match import (
     Pantry,
@@ -198,6 +200,28 @@ async def test_fetch_rechecks_redirects_and_pins_the_ip():
             await fetch_page(bad, resolve=resolve)
 
 
+async def test_fetch_image_same_rules_and_only_images():
+    resolve = await _resolver_for({"img.example": ["93.184.216.34"], "lan.example": ["10.0.0.9"]})
+    with pytest.raises(AppError) as e:
+        await fetch_image("http://lan.example/p.jpg", 1000, resolve=resolve)
+    assert e.value.code == "import_blocked"
+
+    def handler(req: httpx.Request):
+        if req.url.path == "/page":
+            return httpx.Response(200, html="<html></html>")
+        if req.url.path == "/big.jpg":
+            return httpx.Response(200, content=b"x" * 2000, headers={"content-type": "image/jpeg"})
+        return httpx.Response(200, content=b"jpeg", headers={"content-type": "image/jpeg"})
+
+    t = httpx.MockTransport(handler)
+    assert (
+        await fetch_image("http://img.example/p.jpg", 1000, resolve=resolve, transport=t) == b"jpeg"
+    )
+    for path in ("/page", "/big.jpg"):
+        with pytest.raises(AppError):
+            await fetch_image(f"http://img.example{path}", 1000, resolve=resolve, transport=t)
+
+
 # --------------------------------------------------------------------------- API
 
 
@@ -331,11 +355,21 @@ async def test_import_uses_safe_fetcher_and_returns_a_draft(env, app):
     assert r.status_code == 422 and r.json()["code"] == "import_blocked"
 
 
-async def test_extension_import_saves_once_from_the_browsers_copy(env, app):
+async def test_extension_import_saves_once_from_the_browsers_copy(env, app, tmp_path, monkeypatch):
     async def no_fetch(url):
         raise AssertionError("the page sent along is used; the server does not fetch")
 
+    photos: list[str] = []
+
+    async def fake_image(url, max_bytes):
+        photos.append(url)
+        out = io.BytesIO()
+        Image.new("RGB", (40, 30), (200, 80, 20)).save(out, "PNG")
+        return out.getvalue()
+
+    monkeypatch.setattr(app.state.settings, "upload_dir", str(tmp_path))
     app.state.recipe_fetcher = no_fetch
+    app.state.image_fetcher = fake_image
     url = "https://madbloggen.example/pandekager"
     try:
         first = await env.client.post(
@@ -346,12 +380,53 @@ async def test_extension_import_saves_once_from_the_browsers_copy(env, app):
         )
     finally:
         del app.state.recipe_fetcher
+        del app.state.image_fetcher
     assert first.status_code == 200, first.text
     assert first.json()["created"] is True and again.json()["created"] is False
     rec = first.json()["recipe"]
+    # the photo is copied in (the app only shows its own images), once
+    assert photos == ["https://img.example/p.jpg"]
+    assert rec["image_url"].startswith("/api/media/") and rec["image_url"].endswith(".webp")
+    assert (tmp_path / rec["image_url"].rsplit("/", 1)[1]).is_file()
     assert rec["title"] == "Pandekager nemme" and rec["source_url"] == url
     assert rec["ingredients"] and again.json()["recipe"]["id"] == rec["id"]
     assert len((await env.client.get("/api/recipes", headers=env.member)).json()) == 1
+
+
+async def test_saving_a_recipe_copies_its_photo_or_drops_an_unusable_link(
+    env, app, tmp_path, monkeypatch
+):
+    async def fake_image(url, max_bytes):
+        if "broken" in url:
+            raise AppError(422, "import_failed", "The website answered 404.")
+        out = io.BytesIO()
+        Image.new("RGB", (20, 20), (0, 120, 0)).save(out, "JPEG")
+        return out.getvalue()
+
+    monkeypatch.setattr(app.state.settings, "upload_dir", str(tmp_path))
+    app.state.image_fetcher = fake_image
+    try:
+        ok = await env.client.post(
+            "/api/recipes",
+            json={"title": "Suppe", "image_url": "https://site.example/s.jpg"},
+            headers=env.member,
+        )
+        bad = await env.client.post(
+            "/api/recipes",
+            json={"title": "Grød", "image_url": "https://site.example/broken.jpg"},
+            headers=env.member,
+        )
+    finally:
+        del app.state.image_fetcher
+    assert ok.json()["image_url"].startswith("/api/media/")
+    assert bad.status_code == 201 and bad.json()["image_url"] is None
+    # a stored photo is kept as it is on edit (nothing downloaded again)
+    r = await env.client.put(
+        f"/api/recipes/{ok.json()['id']}",
+        json={"title": "Suppe", "image_url": ok.json()["image_url"]},
+        headers={**env.member, "If-Match": "1"},
+    )
+    assert r.json()["image_url"] == ok.json()["image_url"]
 
 
 async def test_meal_plan_never_touches_stock_and_shops_for_the_week(env):

@@ -63,6 +63,9 @@ async def _run(args: argparse.Namespace) -> None:
         if args.command == "import-mealie":
             await _import_mealie(sm, args)
             return
+        if args.command == "copy-recipe-photos":
+            await _copy_photos(sm, args)
+            return
         async with sm() as session:
             await _dispatch(session, args)
             await session.commit()
@@ -115,6 +118,48 @@ async def _import_mealie(sm, args: argparse.Namespace) -> None:
     )
     if st.last_error:
         print(f"last error: {st.last_error}")
+
+
+async def _copy_photos(sm, args: argparse.Namespace) -> None:
+    """Recipes saved with a photo on another website: store a copy (the app only shows its own
+    images). A photo that cannot be fetched is left as it is, so a later run can try again."""
+    from datetime import UTC, datetime
+
+    from .models import Recipe
+    from .recipes.fetch import fetch_image
+    from .services.lookup.media import InvalidImage, store_image
+
+    cfg = get_settings()
+    async with sm() as session:
+        hh = await _household(session, args.household)
+        rows = (
+            await session.execute(
+                select(Recipe.id, Recipe.image_url).where(
+                    Recipe.household_id == hh.id,
+                    Recipe.deleted_at.is_(None),
+                    Recipe.image_url.like("http%"),
+                )
+            )
+        ).all()
+    print(f"{len(rows)} recipes link to a photo on another website", flush=True)
+    copied = failed = 0
+    for rid, url in rows:
+        try:
+            name = await store_image(
+                await fetch_image(url, cfg.image_download_max_bytes), cfg.upload_dir
+            )
+        except (AppError, InvalidImage) as exc:
+            failed += 1
+            print(f"  not copied: {url[:100]} ({exc})", flush=True)
+            continue
+        async with sm() as session, session.begin():
+            r = await session.get(Recipe, rid, with_for_update=True)
+            if r is not None and r.image_url == url:
+                r.image_url = f"/api/media/{name}"
+                r.version += 1
+                r.updated_at = datetime.now(UTC)
+                copied += 1
+    print(f"copied {copied}, not available {failed}")
 
 
 async def _backfill(sm, args: argparse.Namespace) -> None:
@@ -279,6 +324,12 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument(
         "--replace-images", action="store_true", help="re-copy photos even when one is stored"
     )
+
+    s = sub.add_parser(
+        "copy-recipe-photos",
+        help="Store a copy of recipe photos that still link to another website",
+    )
+    s.add_argument("--household")
 
     s = sub.add_parser(
         "classify-recipes",

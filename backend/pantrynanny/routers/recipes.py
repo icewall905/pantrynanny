@@ -9,8 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_session
 from ..errors import AppError
+from ..logging import get_logger
 from ..recipes.course import classify
-from ..recipes.fetch import fetch_page
+from ..recipes.fetch import fetch_image, fetch_page
 from ..recipes.jsonld import extract
 from ..recipes.parse import parse_line
 from ..schemas.recipes import (
@@ -31,9 +32,29 @@ from ..schemas.recipes import (
 from ..security import Principal, get_principal
 from ..services import recipes as svc
 from ..services.households import get_household_settings
+from ..services.lookup.media import InvalidImage, store_image
 from ._common import parse_if_match
 
 router = APIRouter(tags=["recipes"])
+
+
+log = get_logger(__name__)
+
+
+async def _local_photo(request: Request, body: RecipeIn) -> RecipeIn:
+    """Copy a photo from another website into our own storage. The app only shows its own
+    images (Content-Security-Policy), and a copy keeps working if the site moves it."""
+    url = body.image_url
+    if not url or not url.startswith(("http://", "https://")):
+        return body
+    cfg = request.app.state.settings
+    fetcher = getattr(request.app.state, "image_fetcher", None) or fetch_image
+    try:
+        name = await store_image(await fetcher(url, cfg.image_download_max_bytes), cfg.upload_dir)
+    except (AppError, InvalidImage) as exc:
+        log.info("recipe_photo_unavailable", error=type(exc).__name__)
+        return body.model_copy(update={"image_url": None})  # a link the app cannot show anyway
+    return body.model_copy(update={"image_url": f"/api/media/{name}"})
 
 
 def _today(request: Request) -> date:
@@ -206,9 +227,8 @@ async def import_and_save(
     )
     if existing is not None:
         return ImportSavedOut(recipe=svc.recipe_out(existing), created=False)
-    r = await svc.create_recipe(
-        session, principal.household_id, _recipe_in(draft), principal.user_id
-    )
+    body_in = await _local_photo(request, _recipe_in(draft))
+    r = await svc.create_recipe(session, principal.household_id, body_in, principal.user_id)
     await session.commit()
     return ImportSavedOut(recipe=svc.recipe_out(r), created=True)
 
@@ -216,9 +236,11 @@ async def import_and_save(
 @router.post("/recipes", response_model=RecipeOut, status_code=201)
 async def create(
     body: RecipeIn,
+    request: Request,
     principal: Principal = Depends(get_principal),
     session: AsyncSession = Depends(get_session),
 ):
+    body = await _local_photo(request, body)
     r = await svc.create_recipe(session, principal.household_id, body, principal.user_id)
     await session.commit()
     return svc.recipe_out(r)
@@ -237,10 +259,12 @@ async def get(
 async def update(
     rid: uuid.UUID,
     body: RecipeIn,
+    request: Request,
     if_match: str | None = Header(default=None),
     principal: Principal = Depends(get_principal),
     session: AsyncSession = Depends(get_session),
 ):
+    body = await _local_photo(request, body)
     r = await svc.update_recipe(
         session, principal.household_id, rid, body, parse_if_match(if_match)
     )
