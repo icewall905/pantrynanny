@@ -6,6 +6,7 @@ import getpass
 import secrets
 import sys
 import time
+import uuid
 from datetime import timedelta
 
 from sqlalchemy import select, update
@@ -59,6 +60,9 @@ async def _run(args: argparse.Namespace) -> None:
     try:
         if args.command == "backfill-recipes":
             await _backfill(sm, args)
+            return
+        if args.command == "repair-recipes":
+            await _repair(sm, args)
             return
         if args.command == "import-mealie":
             await _import_mealie(sm, args)
@@ -175,6 +179,69 @@ async def _backfill(sm, args: argparse.Namespace) -> None:
         f"checked {st.checked}: times filled {st.times_filled}, courses filled "
         f"{st.courses_filled}, failed {st.failed}; {st.remaining} left"
     )
+
+
+async def _repair(sm, args: argparse.Namespace) -> None:
+    """Read the source page of recipes whose import left a placeholder, and fill them in."""
+    import json
+    from pathlib import Path
+
+    from .services import recipe_repair
+
+    overrides: dict = {}
+    if args.overrides:
+        raw = Path(args.overrides).read_text(encoding="utf-8")  # noqa: ASYNC240
+        overrides = {uuid.UUID(k): v for k, v in json.loads(raw).items()}
+    async with sm() as session:
+        hh = await _household(session, args.household)
+        broken = await recipe_repair.remaining(session, hh.id)
+        no_link = await recipe_repair.missing_links(session, hh.id)
+    print(
+        f"{broken} recipes have no real ingredients or instructions "
+        f"({len(no_link)} without a link to read again)",
+        flush=True,
+    )
+    reader = None
+    if args.ai:
+        from functools import partial
+
+        from .ai.client import AIClient
+        from .recipes import ai_reader
+
+        ai = AIClient(get_settings())
+        await ai.refresh()
+        if ai.enabled:
+            reader = partial(ai_reader.read, ai)
+        else:
+            print("--ai ignored: no AI endpoint is configured (Admin - AI)", file=sys.stderr)
+    status = recipe_repair.RepairStatus()
+    await recipe_repair.run(
+        sm,
+        hh.id,
+        status,
+        delay_s=args.delay,
+        limit=args.limit,
+        dry_run=args.dry_run,
+        overrides=overrides,
+        reader=reader,
+    )
+    print(
+        f"checked {status.checked}: instructions filled {status.instructions_filled}, "
+        f"ingredient lists filled {status.ingredients_filled}, read by the model "
+        f"{status.read_by_model}, failed {status.failed}; {status.remaining} left",
+        flush=True,
+    )
+    for row in status.repaired:
+        print(
+            f"  {'would fill' if status.dry_run else 'filled'}: {row['title'][:60]} "
+            f"({row['instructions']} steps, {row['ingredients']} ingredients) {row['url']}",
+            flush=True,
+        )
+    for row in status.problems:
+        print(f"  could not repair: {row['title'][:60]} {row['url']} - {row['reason']}", flush=True)
+    if args.json:
+        report = json.dumps(status.public(), indent=2, default=str)
+        Path(args.json).write_text(report, encoding="utf-8")  # noqa: ASYNC240
 
 
 async def _dispatch(session: AsyncSession, args: argparse.Namespace) -> None:
@@ -308,6 +375,30 @@ def build_parser() -> argparse.ArgumentParser:
     )
     s.add_argument("--limit", type=int, help="at most this many recipes in this run")
     s.add_argument("--delay", type=float, default=2.0, help="seconds between page fetches")
+    s.add_argument("--household")
+
+    s = sub.add_parser(
+        "repair-recipes",
+        help="Read the source page again for recipes whose import left a placeholder instead of "
+        "the ingredients or the method, and fill those two in (nothing else is changed)",
+    )
+    s.add_argument("--limit", type=int, help="at most this many recipes in this run")
+    s.add_argument("--delay", type=float, default=2.0, help="seconds between page fetches")
+    s.add_argument(
+        "--dry-run", action="store_true", help="read the pages but change nothing (check first)"
+    )
+    s.add_argument(
+        "--ai",
+        action="store_true",
+        help="for pages that carry no recipe data, read the ingredients and the method off the "
+        "page with the household's own model (every line is checked against the page text)",
+    )
+    s.add_argument(
+        "--overrides",
+        help="JSON file {recipe id: url} for recipes whose own link is gone (a page found by "
+        "searching for the recipe)",
+    )
+    s.add_argument("--json", help="write the full report (what was filled, what failed) here")
     s.add_argument("--household")
 
     s = sub.add_parser(

@@ -33,3 +33,26 @@ pantrynanny-admin import-mealie --url https://mealie.example.com
 
 The web app and the Android app show the photos on the recipe cards and let you pick a category on
 "What can we cook?" and "All recipes".
+
+## Recipes that arrived with "Could not detect instructions"
+
+Mealie stores the sentence *"Could not detect instructions"* / *"Could not detect ingredients"* when its
+scraper gives up, and the import copies what Mealie has. Such a recipe shows a title, a photo and one
+meaningless line. `pantrynanny-admin repair-recipes` reads its source page again and replaces **only** the
+ingredient list and the steps; the title, photo, times, tags and course stay as they are.
+
+```bash
+pantrynanny-admin repair-recipes --dry-run      # read the pages, change nothing, list what it would fill
+pantrynanny-admin repair-recipes                # fill in what the pages still hold as schema.org data
+pantrynanny-admin repair-recipes --ai           # also read pages that have no schema.org data at all
+pantrynanny-admin repair-recipes --overrides found.json   # {recipe id: url} for pages that are gone
+```
+
+`--ai` uses the household's own model (Admin → AI) to copy the ingredients and method off a page that has
+no structured data. Every line it returns is checked against the page's own words and dropped when it is not
+really there; an answer that is mostly not from the page is thrown away, so a recipe is never filled with
+guessed content. A page that holds nothing (gone, no list, a video) leaves the recipe untouched and is
+listed as a problem instead. `--json report.json` writes the whole run for later reading.
+
+Find the recipe elsewhere and pass its link in the `--overrides` file when the original page is dead (404);
+`--dry-run` first shows which recipes need that.

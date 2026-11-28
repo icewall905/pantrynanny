@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-11-28 – repairing recipes that arrived with a placeholder
+
+- **`pantrynanny-admin repair-recipes`** reads the source page again for recipes that have no real
+  ingredients or no real method — Mealie stores *"Could not detect instructions"* when its scraper gives
+  up and the import copied that in. Only those two fields are replaced; title, photo, times, tags and
+  course stay as they are, and a page with nothing on it leaves the recipe untouched and is reported.
+  `--dry-run` shows what it would fill, `--overrides {id: url}` takes a page found elsewhere for a dead
+  link, `--json report.json` writes the run.
+- **`--ai`**: for pages that never had schema.org data (small blogs, page builders, videos), the
+  household's own model ([recipes/ai_reader.py](backend/pantrynanny/recipes/ai_reader.py)) copies the
+  ingredients and the method off the page text. Every returned line is checked against the page's own
+  words and dropped when it is not there; an answer mostly not from the page is discarded entirely.
+- Run by hand on the live collection: 42 of 43 broken recipes were repaired (structured data, archived
+  copies for dead links, the model for the rest); everything else is listed per recipe in the report.
+
 ## 2026-11-28 – AVIF photos
 
 - AVIF images are accepted (and stored as WebP). Recipe sites often send AVIF, even behind a `.jpeg` name, so
