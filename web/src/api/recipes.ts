@@ -37,7 +37,7 @@ export interface Recipe {
   created_at: ISODateTime
   updated_at: ISODateTime
 }
-export type IngredientStatus = 'have' | 'low' | 'missing' | 'staple' | 'optional'
+export type IngredientStatus = 'have' | 'low' | 'missing' | 'swap' | 'staple' | 'optional'
 export interface IngredientAvailability {
   ingredient: Ingredient
   status: IngredientStatus
@@ -46,6 +46,8 @@ export interface IngredientAvailability {
   need: number | null
   enough: boolean | null
   expiring: boolean
+  /** status 'swap': not in the house, but this in-stock product can stand in */
+  substitute?: { id: UUID; name: string; total_quantity: number; stock_unit: string; image_url: string | null; next_expiry: ISODate | null } | null
 }
 export interface Availability {
   recipe_id: UUID
@@ -53,6 +55,8 @@ export interface Availability {
   have: number
   missing: number
   required: number
+  /** required lines covered only by a stand-in product */
+  swaps?: number
   coverage: number
   uses_expiring: string[]
   items: IngredientAvailability[]

@@ -160,5 +160,8 @@
     "expiryCleared": "Ingen holdbarhed",
     "moved": "Flyttet til {{name}}",
     "failed": "Kunne ikke gemme – prøv igen"
+  },
+  "manualAdd": {
+    "open": "Tilføj uden stregkode"
   }
 }

@@ -444,3 +444,14 @@ describe('HTTP 500 handling', () => {
     expect((await s.getPending()).length).toBe(0)
   })
 })
+
+describe('searchProducts', () => {
+  it('matches cached products by name substring, prefix matches first', async () => {
+    const s = mk()
+    await s.cacheProduct(product('a', '5701234567892', 'Havremælk'))
+    await s.cacheProduct(product('b', '4006381333931', 'Mælk'))
+    await s.cacheProduct(product('c', '9780201379624', 'Ris'))
+    expect((await s.searchProducts('mæ')).map((p) => p.id)).toEqual(['b', 'a'])
+    expect(await s.searchProducts('  ')).toEqual([])
+  })
+})

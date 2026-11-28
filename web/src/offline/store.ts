@@ -34,7 +34,7 @@ type DB = IDBPDatabase<unknown>
 const RETRY_METHODS = [
   'lookupBarcode', 'displayedQuantity', 'pendingDelta', 'getProduct', 'cacheProduct', 'getHistory',
   'getPending', 'getFailedOps', 'dismissFailedOp', 'retryFailedOp', 'undoScan', 'getMeta', 'setMeta',
-  'getDeviceId', 'adoptSession', 'clearForLogout',
+  'getDeviceId', 'adoptSession', 'clearForLogout', 'searchProducts',
 ] as const
 
 function isDeadConnection(e: unknown): boolean {
@@ -261,6 +261,17 @@ export class OfflineStore {
   }
   async getProduct(id: UUID): Promise<Product | undefined> {
     return (await this.db()).get('products', id)
+  }
+  /** Offline fallback for product typeahead: name/brand/alias substring match over the cached catalogue. */
+  async searchProducts(q: string, limit = 20): Promise<Product[]> {
+    const needle = q.trim().toLocaleLowerCase()
+    if (!needle) return []
+    const all = (await (await this.db()).getAll('products')) as Product[]
+    const hay = (p: Product) => [p.name, p.brand ?? '', ...(p.aliases ?? [])].join(' ').toLocaleLowerCase()
+    return all
+      .filter((p) => !p.deleted_at && hay(p).includes(needle))
+      .sort((a, b) => Number(!a.name.toLocaleLowerCase().startsWith(needle)) - Number(!b.name.toLocaleLowerCase().startsWith(needle)) || a.name.localeCompare(b.name))
+      .slice(0, limit)
   }
   async lookupBarcode(raw: string, symbology?: string | null): Promise<BarcodeLookup> {
     const db = await this.db()

@@ -12,12 +12,14 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..errors import AppError, conflict, not_found
-from ..models import Product, ProductAlias, Recipe, RecipeIngredient
+from ..models import IngredientSubstitute, Product, ProductAlias, Recipe, RecipeIngredient
 from ..recipes.course import classify
 from ..recipes.match import (
     Pantry,
     ProductCandidate,
     best_match,
+    best_substitute,
+    counts_compare,
     is_staple,
     needed_in_stock_units,
     stock_in_base,
@@ -295,8 +297,28 @@ async def pantry(session: AsyncSession, household_id: uuid.UUID) -> Pantry:
                 image_url=f"/api/media/{p.image_path}" if p.image_path else None,
             )
         )
+    substitutes: dict[str, list[object]] = {}
+    for ingredient, pid in (
+        await session.execute(
+            select(IngredientSubstitute.ingredient, IngredientSubstitute.product_id)
+            .where(IngredientSubstitute.household_id == household_id)
+            .order_by(IngredientSubstitute.created_at)
+        )
+    ).all():
+        substitutes.setdefault(ingredient, []).append(pid)
     settings = await get_household_settings(session, household_id)
-    return Pantry(out, staples=settings.staples)
+    return Pantry(out, staples=settings.staples, substitutes=substitutes)
+
+
+def _matched(p: ProductCandidate) -> MatchedProduct:
+    return MatchedProduct(
+        id=p.id,  # type: ignore[arg-type]
+        name=p.name,
+        total_quantity=p.total,
+        stock_unit=p.stock_unit,
+        image_url=p.image_url,
+        next_expiry=p.next_expiry,  # type: ignore[arg-type]
+    )
 
 
 def availability(
@@ -312,13 +334,15 @@ def availability(
     by_id = {p.id: p for p in products}
     soon = (today or date.today()) + timedelta(days=soon_days)
     items: list[IngredientAvailability] = []
-    have = missing = required = 0
+    have = missing = required = swaps = 0
     expiring: list[str] = []
     staple = products.is_staple if isinstance(products, Pantry) else is_staple
     for ing in r.ingredients:
         linked = ing.product_id is not None and ing.product_id in by_id
         p = by_id[ing.product_id] if linked else best_match(ing.name, products)
         qty = ing.quantity * factor if ing.quantity is not None else None
+        if p and not counts_compare(ing.name, ing.unit, p):
+            qty = None  # "3 cloves" of the household's garlic bulbs: only check it is there
         need = needed_in_stock_units(qty, ing.unit, p) if p else None
         enough: bool | None = None
         if p and p.total > 0:
@@ -330,6 +354,7 @@ def availability(
                     enough = have_base[1] >= need_base[1]
         in_stock = bool(p and p.total > 0)
         is_soon = bool(in_stock and p and p.next_expiry and p.next_expiry <= soon)
+        sub: ProductCandidate | None = None
         if p is None and staple(ing.name):
             # only when the household does not keep it as a product: a stocked-out product
             # is reported as missing like any other
@@ -342,6 +367,8 @@ def availability(
                 status, have = "have", have + 1
             elif in_stock:
                 status, have = "low", have + 1
+            elif (sub := best_substitute(ing.name, products)) is not None:
+                status, swaps = "swap", swaps + 1
             else:
                 status, missing = "missing", missing + 1
         if is_soon and p:
@@ -350,16 +377,8 @@ def availability(
             IngredientAvailability(
                 ingredient=ingredient_out(ing),
                 status=status,  # type: ignore[arg-type]
-                product=MatchedProduct(
-                    id=p.id,  # type: ignore[arg-type]
-                    name=p.name,
-                    total_quantity=p.total,
-                    stock_unit=p.stock_unit,
-                    image_url=p.image_url,
-                    next_expiry=p.next_expiry,  # type: ignore[arg-type]
-                )
-                if p
-                else None,
+                product=_matched(p) if p else None,
+                substitute=_matched(sub) if sub else None,
                 linked=linked,
                 need=need,
                 enough=enough,
@@ -372,6 +391,7 @@ def availability(
         have=have,
         missing=missing,
         required=required,
+        swaps=swaps,
         coverage=round(have / required, 3) if required else 1.0,
         uses_expiring=list(dict.fromkeys(expiring)),
         items=items,
@@ -396,7 +416,8 @@ def rank(
     Sort, most important first (with `max_missing=None` every recipe is kept; one with
     nothing to check goes last):
     1. fewest missing ingredients ("cookable now" first, then one shopping item, ...);
-    2. smoothed coverage have / (required + 2). The +2 is a prior of two unknown ingredients,
+    2. smoothed coverage (have + swaps/2) / (required + 2) — a line an in-stock product can
+       stand in for counts half. The +2 is a prior of two unknown ingredients,
        so a short list has to earn its place: 2 of 2 scores 0.50, 5 of 5 scores 0.71 and 8 of 9
        scores 0.73. A two-line "chocolate-dipped apricots" no longer beats a real dish just
        for being short, while among dishes of similar size more of it in the house still wins;
@@ -423,7 +444,7 @@ def rank(
         key=lambda x: (
             not x[1].required,
             x[1].missing,
-            -round(x[1].have / (x[1].required + 2), 6),
+            -round((x[1].have + x[1].swaps / 2) / (x[1].required + 2), 6),
             -len(x[1].uses_expiring),
             -x[1].have,
             minutes(x[0]) or 0,
@@ -435,7 +456,7 @@ def rank(
 
 
 def brief(r: Recipe, a: Availability) -> RecipeBrief:
-    names = {"missing": [], "low": [], "staple": []}  # type: dict[str, list[str]]
+    names = {"missing": [], "swap": [], "low": [], "staple": []}  # type: dict[str, list[str]]
     for it in a.items:
         if it.status in names:
             names[it.status].append(it.ingredient.name)
@@ -454,7 +475,9 @@ def brief(r: Recipe, a: Availability) -> RecipeBrief:
         have=a.have,
         required=a.required,
         missing=a.missing,
+        swaps=a.swaps,
         missing_names=names["missing"],
+        swap_names=names["swap"],
         low_names=names["low"],
         staple_names=names["staple"],
         uses_expiring=a.uses_expiring,

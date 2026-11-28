@@ -2,10 +2,12 @@ import { memo, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { CalendarPlus, FolderInput, LayoutList, Layers, Package, Plus, Search, ShoppingBasket, Trash2, Wand2, X } from 'lucide-react'
-import { useCategories, useInventory, useLocations, type InventoryParams } from '../api/queries'
+import { useCategories, useInventory, useInvalidateStock, useLocations, type InventoryParams } from '../api/queries'
 import type { InventoryItem, Location } from '../api/types'
 import { useSettings } from '../auth/AuthProvider'
 import { ExpiryBadge } from '../components/ExpiryBadge'
+import { ManualAddSheet } from '../components/ManualAddSheet'
+import { useToast } from '../components/Toast'
 import { ProductThumb } from '../components/ProductThumb'
 import { QuantityStepper } from '../components/QuantityStepper'
 import { ExpiryDialog, MoveDialog, useAddToShopping } from '../components/StockDialogs'
@@ -112,6 +114,9 @@ export default function InventoryPage() {
   const [moveItems, setMoveItems] = useState<InventoryItem[] | null>(null)
   const [expiryItem, setExpiryItem] = useState<InventoryItem | null>(null)
   const [confirmRemove, setConfirmRemove] = useState(false)
+  const [manualAdd, setManualAdd] = useState(false)
+  const invalidateStock = useInvalidateStock()
+  const toast = useToast()
 
   const items = useMemo(() => (inv.data ?? []).filter((i) => !lowOnly || i.low_stock), [inv.data, lowOnly])
   const locById = useMemo(() => new Map((locs.data ?? []).map((l) => [l.id, l])), [locs.data])
@@ -162,9 +167,12 @@ export default function InventoryPage() {
           <Link to="/fix-up" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-surface px-4 text-sm font-semibold text-ink-900 ring-1 ring-cream-200 hover:bg-cream-200/70" data-testid="inventory-fixup">
             <Wand2 className="size-4" /> {t('fixUp.link')}
           </Link>
-          <Link to="/products/new" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-leaf-600 px-4 text-sm font-semibold text-white hover:bg-leaf-800">
-            <Plus className="size-4" /> {t('product.new')}
+          <Link to="/products/new" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-surface px-4 text-sm font-semibold text-ink-900 ring-1 ring-cream-200 hover:bg-cream-200/70">
+            <Package className="size-4" /> {t('product.new')}
           </Link>
+          <Button variant="primary" onClick={() => setManualAdd(true)} data-testid="inventory-manual-add">
+            <Plus className="size-4" /> {t('manualAdd.open')}
+          </Button>
           </>
         }
       />
@@ -278,6 +286,16 @@ export default function InventoryPage() {
         }}
       />
       <ExpiryDialog item={expiryItem} onClose={() => setExpiryItem(null)} />
+      <ManualAddSheet
+        open={manualAdd}
+        onClose={() => setManualAdd(false)}
+        locations={locs.data}
+        onAdded={(p, n) => {
+          toast.push(t('manualAdd.added', { name: p.name, count: n }), 'success')
+          void invalidateStock()
+        }}
+        onError={(m) => toast.push(m, 'error')}
+      />
       <Modal
         open={confirmRemove}
         onClose={() => setConfirmRemove(false)}

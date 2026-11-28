@@ -9,6 +9,7 @@ from typing import Any
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     Float,
@@ -284,6 +285,26 @@ class ProductAlias(Base):
 
     __table_args__ = (
         UniqueConstraint("product_id", "alias", name="uq_product_aliases_product_alias"),
+    )
+
+
+class IngredientSubstitute(Base):
+    """A household-approved stand-in: when a recipe asks for `ingredient` (the reduced key from
+    recipes.match.ingredient_key) and it is not in the house, `product` can be used instead."""
+
+    __tablename__ = "ingredient_substitutes"
+    id: Mapped[uuid.UUID] = _pk()
+    household_id: Mapped[uuid.UUID] = _fk("households.id", ondelete="CASCADE")
+    ingredient: Mapped[str] = mapped_column(Text)
+    product_id: Mapped[uuid.UUID] = _fk("products.id", ondelete="CASCADE")
+    source: Mapped[str] = mapped_column(Text, server_default=text("'manual'"))
+    created_at: Mapped[datetime] = _ts()
+
+    __table_args__ = (
+        UniqueConstraint(
+            "household_id", "ingredient", "product_id", name="uq_ingredient_substitutes"
+        ),
+        CheckConstraint("source IN ('manual','ai')", name="ck_ingredient_substitutes_source"),
     )
 
 

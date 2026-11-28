@@ -5,6 +5,9 @@
 #                             "Pomace Olive Oil" and "olivenolie" all end in "olivenolie".
 #   words > also called       a product whose name ends in the left-hand side also counts as the
 #                             right-hand side ("Sunflower Oil" is a neutral oil); one direction only.
+#   ingredient ~ stand-in     not the same thing, but the right-hand side works instead: a recipe
+#                             line shows "swap" (not "have") when only the stand-in is in the
+#                             house. One direction only; the household approves more in the app.
 #
 # Lower case, one rule per line. Grown from misses in scripts/match_eval.py; check precision there
 # after adding a rule. A household can add its own names as product aliases (Admin -> product).
@@ -225,3 +228,89 @@ jasminris > hvide ris
 sushiris > hvide ris
 basmatiris > hvide ris
 lagereddike > hvid eddike
+
+# --- substitutes: the right side can stand in for the left (shown as "swap", never "have")
+smør ~ margarine
+smør ~ plantemargarine
+margarine ~ smør
+skalotteløg ~ løg
+shallot ~ løg
+shallots ~ løg
+rødløg ~ løg
+løg ~ rødløg
+løg ~ skalotteløg
+forårsløg ~ løg
+porre ~ løg
+lime ~ citron
+citron ~ lime
+limesaft ~ citronsaft
+citronsaft ~ limesaft
+lime juice ~ citronsaft
+lemon juice ~ limesaft
+kærnemælk ~ yoghurt naturel
+buttermilk ~ yoghurt naturel
+piskefløde ~ madlavningsfløde
+heavy cream ~ piskefløde
+madlavningsfløde ~ piskefløde
+crème fraiche ~ creme fraiche
+creme fraiche ~ græsk yoghurt
+sour cream ~ creme fraiche
+creme fraiche ~ skyr
+græsk yoghurt ~ skyr
+skyr ~ græsk yoghurt
+mascarpone ~ flødeost
+ricotta ~ hytteost
+parmesan ~ grana padano
+grana padano ~ parmesan
+pecorino ~ parmesan
+cheddar ~ revet ost
+gruyère ~ emmentaler
+sødmælk ~ letmælk
+letmælk ~ sødmælk
+mælk ~ havredrik
+honning ~ ahornsirup
+ahornsirup ~ honning
+brun farin ~ sukker
+puddersukker ~ brun farin
+flormelis ~ sukker
+hvedemel ~ speltmel
+speltmel ~ hvedemel
+basmatiris ~ jasminris
+jasminris ~ basmatiris
+spaghetti ~ linguine
+linguine ~ spaghetti
+penne ~ fusilli
+fusilli ~ penne
+penne ~ pasta
+spaghetti ~ pasta
+hønsebouillon ~ grøntsagsbouillon
+oksebouillon ~ grøntsagsbouillon
+grøntsagsbouillon ~ hønsebouillon
+hvidvinseddike ~ æbleeddike
+rødvinseddike ~ balsamico
+æbleeddike ~ hvidvinseddike
+olivenolie ~ neutral olie
+neutral olie ~ olivenolie
+koriander ~ persille
+persille ~ koriander
+cilantro ~ persille
+estragon ~ dild
+purløg ~ forårsløg
+bladselleri ~ fennikel
+spinat ~ grønkål
+grønkål ~ spinat
+squash ~ aubergine
+champignon ~ svampe
+cherrytomater ~ tomater
+flåede tomater ~ hakkede tomater
+hakkede tomater ~ flåede tomater
+tomatpuré ~ hakkede tomater
+kyllingebryst ~ kyllingelår
+kyllingelår ~ kyllingebryst
+hakket oksekød ~ hakket svinekød
+hakket svinekød ~ hakket oksekød
+bacon ~ pancetta
+pancetta ~ bacon
+kikærter ~ hvide bønner
+kidneybønner ~ sorte bønner
+sorte bønner ~ kidneybønner

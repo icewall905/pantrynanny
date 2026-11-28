@@ -160,5 +160,8 @@
     "expiryCleared": "No expiry",
     "moved": "Moved to {{name}}",
     "failed": "Could not save – try again"
+  },
+  "manualAdd": {
+    "open": "Add without barcode"
   }
 }

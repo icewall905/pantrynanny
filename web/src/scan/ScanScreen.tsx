@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { AlertTriangle, Loader2, Camera, CameraOff, ClipboardList, Flashlight, Keyboard, MapPin, Minus, Plus, RefreshCw, SwitchCamera, Undo2, Volume2, VolumeX, Wifi, WifiOff, X } from 'lucide-react'
+import { AlertTriangle, Loader2, Camera, CameraOff, ClipboardList, Flashlight, Keyboard, MapPin, PackagePlus, Minus, Plus, RefreshCw, SwitchCamera, Undo2, Volume2, VolumeX, Wifi, WifiOff, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useTranslation } from 'react-i18next'
 import { get, qs } from '../api/client'
@@ -23,6 +23,7 @@ import { LookupTracker, reconcileProduct, type CardPhase } from './lookup'
 import { clearCameraOk, loadScanPrefs, markCameraOk, saveScanPrefs, type ScanPrefs } from './prefs'
 import { expired, nameLine, recordScan, recordUndo, saveSession, summarize, type ScanRecord, type ScanSession } from './session'
 import type { WakeState } from './wakelock'
+import { ManualAddSheet } from '../components/ManualAddSheet'
 
 // Whole-screen treatment per mode. Full class strings so Tailwind can see them.
 const THEME = {
@@ -145,6 +146,10 @@ export default function ScanScreen({ settings, kiosk, wake, initialMode, onExit,
   const [camErr, setCamErr] = useState<CameraError | null>(null)
   const [manualOpen, setManualOpen] = useState(false)
   const [manual, setManual] = useState('')
+  const [addSheetOpen, setAddSheetOpen] = useState(false)
+  // the sheet covers the camera: nothing scanned behind it may be counted
+  const addSheetOpenRef = useRef(addSheetOpen)
+  addSheetOpenRef.current = addSheetOpen
   const [debug, setDebug] = useState(false)
   const [failed, setFailed] = useState<FailedRecord[]>([])
   const [failedOpen, setFailedOpen] = useState(false)
@@ -454,7 +459,7 @@ export default function ScanScreen({ settings, kiosk, wake, initialMode, onExit,
     if (!prefs.hid) return
     const det = new HidBurstDetector()
     const onKey = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey || e.altKey || manualOpenRef.current || isTypingTarget(e.target)) {
+      if (e.ctrlKey || e.metaKey || e.altKey || manualOpenRef.current || addSheetOpenRef.current || isTypingTarget(e.target)) {
         det.reset()
         return
       }
@@ -475,7 +480,9 @@ export default function ScanScreen({ settings, kiosk, wake, initialMode, onExit,
     const engine = new ScannerEngine({
       video,
       rearmMs: settings?.scan_rearm_ms ?? DEFAULT_REARM_MS,
-      onScan: submit,
+      onScan: (ev) => {
+        if (!addSheetOpenRef.current) submit(ev)
+      },
       onState: (s, err) => {
         setCamState(s)
         setCamErr(err ?? null)
@@ -696,6 +703,15 @@ export default function ScanScreen({ settings, kiosk, wake, initialMode, onExit,
             </IconBtn>
             <IconBtn label={t('manual.open')} onClick={() => setManualOpen((o) => !o)}>
               <Keyboard className="size-6" />
+            </IconBtn>
+            <IconBtn
+              label={t('manualAdd.open')}
+              onClick={() => {
+                setManualOpen(false)
+                setAddSheetOpen(true)
+              }}
+            >
+              <PackagePlus className="size-6" />
             </IconBtn>
           </div>
           {(wake === 'unsupported' || wake === 'failed') && (
@@ -952,6 +968,13 @@ export default function ScanScreen({ settings, kiosk, wake, initialMode, onExit,
         />
       )}
 
+      <ManualAddSheet
+        open={addSheetOpen}
+        onClose={() => setAddSheetOpen(false)}
+        defaultLocationId={locationId}
+        onAdded={(p, n) => toast(t('manualAdd.added', { name: p.name, count: n }))}
+        onError={(m) => toast(m, 'red')}
+      />
       {debug && <DebugOverlay pending={sync.pending} onClose={() => setDebug(false)} />}
     </div>
   )

@@ -491,3 +491,89 @@ async def identify_photo(
         ),
         model,
     )
+
+
+# --------------------------------------------------------------------------- replacements
+
+REPLACEMENT_BATCH = 25
+REPLACEMENT_PRODUCTS = 300
+
+
+def validate_replacements(
+    raw: dict, asked: list[str], products: list[tuple[object, str]]
+) -> list[dict]:
+    """Keep answers for ingredients we asked about that name a listed product by number."""
+    items = raw.get("answers", raw.get("recipes"))  # a bare list arrives as "recipes"
+    if not isinstance(items, list):
+        raise ValueError("missing answers list")
+    wanted = {norm(a): a for a in asked}
+    out: list[dict] = []
+    seen: set[tuple[str, int]] = set()
+    for it in items:
+        if not isinstance(it, dict):
+            continue
+        ing = wanted.get(norm(str(it.get("ingredient", ""))))
+        kind = it.get("kind")
+        try:
+            n = int(it.get("product"))
+        except (TypeError, ValueError):
+            continue
+        if ing is None or kind not in ("same", "swap") or not 1 <= n <= len(products):
+            continue
+        if (ing, n) in seen:
+            continue
+        seen.add((ing, n))
+        pid, name = products[n - 1]
+        out.append(
+            {
+                "ingredient": ing,
+                "product_id": pid,
+                "product_name": name,
+                "kind": kind,
+                "reason": str(it.get("reason", "")).strip()[:160],
+            }
+        )
+    return out
+
+
+async def suggest_replacements(
+    ai: AIClient, ingredients: list[str], products: list[tuple[object, str]], locale: str
+) -> list[dict]:
+    """Ask which in-stock product is the same thing as, or can stand in for, each ingredient
+    no product matches by name. Products go in numbered (no ids to the model)."""
+    products = products[:REPLACEMENT_PRODUCTS]
+    if not ingredients or not products:
+        return []
+    listing = "\n".join(f"{i}. {clean(name)}" for i, (_, name) in enumerate(products, 1))
+    da = locale == "da"
+    instr = (
+        "For hver ingrediens: find en vare fra listen der ER det samme (en anden form eller et "
+        'andet navn, fx "fed hvidløg" = "Hvidløg") → kind "same", eller som kan BRUGES I STEDET '
+        'i madlavning (fx smør → margarine) → kind "swap". Spring over hvis intet passer godt. '
+        'Svar KUN med JSON: {"answers":[{"ingredient":str,"product":int,"kind":"same"|"swap",'
+        '"reason":str}]}. "product" er varens nummer.'
+        if da
+        else "For each ingredient: find a product from the list that IS the same thing (another "
+        'form or name, e.g. "garlic cloves" = "Garlic bulbs") → kind "same", or that can be USED '
+        'INSTEAD in cooking (e.g. butter → margarine) → kind "swap". Skip it if nothing fits '
+        'well. Reply with ONLY JSON: {"answers":[{"ingredient":str,"product":int,'
+        '"kind":"same"|"swap","reason":str}]}. "product" is the product number.'
+    )
+    stock = wrap_untrusted("products", listing)
+    out: list[dict] = []
+    for i in range(0, len(ingredients), REPLACEMENT_BATCH):
+        batch = ingredients[i : i + REPLACEMENT_BATCH]
+        asked = wrap_untrusted("ingredients", "\n".join(f"- {clean(x)}" for x in batch))
+        convo: list[dict[str, Any]] = [
+            {"role": "user", "content": f"{instr}\n\n{stock}\n\n{asked}"}
+        ]
+        for _ in range(2):
+            msg = await ai.chat(convo, json_mode=True, max_tokens=3000, temperature=0.1)
+            try:
+                out += validate_replacements(
+                    parse_json_object(msg.get("content") or ""), batch, products
+                )
+                break
+            except ValueError:
+                continue
+    return out

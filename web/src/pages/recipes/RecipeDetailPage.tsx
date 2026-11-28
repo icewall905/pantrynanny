@@ -11,7 +11,7 @@ import { useToast } from '../../components/Toast'
 import { enqueueOp } from '../../offline'
 import { cn, formatQty, todayISO } from '../../lib/format'
 
-const TONE = { have: 'good', low: 'warn', missing: 'bad', staple: 'neutral', optional: 'neutral' } as const
+const TONE = { have: 'good', low: 'warn', missing: 'bad', swap: 'warn', staple: 'neutral', optional: 'neutral' } as const
 
 export default function RecipeDetailPage() {
   const { id = '' } = useParams()
@@ -124,7 +124,11 @@ export default function RecipeDetailPage() {
           </div>
           {a && (
             <p className="mb-2 text-sm text-ink-500">
-              {a.missing === 0 ? t('recipes.allHome') : t('recipes.coverage', { have: a.have, of: a.required })}
+              {a.missing === 0
+                ? a.swaps
+                  ? t('recipes.allHomeSwaps', { count: a.swaps })
+                  : t('recipes.allHome')
+                : t('recipes.coverage', { have: a.have, of: a.required })}
             </p>
           )}
           <ul className="divide-y divide-cream-200" data-testid="ingredients">
@@ -136,6 +140,11 @@ export default function RecipeDetailPage() {
                     <div className="text-xs text-ink-500">
                       {it.product.name} · {t('recipes.inStock', { qty: formatQty(it.product.total_quantity), unit: t(`units.${it.product.stock_unit}`) })}
                       {it.expiring && <span className="ml-1 text-honey-600">· {t('recipes.expiringSoon')}</span>}
+                    </div>
+                  )}
+                  {it.substitute && (
+                    <div className="text-xs text-honey-600" data-testid="swap-hint">
+                      {t('recipes.useInstead', { name: it.substitute.name })} · {t('recipes.inStock', { qty: formatQty(it.substitute.total_quantity), unit: t(`units.${it.substitute.stock_unit}`) })}
                     </div>
                   )}
                 </div>

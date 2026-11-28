@@ -118,6 +118,19 @@ GENERIC = {"sauce", "sovs", "juice", "saft", "dressing", "krydderi", "spice", "s
 # fmt: on
 # Package sizes and counting words ("Letmælk 1 l", "Æg 10 stk", "garlic cloves").
 SIZE_WORDS = {"g", "kg", "ml", "cl", "dl", "l", "stk", "pk", "pcs", "ks", "x", "sheets", "sheet"}
+# The part or form an ingredient comes in, not a different thing: "garlic cloves" and "Garlic
+# bulbs" are both garlic, "fed hvidløg" is hvidløg. Dropped only when another word says what it
+# is ("cloves" alone is the spice).
+# fmt: off
+FORM_WORDS = {
+    "clove", "cloves", "bulb", "bulbs", "head", "heads", "knob", "knobs", "sprig", "sprigs",
+    "stalk", "stalks", "stick", "sticks", "bunch", "bunches", "fed", "kvist", "kviste", "stilk",
+    "stilke", "hoved", "hoveder",
+}
+# ...and as the end of a Danish compound ("hvidløgsfed", "selleristilke"). Not leaves: lime
+# leaves, bay leaves and curry leaves are their own ingredient.
+FORM_ENDINGS = ("fed", "kviste", "kvist", "stilke", "stilk", "stænger", "stang")
+# fmt: on
 # Left over at the start of English lines by the amount parser ("c. tahini", "can black beans").
 # fmt: off
 LEADING_JUNK = {
@@ -184,14 +197,20 @@ def tokens(s: str) -> list[str]:
 
 
 @cache
-def _rules() -> tuple[dict[str, list[str]], dict[tuple[str, ...], list[str]], list]:
+def _rules() -> tuple[
+    dict[str, list[str]],
+    dict[tuple[str, ...], list[str]],
+    list[tuple[tuple[str, ...], list[str]]],
+    list[tuple[list[str], list[str]]],
+]:
     words: dict[str, list[str]] = {}
     phrases: dict[tuple[str, ...], list[str]] = {}
     kinds: list[tuple[tuple[str, ...], list[str]]] = []
+    swaps: list[tuple[list[str], list[str]]] = []
     lines = [ln.split("#", 1)[0].strip() for ln in SYNONYM_FILE.read_text().splitlines()]
     rules = []
     for ln in lines:
-        for sep in ("=", ">"):
+        for sep in ("=", ">", "~"):
             if sep in ln:
                 left, right = ln.split(sep, 1)
                 rules.append((sep, tokens(left), tokens(right)))
@@ -200,12 +219,17 @@ def _rules() -> tuple[dict[str, list[str]], dict[tuple[str, ...], list[str]], li
         if sep == "=" and len(left) == 1:
             words[left[0]] = right
     for sep, left, right in rules:  # phrases see the words already rewritten
+        if sep == "~":
+            continue
         left, right = _words(left, words), _words(right, words)
         if sep == ">":
             kinds.append((tuple(left), right))
         elif len(left) > 1:
             phrases[tuple(left)] = right
-    return words, phrases, kinds
+    for sep, left, right in rules:  # substitutes see words and phrases already rewritten
+        if sep == "~":
+            swaps.append((left, right))
+    return words, phrases, kinds, swaps
 
 
 def _words(toks: list[str], words: dict[str, list[str]]) -> list[str]:
@@ -214,7 +238,7 @@ def _words(toks: list[str], words: dict[str, list[str]]) -> list[str]:
 
 def canonical(toks: list[str]) -> list[str]:
     """Rewrite with the synonym table: single words first, then phrases (longest first)."""
-    words, phrases, _ = _rules()
+    words, phrases, *_ = _rules()
     toks = _words(toks, words)
     out: list[str] = []
     i = 0
@@ -237,12 +261,23 @@ def core(toks: list[str]) -> list[str]:
         if i and t in CUT:
             toks = toks[:i]
             break
-    toks = [t for t in toks if t not in SIZE_WORDS]
+    toks = [_unform(t) for t in toks if t not in SIZE_WORDS]
+    if any(t not in FORM_WORDS and t not in FILLER for t in toks):
+        toks = [t for t in toks if t not in FORM_WORDS]
     while toks and toks[-1] in FILLER:
         toks = toks[:-1]
     if len(toks) > 1 and toks[-1] in GENERIC_TAIL:
         toks = toks[:-1]
     return toks
+
+
+def _unform(t: str) -> str:
+    """ "hvidløgsfed" → hvidløg, "kanelstang" → kanel."""
+    for e in FORM_ENDINGS:
+        if t.endswith(e) and len(t) - len(e) >= 4:
+            head = t[: -len(e)]
+            return head[:-1] if head.endswith("s") and len(head) > 4 else head
+    return t
 
 
 def _strip_leading_junk(toks: list[str]) -> list[str]:
@@ -467,6 +502,54 @@ def best_match(
     return ranked[0][1]
 
 
+# --------------------------------------------------------------------------- substitutes
+
+
+def ingredient_key(ingredient_name: str) -> str:
+    """What an ingredient line asks for, as a stable key ("2 fed hvidløg" → hvidløg): the key a
+    household's approved substitutes are stored under."""
+    toks = _first_choice(_strip_leading_junk(tokens(ELIDED.sub("", norm(ingredient_name)))))
+    return " ".join(core(canonical(toks)) or core(toks))
+
+
+@cache
+def _swap_rules() -> list[tuple[list[str], str]]:
+    """`a ~ b` lines: the ingredient (as reduced keys) and what can stand in for it."""
+    out = []
+    for left, right in _rules()[3]:
+        k = ingredient_key(" ".join(left))
+        if k:
+            out.append((k.split(), " ".join(right)))
+    return out
+
+
+def best_substitute(
+    ingredient_name: str,
+    products: list[ProductCandidate],
+    approved: dict[str, list[object]] | None = None,
+) -> ProductCandidate | None:
+    """An in-stock product that can stand in when the ingredient itself is not in the house:
+    the household's approved swaps first (by product id), then the built-in `a ~ b` rules."""
+    if isinstance(products, Pantry):
+        return products.substitute(ingredient_name)
+    key = ingredient_key(ingredient_name)
+    if not key:
+        return None
+    by_id = {p.id: p for p in products}
+    for pid in (approved or {}).get(key, []):
+        p = by_id.get(pid)
+        if p is not None and p.total > 0:
+            return p
+    asked = key.split()
+    for left, right in _swap_rules():
+        if _token_score(asked, left) < 0.5:
+            continue
+        p = best_match(right, [p for p in products if p.total > 0])
+        if p is not None:
+            return p
+    return None
+
+
 # --------------------------------------------------------------------------- staples
 
 # Seed for a household's "always in the house" list (editable in Admin -> Settings).
@@ -559,8 +642,11 @@ class Pantry(list[ProductCandidate]):
         self,
         products: list[ProductCandidate],
         staples: "Staples | list[str] | bool | None" = None,
+        substitutes: dict[str, list[object]] | None = None,
     ):
         super().__init__(products)
+        self.substitutes = substitutes or {}
+        self._swap: dict[str, ProductCandidate | None] = {}
         if staples is False:
             self.staples = None
         else:
@@ -594,6 +680,12 @@ class Pantry(list[ProductCandidate]):
                 ingredient_name, self._candidates(ingredient_name), threshold
             )
         return self._best[key]
+
+    def substitute(self, ingredient_name: str) -> ProductCandidate | None:
+        key = norm(ingredient_name)
+        if key not in self._swap:
+            self._swap[key] = best_substitute(ingredient_name, list(self), self.substitutes)
+        return self._swap[key]
 
     def is_staple(self, name: str) -> bool:
         return self.staples is not None and name in self.staples
@@ -647,6 +739,37 @@ def needed_in_stock_units(
     if fam == "count":
         return _round(amount)
     return None
+
+
+# What one counted piece is: "3 cloves" of garlic are not 3 of the household's garlic bulbs.
+FORM_GROUP = {
+    "clove": "clove", "cloves": "clove", "fed": "clove",
+    "bulb": "head", "bulbs": "head", "head": "head", "heads": "head", "hoved": "head",
+    "hoveder": "head", "knold": "head",
+    "stalk": "stalk", "stalks": "stalk", "stilk": "stalk", "stilke": "stalk",
+    "stick": "stick", "sticks": "stick", "stang": "stick", "stænger": "stick",
+    "sprig": "sprig", "sprigs": "sprig", "kvist": "sprig", "kviste": "sprig",
+    "knob": "knob", "knobs": "knob", "bunch": "bunch", "bunches": "bunch", "bundt": "bunch",
+}  # fmt: skip
+
+
+def _forms(words: list[str]) -> set[str]:
+    out = set()
+    for w in words:
+        if w in FORM_GROUP:
+            out.add(FORM_GROUP[w])
+        else:
+            out |= {FORM_GROUP[e] for e in FORM_ENDINGS if w.endswith(e) and len(w) - len(e) >= 4}
+    return out
+
+
+def counts_compare(ingredient_name: str, unit: str | None, p: ProductCandidate) -> bool:
+    """False when the recipe counts a part the product is not counted in (cloves vs. bulbs):
+    the amount then cannot be checked, only that it is in the house."""
+    asked = _forms(tokens(ingredient_name) + ([unit.lower()] if unit else []))
+    if not asked:
+        return True
+    return asked <= _forms(product_tokens(p.name))
 
 
 def _round(d: Decimal) -> Decimal:

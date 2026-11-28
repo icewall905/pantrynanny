@@ -291,7 +291,7 @@ function RecipeCard({ s }: { s: RecipeSummary }) {
           )}
           {a.required > 0 && <span title={t('recipes.coverage', { have: a.have, of: a.required })}>{a.have}/{a.required}</span>}
           <Badge className="ml-auto" tone={ready && a.required > 0 ? 'good' : a.coverage >= 0.6 ? 'warn' : 'neutral'}>
-            {a.required === 0 ? t('recipes.nothingToCheck') : ready ? t('recipes.ready') : t('recipes.missingN', { count: a.missing })}
+            {a.required === 0 ? t('recipes.nothingToCheck') : ready ? (a.swaps ? t('recipes.readySwaps', { count: a.swaps }) : t('recipes.ready')) : t('recipes.missingN', { count: a.missing })}
           </Badge>
         </div>
       </div>

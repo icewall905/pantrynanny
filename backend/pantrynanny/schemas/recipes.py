@@ -11,7 +11,7 @@ Slot = Literal["breakfast", "lunch", "dinner", "snack"]
 Course = Literal[
     "breakfast", "lunch", "dinner", "side", "dessert", "baking", "drink", "snack", "condiment"
 ]
-IngredientStatus = Literal["have", "low", "missing", "staple", "optional"]
+IngredientStatus = Literal["have", "low", "missing", "swap", "staple", "optional"]
 
 
 def _http_or_none(v: str | None) -> str | None:
@@ -120,6 +120,8 @@ class IngredientAvailability(BaseModel):
     need: Qty | None  # in the product's stock unit, for the requested servings
     enough: bool | None  # None = cannot tell (units not comparable)
     expiring: bool
+    # status "swap": not in the house, but this in-stock product can stand in for it
+    substitute: MatchedProduct | None = None
 
 
 class Availability(BaseModel):
@@ -128,6 +130,7 @@ class Availability(BaseModel):
     have: int
     missing: int
     required: int
+    swaps: int = 0  # required lines not in the house that an in-stock product can stand in for
     coverage: float  # 0..1 over required, non-staple ingredients
     uses_expiring: list[str]
     items: list[IngredientAvailability]
@@ -156,7 +159,9 @@ class RecipeBrief(BaseModel):
     have: int
     required: int
     missing: int
+    swaps: int = 0
     missing_names: list[str]
+    swap_names: list[str] = Field(default_factory=list)
     low_names: list[str]
     staple_names: list[str]
     uses_expiring: list[str]
