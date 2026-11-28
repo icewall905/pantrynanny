@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-28 – AVIF photos
+
+- AVIF images are accepted (and stored as WebP). Recipe sites often send AVIF, even behind a `.jpeg` name, so
+  those imports came without a photo.
+
 ## 2026-11-27 – recipe photos are stored, not linked
 
 - Saving a recipe with a photo from another website (import, browser extension, typed link) stores a copy under

@@ -631,6 +631,16 @@ async def test_rotated_jpeg_is_still_oriented(env, lookup_on):
     assert out.size == (100, 300)
 
 
+def test_avif_photos_are_accepted():
+    """Recipe sites often send AVIF (we ask for it), even behind a .jpeg name."""
+    from pantrynanny.services.lookup.media import reencode_webp
+
+    buf = io.BytesIO()
+    Image.new("RGB", (64, 36), (200, 120, 10)).save(buf, "AVIF")
+    out = Image.open(io.BytesIO(reencode_webp(buf.getvalue())))
+    assert (out.format, out.size) == ("WEBP", (64, 36))
+
+
 async def test_token_bucket_wait_interrupted_by_stop():
     import asyncio
 

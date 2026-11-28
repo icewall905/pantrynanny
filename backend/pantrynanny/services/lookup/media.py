@@ -18,7 +18,7 @@ log = get_logger()
 MAX_DIMENSION = 1600
 MAX_PIXELS = 40_000_000  # Pillow's own bomb guard (errors above 2x this)
 MAX_INPUT_PIXELS = 24_000_000  # we refuse anything larger before decoding it
-ALLOWED_FORMATS = {"JPEG", "PNG", "WEBP", "MPO", "HEIF", "HEIC"}
+ALLOWED_FORMATS = {"JPEG", "PNG", "WEBP", "MPO", "HEIF", "HEIC", "AVIF"}
 FILE_RE = re.compile(r"^[0-9a-f]{32}\.webp$")
 # Only images served by the Open*Facts projects may be fetched by the server.
 IMAGE_URL_RE = re.compile(
