@@ -247,6 +247,9 @@
     <string name="st_have">at home</string>
     <string name="st_low">not enough</string>
     <string name="st_missing">missing</string>
+    <string name="st_swap">swap</string>
+    <string name="use_instead">Use %1$s instead (%2$s in stock)</string>
+    <string name="ready_swaps">Ready · %1$s swap(s)</string>
     <string name="st_optional">optional</string>
     <string name="st_staple">basic</string>
     <string name="stat_expiring">expiring</string>
@@ -277,4 +280,16 @@
     <string name="chip_no_expiry">None</string>
     <string name="place_expiry_label">Expires</string>
     <string name="place_failed">Couldn\'t save expiry/location</string>
+    <string name="manual_add_title">Add without barcode</string>
+    <string name="manual_name">What is it?</string>
+    <string name="manual_create">Create “%1$s”</string>
+    <string name="manual_change">Change</string>
+    <string name="manual_quantity">Quantity</string>
+    <string name="manual_expiry">Expires (YYYY-MM-DD, optional)</string>
+    <string name="manual_add">Add</string>
+    <string name="manual_added">%1$s added</string>
+    <string name="manual_needs_connection">Needs a connection to create a new product</string>
+    <string name="manual_bad_date">Write the date as YYYY-MM-DD</string>
+    <string name="shopping_reset">Reset shopping list</string>
+    <string name="shopping_reset_confirm">Remove all %1$s items from the shopping list?</string>
 </resources>

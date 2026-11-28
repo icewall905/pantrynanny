@@ -280,7 +280,8 @@ private fun RecipeCard(s: RecipeSummaryDto, onClick: () -> Unit) {
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(s.recipe.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                    if (a.missing == 0) Pill(stringResource(R.string.all_home), AddColor)
+                    if (a.missing == 0 && a.swaps > 0) Pill(stringResource(R.string.ready_swaps, a.swaps.toString()), AddColor)
+                    else if (a.missing == 0) Pill(stringResource(R.string.all_home), AddColor)
                     else Pill(stringResource(R.string.missing_n, a.missing.toString()), WarnColor)
                 }
                 val meta = listOfNotNull(
@@ -450,7 +451,8 @@ fun RecipeDetailScreen(
                         TextButton(onClick = { vm.setServings(a.servings + 1) }) { Text("+") }
                     }
                     Text(
-                        if (a.missing == 0) stringResource(R.string.all_home)
+                        if (a.missing == 0 && a.swaps > 0) stringResource(R.string.ready_swaps, a.swaps.toString())
+                        else if (a.missing == 0) stringResource(R.string.all_home)
                         else stringResource(R.string.coverage, a.have.toString(), a.required.toString()),
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -463,6 +465,13 @@ fun RecipeDetailScreen(
                                         stringResource(R.string.matched_product, p.name, QuantityMath.format(p.totalQuantity)),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                row.substitute?.let { p ->
+                                    Text(
+                                        stringResource(R.string.use_instead, p.name, QuantityMath.format(p.totalQuantity)),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = WarnColor,
                                     )
                                 }
                             }
@@ -515,6 +524,7 @@ fun StatusPill(status: String) {
         "have" -> Pill(stringResource(R.string.st_have), AddColor)
         "low" -> Pill(stringResource(R.string.st_low), WarnColor)
         "missing" -> Pill(stringResource(R.string.st_missing), RemoveColor)
+        "swap" -> Pill(stringResource(R.string.st_swap), WarnColor)
         "staple" -> Pill(stringResource(R.string.st_staple))
         else -> Pill(stringResource(R.string.st_optional))
     }

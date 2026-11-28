@@ -64,6 +64,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dk.pantrynanny.app.R
+import dk.pantrynanny.app.PantryApp
 import dk.pantrynanny.app.data.local.HistoryRow
 import dk.pantrynanny.app.domain.CardPhase
 import dk.pantrynanny.app.domain.ExpiryChip
@@ -218,13 +219,24 @@ fun ScannerScreen(vm: ScannerViewModel, snackbar: SnackbarHostState, onRegisterP
             }
         }
 
-        OutlinedButton(
-            onClick = vm::undo,
-            enabled = state.history.any { !it.entry.undone },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp),
-        ) { Text(stringResource(R.string.undo_last)) }
+        var manualOpen by remember { mutableStateOf(false) }
+        if (manualOpen) {
+            ManualAddDialog((context.applicationContext as PantryApp).container, onDismiss = { manualOpen = false }, onDone = { name ->
+                manualOpen = false
+                scope.launch { snackbar.showSnackbar(context.getString(R.string.manual_added, name)) }
+            })
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(
+                onClick = { manualOpen = true },
+                modifier = Modifier.weight(1f).height(48.dp),
+            ) { Text(stringResource(R.string.manual_add_title)) }
+            OutlinedButton(
+                onClick = vm::undo,
+                enabled = state.history.any { !it.entry.undone },
+                modifier = Modifier.weight(1f).height(48.dp),
+            ) { Text(stringResource(R.string.undo_last)) }
+        }
     }
 }
 

@@ -194,6 +194,17 @@ async def clear_checked(session: AsyncSession, household_id: uuid.UUID) -> int:
     return res.rowcount or 0
 
 
+async def clear_all(session: AsyncSession, household_id: uuid.UUID) -> int:
+    """Reset the list: every item, checked or not (soft delete, so other devices sync it)."""
+    now = datetime.now(UTC)
+    res = await session.execute(
+        update(ShoppingItem)
+        .where(ShoppingItem.household_id == household_id, ShoppingItem.deleted_at.is_(None))
+        .values(deleted_at=now, updated_at=now)
+    )
+    return res.rowcount or 0
+
+
 async def suggestions(session: AsyncSession, household_id: uuid.UUID) -> list[StockView]:
     open_ids = set(
         (

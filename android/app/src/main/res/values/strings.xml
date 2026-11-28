@@ -247,6 +247,9 @@
     <string name="st_have">hjemme</string>
     <string name="st_low">for lidt</string>
     <string name="st_missing">mangler</string>
+    <string name="st_swap">erstat</string>
+    <string name="use_instead">Brug %1$s i stedet (%2$s på lager)</string>
+    <string name="ready_swaps">Klar · %1$s erstatning(er)</string>
     <string name="st_optional">valgfri</string>
     <string name="st_staple">basis</string>
     <string name="stat_expiring">udløber</string>
@@ -277,4 +280,16 @@
     <string name="chip_no_expiry">Ingen</string>
     <string name="place_expiry_label">Holdbar</string>
     <string name="place_failed">Kunne ikke gemme holdbarhed/sted</string>
+    <string name="manual_add_title">Tilføj uden stregkode</string>
+    <string name="manual_name">Hvad er det?</string>
+    <string name="manual_create">Opret „%1$s“</string>
+    <string name="manual_change">Skift</string>
+    <string name="manual_quantity">Antal</string>
+    <string name="manual_expiry">Udløber (ÅÅÅÅ-MM-DD, valgfri)</string>
+    <string name="manual_add">Tilføj</string>
+    <string name="manual_added">%1$s tilføjet</string>
+    <string name="manual_needs_connection">Kræver forbindelse for at oprette en ny vare</string>
+    <string name="manual_bad_date">Skriv datoen som ÅÅÅÅ-MM-DD</string>
+    <string name="shopping_reset">Nulstil indkøbslisten</string>
+    <string name="shopping_reset_confirm">Fjern alle %1$s varer fra indkøbslisten?</string>
 </resources>

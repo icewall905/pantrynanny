@@ -21,6 +21,7 @@ beforeEach(() => {
     ],
     'GET /shopping/suggestions': [],
     'POST /shopping/clear-checked': { removed: 1 },
+    'POST /shopping/clear': { removed: 3 },
   })
 })
 
@@ -55,6 +56,18 @@ describe('ShoppingPage', () => {
     await user.click(screen.getByTestId('put-away-confirm'))
     await waitFor(() => expect(enqueueOp).toHaveBeenCalledWith({ type: 'add', product_id: 'p-smor', quantity: 2 }))
     await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === '/shopping/clear-checked')).toBe(true))
+  })
+
+  it('resets the whole list only after confirming', async () => {
+    const user = userEvent.setup()
+    const ask = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    renderApp(<ShoppingPage />)
+    await user.click(await screen.findByTestId('shopping-reset'))
+    expect(calls.some((c) => c.path === '/shopping/clear')).toBe(false)
+    await user.click(screen.getByTestId('shopping-reset'))
+    await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === '/shopping/clear')).toBe(true))
+    expect(ask).toHaveBeenCalledTimes(2)
+    ask.mockRestore()
   })
 
   it('can group by shop', async () => {

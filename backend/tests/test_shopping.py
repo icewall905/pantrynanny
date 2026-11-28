@@ -161,3 +161,15 @@ async def test_concurrent_adds_of_same_product_merge(env):
     assert all(r.status_code in (200, 201) for r in rs), [r.text for r in rs]
     items = (await env.client.get("/api/shopping", headers=env.member)).json()
     assert len(items) == 1 and items[0]["quantity"] == 8
+
+
+async def test_reset_removes_every_item(env):
+    c, h = env.client, env.member
+    a = (await c.post("/api/shopping", json={"name": "A"}, headers=h)).json()
+    await c.post("/api/shopping", json={"name": "B"}, headers=h)
+    await c.patch(
+        f"/api/shopping/{a['id']}", json={"checked": True}, headers={**h, "If-Match": "1"}
+    )
+    assert (await c.post("/api/shopping/clear", headers=h)).json() == {"removed": 2}
+    assert (await c.get("/api/shopping", headers=h)).json() == []
+    assert (await c.post("/api/shopping/clear", headers=h)).json() == {"removed": 0}

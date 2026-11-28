@@ -121,6 +121,9 @@ class ShoppingViewModel(c: AppContainer) : RemoteVm<ShoppingData>(c) {
 
     fun clearChecked() = act(null) { c.api.call("POST", "api/shopping/clear-checked") }
 
+    /** Reset: every item off the list, checked or not. */
+    fun clearAll() = act(null) { c.api.call("POST", "api/shopping/clear") }
+
     /** "Put the shopping away": ticked items linked to a product go into stock (offline queue), then off the list. */
     fun putAway(items: List<ShoppingItemDto>) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -143,6 +146,7 @@ fun ShoppingScreen(container: AppContainer, snackbar: SnackbarHostState, onBack:
     LaunchedEffect(Unit) { vm.refresh() }
     var text by remember { mutableStateOf("") }
     var confirmPutAway by remember { mutableStateOf(false) }
+    var confirmReset by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize()) {
         ScreenHeader(stringResource(R.string.nav_shopping), onBack = onBack) {
@@ -211,6 +215,27 @@ fun ShoppingScreen(container: AppContainer, snackbar: SnackbarHostState, onBack:
                     }
                     items(done, key = { it.id }) { i -> ShoppingRow(i, vm) }
                 }
+                if (data.items.isNotEmpty()) {
+                    item {
+                        TextButton(onClick = { confirmReset = true }, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                            Text(stringResource(R.string.shopping_reset), color = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                }
+            }
+            if (confirmReset) {
+                AlertDialog(
+                    onDismissRequest = { confirmReset = false },
+                    title = { Text(stringResource(R.string.shopping_reset)) },
+                    text = { Text(stringResource(R.string.shopping_reset_confirm, data.items.size.toString())) },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            confirmReset = false
+                            vm.clearAll()
+                        }) { Text(stringResource(R.string.shopping_reset)) }
+                    },
+                    dismissButton = { TextButton(onClick = { confirmReset = false }) { Text(stringResource(R.string.cancel)) } },
+                )
             }
             if (confirmPutAway) {
                 AlertDialog(

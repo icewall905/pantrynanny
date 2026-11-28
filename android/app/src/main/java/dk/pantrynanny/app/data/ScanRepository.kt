@@ -94,9 +94,10 @@ class ScanRepository(private val db: AppDatabase) {
         quantity: Double,
         locationId: String? = null,
         toLocationId: String? = null,
+        expiresAt: String? = null,
     ): ScanOutcome? = db.withTransaction {
         val product = db.productDao().getWithQty(productId) ?: return@withTransaction null
-        enqueue(type, null, null, product, quantity, locationId, toLocationId = toLocationId)
+        enqueue(type, null, null, product, quantity, locationId, toLocationId = toLocationId, expiresAt = expiresAt)
     }
 
     private suspend fun enqueue(
@@ -108,6 +109,7 @@ class ScanRepository(private val db: AppDatabase) {
         locationId: String?,
         onCacheMiss: ((String) -> Unit)? = null,
         toLocationId: String? = null,
+        expiresAt: String? = null,
     ): ScanOutcome {
         val delta = when {
             product == null -> 0.0
@@ -127,7 +129,7 @@ class ScanRepository(private val db: AppDatabase) {
                 quantity = quantity,
                 locationId = locationId,
                 toLocationId = toLocationId,
-                expiresAt = null,
+                expiresAt = expiresAt,
                 undoesClientOpId = null,
                 occurredAt = now.toString(),
                 localDelta = delta,

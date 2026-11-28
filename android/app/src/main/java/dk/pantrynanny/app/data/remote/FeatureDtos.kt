@@ -131,6 +131,8 @@ data class IngredientAvailabilityDto(
     val need: Double? = null,
     val enough: Boolean? = null,
     val expiring: Boolean = false,
+    /** status "swap": not in the house, but this in-stock product can stand in. */
+    val substitute: MatchedProductDto? = null,
 )
 
 @Serializable
@@ -139,6 +141,7 @@ data class AvailabilityDto(
     val have: Int = 0,
     val missing: Int = 0,
     val required: Int = 0,
+    val swaps: Int = 0,
     val coverage: Double = 0.0,
     @SerialName("uses_expiring") val usesExpiring: List<String> = emptyList(),
     val items: List<IngredientAvailabilityDto> = emptyList(),

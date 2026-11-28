@@ -37,6 +37,16 @@ async def clear_checked(
     return {"removed": removed}
 
 
+@router.post("/shopping/clear")
+async def clear_all(
+    principal: Principal = Depends(get_principal), session: AsyncSession = Depends(get_session)
+):
+    """Reset the shopping list: remove every item, checked or not."""
+    removed = await svc.clear_all(session, principal.household_id)
+    await session.commit()
+    return {"removed": removed}
+
+
 @router.post("/shopping", response_model=ShoppingItemOut, status_code=201)
 async def add_shopping(
     body: ShoppingCreate,

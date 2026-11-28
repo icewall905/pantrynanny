@@ -121,6 +121,7 @@ export default function ShoppingPage() {
   })
   const remove = useMutation({ mutationFn: (i: ShoppingItem) => del(`/shopping/${i.id}`), onSuccess: refresh })
   const clear = useMutation({ mutationFn: () => post('/shopping/clear-checked'), onSuccess: refresh })
+  const reset = useMutation({ mutationFn: () => post('/shopping/clear'), onSuccess: refresh })
 
   const items = list.data ?? []
   const [groupBy, setGroupByState] = useState<'category' | 'store'>(() => {
@@ -302,6 +303,17 @@ export default function ShoppingPage() {
                 <Trash2 className="size-4" /> {t('shopping.clearChecked', { count: checkedCount })}
               </Button>
             </div>
+          )}
+          {items.length > 0 && (
+            <Button
+              variant="ghost"
+              className="w-full text-tomato-600"
+              loading={reset.isPending}
+              onClick={() => window.confirm(t('shopping.resetConfirm', { count: items.length })) && reset.mutate()}
+              data-testid="shopping-reset"
+            >
+              <Trash2 className="size-4" /> {t('shopping.reset')}
+            </Button>
           )}
         </div>
       )}

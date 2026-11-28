@@ -288,6 +288,8 @@
     "more": "More {{name}}",
     "noCategory": "Other",
     "suggestions": "Suggestions – running low",
+    "reset": "Reset shopping list",
+    "resetConfirm": "Remove all {{count}} items from the shopping list?",
     "clearChecked": "Remove checked ({{count}})",
     "copy": "Copy list",
     "copied": "List copied",

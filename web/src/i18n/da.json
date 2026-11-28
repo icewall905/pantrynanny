@@ -288,6 +288,8 @@
     "more": "Flere {{name}}",
     "noCategory": "Andet",
     "suggestions": "Forslag – løber snart tør",
+    "reset": "Nulstil indkøbslisten",
+    "resetConfirm": "Fjern alle {{count}} varer fra indkøbslisten?",
     "clearChecked": "Fjern afkrydsede ({{count}})",
     "copy": "Kopiér liste",
     "copied": "Listen er kopieret",
