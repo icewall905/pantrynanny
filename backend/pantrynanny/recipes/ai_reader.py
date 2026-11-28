@@ -8,6 +8,7 @@ is thrown away entirely. Nothing the model makes up can reach a recipe that way.
 """
 
 import html
+import json
 import re
 
 from ..ai.service import parse_json_object
@@ -16,7 +17,21 @@ DROP_RE = re.compile(r"<(script|style|noscript|svg)\b[^>]*>.*?</\1>", re.I | re.
 TAG_RE = re.compile(r"<[^>]+>")
 SPACE_RE = re.compile(r"[ \t\r\f\v]+")
 TOKEN_RE = re.compile(r"[^\W_]+", re.UNICODE)
-MAX_PAGE_CHARS = 14_000
+# a page whose readable text is this thin is a video or a script-driven page: the recipe is in its
+# own description instead (a YouTube description, a meta description)
+SHORT_TEXT = 400
+SHORT_DESC_RE = re.compile(r'"shortDescription":"(.*?)","', re.S)
+META_DESC_RE = re.compile(
+    r"<meta[^>]+(?:name|property)\s*=\s*[\"'](?:description|og:description)[\"'][^>]*"
+    r"content\s*=\s*[\"']([^\"']+)",
+    re.I,
+)
+MAX_PAGE_CHARS = 200_000  # an upper bound on what is kept from a page at all
+# What the model is given. A page longer than this is cut from its ingredient heading, so a very
+# long article does not push the recipe out. Only real headings are used: a phrase like "du skal
+# bruge" also turns up in the method and would cut the first steps off.
+MAX_TEXT = 14_000
+RECIPE_MARKERS = ("ingredients", "ingredienser", "ingrediens", "method", "instructions")
 MAX_LINES = 100
 # an answer is believed only if at least this much of it is really on the page
 KEEP_RATIO = 0.5
@@ -35,6 +50,40 @@ def page_text(page: str) -> str:
     text = html.unescape(text).replace("\xa0", " ")
     text = SPACE_RE.sub(" ", text)
     return re.sub(r"\n{2,}", "\n", text).strip()[:MAX_PAGE_CHARS]
+
+
+def page_description(page: str) -> str:
+    """A page's own summary: the video description, or the site's meta description."""
+    m = SHORT_DESC_RE.search(page)
+    if m:
+        try:
+            return str(json.loads('"' + m.group(1) + '"')).strip()
+        except ValueError:
+            pass
+    m = META_DESC_RE.search(page)
+    return html.unescape(m.group(1)).strip() if m else ""
+
+
+def recipe_window(text: str) -> str:
+    """A long page cut from its first ingredient/method heading (the rest cannot be the recipe)."""
+    if len(text) <= MAX_TEXT:
+        return text
+    low = text.lower()
+    starts = [i for m in RECIPE_MARKERS if (i := low.find(m)) >= 0]
+    if not starts:
+        return text[:MAX_TEXT]
+    start = max(0, min(starts) - 200)
+    return text[start : start + MAX_TEXT].strip()
+
+
+def text_to_read(page: str) -> str:
+    """What the model reads: the page's words, plus its description when there is little text."""
+    text = recipe_window(page_text(page))
+    if len(text) < SHORT_TEXT:
+        extra = page_description(page)[:MAX_TEXT]
+        if extra:
+            text = f"{text}\n\n{extra}".strip()
+    return text
 
 
 def tokens(text: str) -> list[str]:
@@ -84,7 +133,7 @@ def believe(
 
 async def read(ai, page: str) -> dict[str, list[str]] | None:
     """Ask the model for the recipe on this page; None when its answer is not from the page."""
-    text = page_text(page)
+    text = text_to_read(page)
     if len(text) < 200:  # a page with nothing to read is not worth a request
         return None
     message = await ai.chat(
@@ -93,7 +142,7 @@ async def read(ai, page: str) -> dict[str, list[str]] | None:
             {"role": "user", "content": text},
         ],
         json_mode=True,
-        max_tokens=2048,
+        max_tokens=4096,  # a long list plus the model's own reasoning does not fit in less
         temperature=0.0,
     )
     try:

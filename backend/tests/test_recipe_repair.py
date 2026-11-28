@@ -362,3 +362,64 @@ async def test_the_reader_is_not_asked_when_the_page_has_a_recipe(env, app):
         reader=reader,
     )
     assert asked == []
+
+
+def test_a_video_page_is_read_through_its_own_description():
+    page = (
+        "<html><head><title>Apple Pie Cupcakes - YouTube</title></head><body>"
+        "<p>Apple Pie Cupcakes - YouTube Om Presse Ophavsret</p>"
+        '<script>var x = {"shortDescription":"Ingredients\\n2 large apples, peeled and diced\\n'
+        'Instructions\\nHeat oven to 350 degrees F.","isCrawlable":true}</script></body></html>'
+    )
+    text = ai_reader.text_to_read(page)
+    assert "2 large apples, peeled and diced" in text
+    assert "Heat oven to 350 degrees F." in text
+    # a line that is only in the description still counts as being on the page
+    assert ai_reader.on_page("2 large apples, peeled and diced", ai_reader.tokens(text))
+
+
+def test_a_page_with_words_of_its_own_keeps_them_and_ignores_the_description():
+    page = (
+        '<html><head><meta name="description" content="A meta line about the site">'
+        "</head><body><p>" + ("Real page text. " * 40) + "</p></body></html>"
+    )
+    text = ai_reader.text_to_read(page)
+    assert "Real page text." in text
+    assert "A meta line about the site" not in text
+
+
+def test_a_short_page_falls_back_to_the_meta_description():
+    page = '<html><head><meta property="og:description" content="2 eggs &amp; 100 g flour">'
+    assert ai_reader.page_description(page) == "2 eggs & 100 g flour"
+
+
+def test_a_long_page_is_cut_to_the_recipe_window():
+    page = (
+        "<p>"
+        + ("nyhedsbrev og reklamer. " * 900)
+        + "</p><h2>Ingredienser</h2><p>"
+        + ("mel " * 200)
+        + "</p>"
+    )
+    text = ai_reader.text_to_read(page)
+    assert len(text) <= ai_reader.MAX_TEXT + 1
+    assert "Ingredienser" in text and "mel" in text
+    assert text.index("Ingredienser") < 300  # the window starts at the recipe, not the chatter
+
+
+def test_a_page_that_only_looks_like_a_heading_is_not_cut():
+    # "du skal bruge" is prose here, not a heading: the method before it has to be kept
+    page = (
+        "<p>"
+        + ("trin et. " * 2000)
+        + " Du skal bruge lidt muller til at rulle det ud. "
+        + ("trin to. " * 2000)
+        + "</p>"
+    )
+    text = ai_reader.text_to_read(page)
+    assert text.startswith("trin et.")
+
+
+def test_a_short_page_is_not_cut():
+    page = "<h2>Ingredients</h2><p>2 eggs</p>"
+    assert ai_reader.text_to_read(page).endswith("2 eggs")

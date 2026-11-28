@@ -12,8 +12,11 @@
   household's own model ([recipes/ai_reader.py](backend/pantrynanny/recipes/ai_reader.py)) copies the
   ingredients and the method off the page text. Every returned line is checked against the page's own
   words and dropped when it is not there; an answer mostly not from the page is discarded entirely.
-- Run by hand on the live collection: 42 of 43 broken recipes were repaired (structured data, archived
-  copies for dead links, the model for the rest); everything else is listed per recipe in the report.
+  A page whose readable text is thin (a video, a script-driven page) is read through its own
+  description, and a very long article is cut from its ingredient heading so the recipe stays in view.
+- Run by hand on the live collection (2,153 recipes): 40 of the 44 had both lists missing and now have
+  ingredients and method; the last 4 have ingredients but no method, because no page or archive found
+  holds one as text. Nothing else about those recipes changed (photo, times, tags, course, servings).
 
 ## 2026-11-28 – AVIF photos
 
