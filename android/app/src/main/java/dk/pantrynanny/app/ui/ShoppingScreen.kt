@@ -246,7 +246,7 @@ fun ShoppingScreen(container: AppContainer, snackbar: SnackbarHostState, onBack:
                             Text(stringResource(R.string.put_away_hint))
                             done.forEach { i ->
                                 Text(
-                                    "• ${QuantityMath.format(i.quantity)} × ${i.name}" +
+                                    "• ${QuantityMath.format(i.quantity)} ${unitLabel(i.unit)} × ${i.name}" +
                                         if (i.productId == null) " (" + stringResource(R.string.not_linked) + ")" else "",
                                 )
                             }
@@ -278,7 +278,7 @@ private fun ShoppingRow(i: ShoppingItemDto, vm: ShoppingViewModel) {
             i.note?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
         }
         TextButton(onClick = { if (i.quantity > 1) vm.setQuantity(i, i.quantity - 1) }) { Text("−") }
-        Text(QuantityMath.format(i.quantity), fontWeight = FontWeight.Bold)
+        Text("${QuantityMath.format(i.quantity)} ${unitLabel(i.unit)}", fontWeight = FontWeight.Bold)
         TextButton(onClick = { vm.setQuantity(i, i.quantity + 1) }) { Text("+") }
         IconButton(onClick = { vm.delete(i) }) {
             Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.delete))
